@@ -1,0 +1,583 @@
+{
+  "version": "1.0.0",
+  "lastUpdated": "2026-01-09",
+  "disclaimer": "This registry is for informational purposes only. Always consult official government sources and legal professionals for compliance requirements.",
+  "regions": {
+    "US": {
+      "code": "US",
+      "name": "United States",
+      "authority": "OSHA (Occupational Safety and Health Administration)",
+      "authorityWebsite": "https://www.osha.gov",
+      "enforcementAgency": "U.S. Department of Labor",
+      "penaltyRange": "Serious: $10,816-$15,625; Willful: $21,632-$156,259 (2024)",
+      "standards": [
+        {
+          "id": "1910.132",
+          "title": "Personal Protective Equipment (PPE) - General Requirements",
+          "type": "Standard",
+          "hazardCategories": ["Physical health hazards", "PPE", "Workplace / Infrastructure Design"],
+          "applicableIndustries": ["All"],
+          "summary": "Employers must assess workplace hazards, select appropriate PPE, and ensure employees are trained on proper use and maintenance.",
+          "requirements": [
+            "Conduct workplace hazard assessment",
+            "Select and provide appropriate PPE at no cost to employees",
+            "Ensure proper fit and usage",
+            "Provide training on PPE use, care, and disposal",
+            "Maintain and replace PPE as needed",
+            "Document hazard assessment"
+          ],
+          "violations": "Failure to provide PPE can result in fines up to $15,625 per violation",
+          "keyPoints": "PPE is the last line of defense; engineering controls must be considered first",
+          "links": {
+            "official": "https://www.osha.gov/laws-regs/regulations/standardnumber/1910/1910.132",
+            "guidance": "https://www.osha.gov/dte/grant_materials/osh_acute/standards/1910_132.html"
+          },
+          "version": "1994",
+          "revisionDate": "2015"
+        },
+        {
+          "id": "1910.147",
+          "title": "Lockout/Tagout (LOTO) - Control of Hazardous Energy",
+          "type": "Standard",
+          "hazardCategories": ["Mechanical / Machinery hazards", "Electrical hazards"],
+          "applicableIndustries": ["Manufacturing", "Utilities", "Construction"],
+          "summary": "Establishes requirements to control hazardous energy during maintenance, servicing, and repair of machines and equipment.",
+          "requirements": [
+            "Establish an energy control program",
+            "Identify and label all energy sources",
+            "Provide lockout/tagout devices",
+            "Train employees on the LOTO procedure",
+            "Perform scheduled inspections and audits",
+            "Establish clearance and re-entry procedures"
+          ],
+          "violations": "One of OSHA's most frequently cited standards with fines averaging $13,000",
+          "keyPoints": "All hazardous energy must be locked out and tagged out before service work",
+          "links": {
+            "official": "https://www.osha.gov/laws-regs/regulations/standardnumber/1910/1910.147",
+            "guidance": "https://www.osha.gov/Lockout-Tagout-LOTO"
+          },
+          "version": "1989",
+          "revisionDate": "2013"
+        },
+        {
+          "id": "1910.212",
+          "title": "General Requirements for All Machines",
+          "type": "Standard",
+          "hazardCategories": ["Mechanical / Machinery hazards"],
+          "applicableIndustries": ["Manufacturing", "All"],
+          "summary": "Requires all machines to be guarded to protect employees from hazardous parts.",
+          "requirements": [
+            "Remove or guard all hazardous moving parts",
+            "Ensure guards prevent contact with hazards",
+            "Install emergency stop buttons",
+            "Maintain guarding equipment",
+            "Provide training on safe machine operation"
+          ],
+          "violations": "Common citation for inadequate machine guarding",
+          "keyPoints": "Guards must be effective against the specific hazard and not create new hazards",
+          "links": {
+            "official": "https://www.osha.gov/laws-regs/regulations/standardnumber/1910/1910.212",
+            "guidance": "https://www.osha.gov/dte/grant_materials/osh_acute/standards/1910_212.html"
+          },
+          "version": "1967",
+          "revisionDate": "2015"
+        },
+        {
+          "id": "1910.1200",
+          "title": "Hazard Communication (HazCom) Standard",
+          "type": "Standard",
+          "hazardCategories": ["Physical health hazards", "Chemical hazards"],
+          "applicableIndustries": ["All"],
+          "summary": "Requires employers to provide information about hazardous chemicals through labels, Safety Data Sheets (SDS), and training.",
+          "requirements": [
+            "Classify all chemicals for hazards",
+            "Label all containers with hazard information",
+            "Provide Safety Data Sheets (SDS) for all chemicals",
+            "Train employees on hazard communication",
+            "Create chemical inventory",
+            "Update information when products change"
+          ],
+          "violations": "Frequently cited; fines for inadequate labeling or missing SDS",
+          "keyPoints": "Uses Globally Harmonized System (GHS) classification and labeling",
+          "links": {
+            "official": "https://www.osha.gov/laws-regs/regulations/standardnumber/1910/1910.1200",
+            "guidance": "https://www.osha.gov/hazcom/"
+          },
+          "version": "2012",
+          "revisionDate": "2019"
+        },
+        {
+          "id": "1926.502",
+          "title": "Fall Protection - Construction",
+          "type": "Standard",
+          "hazardCategories": ["Workplace / Infrastructure Design", "Physical health hazards"],
+          "applicableIndustries": ["Construction", "Roofing", "Steel erection"],
+          "summary": "Requires fall protection systems for all employees working at heights of 6 feet or more above a lower level.",
+          "requirements": [
+            "Use fall arrest systems, safety nets, or warning lines",
+            "Inspect all equipment before use",
+            "Ensure proper fit and connection of harnesses",
+            "Provide rescue procedures",
+            "Train employees on fall hazards",
+            "Maintain equipment in safe condition"
+          ],
+          "violations": "Leading cause of worker deaths; severe penalties",
+          "keyPoints": "6-foot rule applies; all systems must meet ANSI standards",
+          "links": {
+            "official": "https://www.osha.gov/laws-regs/regulations/standardnumber/1926/1926.502",
+            "guidance": "https://www.osha.gov/construction/fall-protection"
+          },
+          "version": "1995",
+          "revisionDate": "2018"
+        }
+      ]
+    },
+    "UK": {
+      "code": "UK",
+      "name": "United Kingdom",
+      "authority": "HSE (Health and Safety Executive)",
+      "authorityWebsite": "https://www.hse.gov.uk",
+      "enforcementAgency": "Health and Safety Executive",
+      "penaltyRange": "Unlimited fines; Improvement Notices; Prohibition Notices; Prosecution",
+      "standards": [
+        {
+          "id": "HSWA74",
+          "title": "Health and Safety at Work etc. Act 1974",
+          "type": "Primary Legislation",
+          "hazardCategories": ["All"],
+          "applicableIndustries": ["All"],
+          "summary": "The primary health and safety law in Great Britain. Employers must ensure the health, safety, and welfare of employees and others affected by their work.",
+          "requirements": [
+            "Assess all workplace risks (Section 3)",
+            "Provide safe systems of work",
+            "Maintain equipment in safe condition",
+            "Provide information, instruction, training, and supervision",
+            "Consult with employees on safety matters",
+            "Provide first aid facilities",
+            "Establish emergency procedures"
+          ],
+          "violations": "Criminal liability; Crown Court can impose unlimited fines and imprisonment",
+          "keyPoints": "Covers employers, employees, self-employed, and manufacturers",
+          "links": {
+            "official": "https://www.legislation.gov.uk/ukpga/1974/37",
+            "guidance": "https://www.hse.gov.uk/simple-health-safety/law/"
+          },
+          "version": "1974",
+          "revisionDate": "2015"
+        },
+        {
+          "id": "MHSWR99",
+          "title": "Management of Health and Safety at Work Regulations 1999",
+          "type": "Regulations",
+          "hazardCategories": ["All"],
+          "applicableIndustries": ["All"],
+          "summary": "Specifies minimum requirements for managing health and safety. Requires risk assessments, safety policies, and emergency procedures.",
+          "requirements": [
+            "Conduct risk assessment for all hazards",
+            "Record significant findings of assessment",
+            "Implement control measures based on risk",
+            "Establish emergency procedures",
+            "Provide health surveillance where needed",
+            "Cooperate with other employers",
+            "Provide adequate supervision and training"
+          ],
+          "violations": "Improvement Notices; Prohibition Notices; Prosecution with fines",
+          "keyPoints": "Foundation for all UK health and safety management",
+          "links": {
+            "official": "https://www.legislation.gov.uk/uksi/1999/3242",
+            "guidance": "https://www.hse.gov.uk/simple-health-safety/risk/"
+          },
+          "version": "1999",
+          "revisionDate": "2006"
+        },
+        {
+          "id": "PUWER98",
+          "title": "Provision and Use of Work Equipment Regulations 1998",
+          "type": "Regulations",
+          "hazardCategories": ["Mechanical / Machinery hazards", "Workplace / Infrastructure Design"],
+          "applicableIndustries": ["Manufacturing", "Construction", "All"],
+          "summary": "Requires employers to ensure work equipment is safe, properly maintained, and adequately guarded.",
+          "requirements": [
+            "Select appropriate work equipment",
+            "Ensure suitable maintenance schedule",
+            "Provide guards and protective devices",
+            "Ensure machinery is properly installed",
+            "Provide training on safe use",
+            "Maintain equipment log",
+            "Ensure tools are suitable for the task"
+          ],
+          "violations": "Enforcement by HSE; can result in prohibition of equipment use",
+          "keyPoints": "Covers all tools and equipment from hand tools to heavy machinery",
+          "links": {
+            "official": "https://www.legislation.gov.uk/uksi/1998/2306",
+            "guidance": "https://www.hse.gov.uk/work-equipment-machinery/"
+          },
+          "version": "1998",
+          "revisionDate": "2006"
+        },
+        {
+          "id": "PPE2016",
+          "title": "Personal Protective Equipment at Work Regulations 2016",
+          "type": "Regulations",
+          "hazardCategories": ["PPE", "Physical health hazards"],
+          "applicableIndustries": ["All"],
+          "summary": "Requires employers to provide appropriate PPE, ensure proper fit, and train employees on use.",
+          "requirements": [
+            "Conduct assessment to determine PPE needs",
+            "Provide PPE free of charge",
+            "Ensure PPE fits properly",
+            "Provide training on correct use",
+            "Maintain and replace PPE as needed",
+            "Ensure safe storage of PPE",
+            "Document assessment and training"
+          ],
+          "violations": "Improvement Notices and fines for inadequate PPE provision",
+          "keyPoints": "PPE should be last line of defense after engineering controls",
+          "links": {
+            "official": "https://www.legislation.gov.uk/uksi/2016/425",
+            "guidance": "https://www.hse.gov.uk/ppe/"
+          },
+          "version": "2016",
+          "revisionDate": "2016"
+        },
+        {
+          "id": "COSHH2002",
+          "title": "Control of Substances Hazardous to Health (COSHH) Regulations 2002",
+          "type": "Regulations",
+          "hazardCategories": ["Physical health hazards", "Chemical hazards"],
+          "applicableIndustries": ["All"],
+          "summary": "Requires employers to assess and control exposure to hazardous substances.",
+          "requirements": [
+            "Identify all hazardous substances used",
+            "Assess risk from each substance",
+            "Implement control measures",
+            "Monitor exposure where required",
+            "Provide health surveillance",
+            "Provide training on safe handling",
+            "Maintain Safety Data Sheets"
+          ],
+          "violations": "Improvement Notices; fines for inadequate control measures",
+          "keyPoints": "Uses CHIPS labeling system for chemical hazard information",
+          "links": {
+            "official": "https://www.legislation.gov.uk/uksi/2002/2677",
+            "guidance": "https://www.hse.gov.uk/coshh/"
+          },
+          "version": "2002",
+          "revisionDate": "2004"
+        }
+      ]
+    },
+    "UAE": {
+      "code": "UAE",
+      "name": "United Arab Emirates",
+      "regions": [
+        {
+          "code": "ABUDHABI",
+          "name": "Abu Dhabi",
+          "authority": "ADOSH (Abu Dhabi Occupational Safety and Health Center)",
+          "authorityWebsite": "https://www.adosh.gov.ae",
+          "enforcementAgency": "Department of Health - Abu Dhabi",
+          "penaltyRange": "AED 10,000 - AED 1,000,000 (varies by violation)"
+        },
+        {
+          "code": "DUBAI",
+          "name": "Dubai",
+          "authority": "Dubai Municipality & Ministry of Human Resources and Emiratisation",
+          "authorityWebsite": "https://www.dm.gov.ae",
+          "enforcementAgency": "Dubai Municipality",
+          "penaltyRange": "AED 5,000 - AED 500,000 (varies by violation)"
+        }
+      ],
+      "standards": [
+        {
+          "id": "ADOSH-001",
+          "title": "General Occupational Safety and Health Requirements",
+          "type": "Regulation",
+          "hazardCategories": ["All"],
+          "applicableIndustries": ["All"],
+          "applicableAreas": ["ABUDHABI", "DUBAI"],
+          "summary": "General requirement that employers provide a safe and healthy work environment for all employees.",
+          "requirements": [
+            "Conduct hazard assessment for all work areas",
+            "Establish occupational health program",
+            "Maintain safe working conditions",
+            "Provide personal protective equipment",
+            "Conduct regular safety inspections",
+            "Maintain first aid facilities",
+            "Report workplace injuries and accidents",
+            "Provide induction training for all workers"
+          ],
+          "violations": "Administrative fines; closure of operations in severe cases",
+          "keyPoints": "Applies to all private and public sector employers",
+          "links": {
+            "official": "https://www.adosh.gov.ae/",
+            "guidance": "Contact ADOSH for specific guidance"
+          },
+          "version": "2017",
+          "revisionDate": "2021"
+        },
+        {
+          "id": "ADOSH-002",
+          "title": "Personal Protective Equipment (PPE) Requirements",
+          "type": "Regulation",
+          "hazardCategories": ["PPE", "Physical health hazards"],
+          "applicableIndustries": ["All"],
+          "applicableAreas": ["ABUDHABI", "DUBAI"],
+          "summary": "Requires employers to assess and provide appropriate PPE for all workplace hazards.",
+          "requirements": [
+            "Assess PPE requirements for each hazard",
+            "Provide PPE at employer's expense",
+            "Ensure proper fit and functionality",
+            "Conduct PPE training",
+            "Maintain and inspect PPE regularly",
+            "Replace damaged or worn PPE",
+            "Use only approved certified PPE",
+            "Ensure proper storage and hygiene"
+          ],
+          "violations": "Fines for inadequate PPE provision; worker injuries attributed to lack of PPE",
+          "keyPoints": "All PPE must meet international standards (ISO, EN, ANSI)",
+          "links": {
+            "official": "https://www.adosh.gov.ae/",
+            "guidance": "Contact ADOSH for certification requirements"
+          },
+          "version": "2017",
+          "revisionDate": "2021"
+        },
+        {
+          "id": "ADOSH-003",
+          "title": "Machinery and Equipment Safety",
+          "type": "Regulation",
+          "hazardCategories": ["Mechanical / Machinery hazards"],
+          "applicableIndustries": ["Manufacturing", "Construction", "All"],
+          "applicableAreas": ["ABUDHABI", "DUBAI"],
+          "summary": "Requires proper maintenance, guarding, and safe operation of all machinery and equipment.",
+          "requirements": [
+            "Ensure machinery has proper guards and interlocks",
+            "Maintain preventive maintenance schedule",
+            "Conduct pre-start inspections",
+            "Train operators on safe use",
+            "Implement lockout/tagout procedures",
+            "Keep maintenance records",
+            "Use only qualified contractors for repairs",
+            "Post safety warnings and operational procedures"
+          ],
+          "violations": "Equipment seizure; fines for unsafe operations",
+          "keyPoints": "All machinery must comply with Gulf Cooperation Council (GCC) standards",
+          "links": {
+            "official": "https://www.adosh.gov.ae/",
+            "guidance": "GCC machinery standards apply"
+          },
+          "version": "2017",
+          "revisionDate": "2021"
+        },
+        {
+          "id": "ADOSH-004",
+          "title": "Work at Height Safety Standards",
+          "type": "Regulation",
+          "hazardCategories": ["Workplace / Infrastructure Design", "Physical health hazards"],
+          "applicableIndustries": ["Construction", "Maintenance", "Utilities"],
+          "applicableAreas": ["ABUDHABI", "DUBAI"],
+          "summary": "Establishes requirements for safe work at heights (2 meters or above).",
+          "requirements": [
+            "Assess fall hazards",
+            "Provide fall protection equipment",
+            "Use harnesses, nets, or scaffolding",
+            "Ensure proper installation of equipment",
+            "Conduct rescue procedures",
+            "Train all workers on fall protection",
+            "Inspect equipment regularly",
+            "Maintain rescue equipment and trained personnel"
+          ],
+          "violations": "Severe penalties for fall accidents; shutdown of construction activities",
+          "keyPoints": "Work at height threshold is 2 meters in UAE (lower than international standards)",
+          "links": {
+            "official": "https://www.adosh.gov.ae/",
+            "guidance": "Fall Protection Guidelines available from ADOSH"
+          },
+          "version": "2017",
+          "revisionDate": "2021"
+        },
+        {
+          "id": "ADOSH-005",
+          "title": "Chemical Hazard Control and Management",
+          "type": "Regulation",
+          "hazardCategories": ["Physical health hazards", "Chemical hazards"],
+          "applicableIndustries": ["All"],
+          "applicableAreas": ["ABUDHABI", "DUBAI"],
+          "summary": "Requires identification, assessment, and control of chemical hazards in the workplace.",
+          "requirements": [
+            "Inventory all hazardous chemicals",
+            "Maintain Safety Data Sheets (SDS)",
+            "Label all containers appropriately",
+            "Implement exposure controls",
+            "Conduct health monitoring",
+            "Provide chemical training",
+            "Establish spill response procedures",
+            "Maintain proper storage facilities"
+          ],
+          "violations": "Fines for improper chemical handling; environmental penalties",
+          "keyPoints": "GHS labeling system is recommended; local authorities may have specific requirements",
+          "links": {
+            "official": "https://www.adosh.gov.ae/",
+            "guidance": "Chemical safety guidance from ADOSH"
+          },
+          "version": "2017",
+          "revisionDate": "2021"
+        }
+      ]
+    },
+    "LUXEMBOURG": {
+      "code": "LUXEMBOURG",
+      "name": "Luxembourg",
+      "authority": "ADEM (Agence pour le développement de l'emploi - Employment and Occupational Health Agency)",
+      "authorityWebsite": "https://adem.lu",
+      "enforcementAgency": "Inspection du Travail et des Mines (Labor and Mines Inspection)",
+      "penaltyRange": "EUR 500 - EUR 100,000 depending on violation severity",
+      "euDirectives": "Implements EU-wide Occupational Safety and Health Directives",
+      "standards": [
+        {
+          "id": "LUXEMBOURG-001",
+          "title": "General Obligation to Protect Workers' Health and Safety",
+          "type": "National Legislation",
+          "hazardCategories": ["All"],
+          "applicableIndustries": ["All"],
+          "summary": "Employers must take measures to protect the health and safety of workers, in accordance with EU directives and national law.",
+          "requirements": [
+            "Conduct risk assessment for all workplaces",
+            "Document assessment findings",
+            "Implement preventive measures",
+            "Provide information and training",
+            "Establish emergency procedures",
+            "Maintain first aid facilities",
+            "Consult with safety representatives",
+            "Report serious accidents to authorities"
+          ],
+          "violations": "Administrative fines; criminal liability for serious breaches",
+          "keyPoints": "Based on EU Framework Directive 89/391/EEC; goes beyond minimum requirements",
+          "links": {
+            "official": "https://adem.lu/en/standards-and-legislation",
+            "guidance": "ADEM guidance documents available on website"
+          },
+          "version": "1994",
+          "revisionDate": "2015"
+        },
+        {
+          "id": "LUXEMBOURG-002",
+          "title": "Use of Personal Protective Equipment (PPE)",
+          "type": "Regulation",
+          "hazardCategories": ["PPE", "Physical health hazards"],
+          "applicableIndustries": ["All"],
+          "summary": "Implements EU Directive 89/656/EEC on PPE use requirements.",
+          "requirements": [
+            "Assess need for PPE based on risk assessment",
+            "Select appropriate certified PPE",
+            "Provide PPE at no cost to workers",
+            "Ensure proper fit and functionality",
+            "Provide information and training",
+            "Maintain and replace PPE regularly",
+            "Ensure proper storage and cleaning",
+            "Document PPE provision and training"
+          ],
+          "violations": "Fines for failure to provide appropriate PPE; worker compensation claims",
+          "keyPoints": "All PPE must bear CE mark and meet EN or ISO standards",
+          "links": {
+            "official": "https://adem.lu/en/standards-and-legislation",
+            "guidance": "EU PPE Regulation (EU) 2016/425 applies"
+          },
+          "version": "1992",
+          "revisionDate": "2019"
+        },
+        {
+          "id": "LUXEMBOURG-003",
+          "title": "Machinery Safety and Use of Work Equipment",
+          "type": "Regulation",
+          "hazardCategories": ["Mechanical / Machinery hazards"],
+          "applicableIndustries": ["Manufacturing", "Construction", "All"],
+          "summary": "Implements EU Directive 2006/42/EC on machinery safety and equipment use.",
+          "requirements": [
+            "Ensure machinery has CE marking",
+            "Install proper guards and emergency stops",
+            "Maintain preventive maintenance schedule",
+            "Provide operator training",
+            "Implement lockout/tagout procedures",
+            "Keep technical documentation",
+            "Remove or secure hazardous parts",
+            "Conduct pre-use inspections"
+          ],
+          "violations": "Equipment seizure; fines for unsafe machinery",
+          "keyPoints": "Covers both new and used machinery; high standards for safety",
+          "links": {
+            "official": "https://adem.lu/en/standards-and-legislation",
+            "guidance": "EU Machinery Directive 2006/42/EC requirements"
+          },
+          "version": "2007",
+          "revisionDate": "2019"
+        },
+        {
+          "id": "LUXEMBOURG-004",
+          "title": "Chemical Substances and Hazardous Substances Labeling",
+          "type": "Regulation",
+          "hazardCategories": ["Physical health hazards", "Chemical hazards"],
+          "applicableIndustries": ["All"],
+          "summary": "Implements EU REACH Regulation and CLP Regulation on chemical safety and labeling.",
+          "requirements": [
+            "Register chemicals with ECHA if applicable",
+            "Classify chemicals according to GHS/CLP",
+            "Label containers with hazard pictograms and warnings",
+            "Provide Safety Data Sheets (SDS)",
+            "Conduct chemical risk assessment",
+            "Implement exposure controls",
+            "Provide worker training on chemicals",
+            "Maintain chemical inventory"
+          ],
+          "violations": "Significant fines for non-compliance with REACH/CLP; product seizure",
+          "keyPoints": "EU-wide standards ensure consistency; strict enforcement",
+          "links": {
+            "official": "https://adem.lu/en/standards-and-legislation",
+            "guidance": "EU REACH (EC 1907/2006) and CLP (EC 1272/2008) Regulations"
+          },
+          "version": "2006",
+          "revisionDate": "2019"
+        },
+        {
+          "id": "LUXEMBOURG-005",
+          "title": "Work at Height and Fall Protection",
+          "type": "Regulation",
+          "hazardCategories": ["Workplace / Infrastructure Design", "Physical health hazards"],
+          "applicableIndustries": ["Construction", "Maintenance", "All"],
+          "summary": "Implements EU Temporary or Mobile Work Sites Directive on fall protection.",
+          "requirements": [
+            "Assess fall hazards (2 meters or more)",
+            "Use collective protection (scaffolding, guardrails)",
+            "Provide personal fall arrest systems",
+            "Conduct rescue procedures",
+            "Inspect all equipment regularly",
+            "Train workers on fall protection",
+            "Maintain rescue equipment",
+            "Use certified fall protection equipment"
+          ],
+          "violations": "Severe fines; shutdown of work activities if violations present",
+          "keyPoints": "EU standards require 2-meter threshold; high safety requirements",
+          "links": {
+            "official": "https://adem.lu/en/standards-and-legislation",
+            "guidance": "EU Directive 92/57/EEC on Temporary Work Sites"
+          },
+          "version": "1992",
+          "revisionDate": "2009"
+        }
+      ]
+    }
+  },
+  "hazardCategoryMappings": {
+    "Mechanical / Machinery hazards": ["Hand tools", "Powered tools", "Rotating parts", "Pinch points", "Equipment failure", "Guarding"],
+    "Workplace / Infrastructure Design": ["Slips and trips", "Work at height", "Confined spaces", "Temporary structures", "Poor ventilation", "Lighting", "Temperature control"],
+    "Physical health hazards": ["Falls", "Noise exposure", "Vibration", "Heat stress", "Cold stress", "Radiation", "Electro-magnetic fields"],
+    "Chemical hazards": ["Toxic substances", "Corrosive materials", "Flammable liquids", "Gases", "Asbestos", "Crystalline silica", "Pesticides"],
+    "Hazardous Energy": ["Electricity", "Compressed air", "Steam", "Hydraulic", "Pneumatic", "Stored energy", "LOTO requirements"],
+    "Transportation": ["Vehicle interaction", "Road conditions", "Load securing", "Driver fatigue", "Speed control"],
+    "Ergonomic hazards": ["Posture issues", "Lifting/Lowering", "Repetitive strain", "Carrying", "Standing/Sitting duration", "Workstation design"],
+    "Organizational and Psychosocial": ["Stress management", "Fatigue", "Training gaps", "Communication", "Workplace bullying", "Job demands", "Work-life balance"],
+    "Biological hazard": ["Bloodborne pathogens", "Biological agents", "Infectious diseases", "Contaminated materials", "Mold", "Legionella"],
+    "Fire and explosion": ["Flammable materials", "Ignition sources", "Fire prevention", "Emergency exits", "Fire extinguishers", "Explosive atmospheres"]
+  }
+}

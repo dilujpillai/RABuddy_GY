@@ -1,0 +1,56 @@
+name: Update Legal Registry Monthly
+
+on:
+  schedule:
+    # Runs on the 1st of every month at 2 AM UTC
+    - cron: '0 2 1 * *'
+  
+  # Allow manual trigger from GitHub UI
+  workflow_dispatch:
+
+jobs:
+  update-regulations:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+      
+      - name: Install dependencies
+        run: |
+          npm install axios cheerio @anthropic-ai/sdk
+      
+      - name: Run regulation update script
+        env:
+          # Use GitHub's built-in limited Claude access (or add your own)
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          node scripts/update-regulations.js
+      
+      - name: Commit and push updates
+        run: |
+          git config user.name "Legal Registry Bot"
+          git config user.email "bot@risk-assessment-buddy.dev"
+          
+          # Check if there are changes
+          if git diff --quiet; then
+            echo "No changes to legal registry"
+          else
+            echo "Changes detected, committing..."
+            git add legal-registry.json
+            git commit -m "🤖 Auto-update: Legal registry refresh - $(date +'%Y-%m-%d')"
+            git push
+          fi
+      
+      - name: Log completion
+        run: |
+          echo "✅ Legal Registry Update Completed"
+          echo "📅 Timestamp: $(date)"
+          echo "📊 Registry file: legal-registry.json"

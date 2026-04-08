@@ -1,0 +1,19 @@
+{
+  "name": "risk-assessment-api",
+  "version": "1.0.0",
+  "description": "Serverless API proxy for Risk Assessment app",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "axios": "^1.6.2",
+    "cheerio": "^1.0.0-rc.12",
+    "@anthropic-ai/sdk": "^0.16.0"
+  },
+  "devDependencies": {
+    "cheerio": "^1.0.0-rc.12"
+  }
+}
