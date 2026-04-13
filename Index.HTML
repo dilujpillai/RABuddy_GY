@@ -29,6 +29,21 @@
     <script src="lib/pdfkit.min.js"></script>
     <script src="lib/blob-stream.min.js"></script>
     <script src="shareable_html_generator.js"></script>
+    <script src="image-editor.js"></script>
+
+    <!-- React 18 + htm (no build step) -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/htm@3/dist/htm.umd.js"></script>
+
+    <!-- Fire Risk Assessment — modular files -->
+    <link rel="stylesheet" href="fra/fra-styles.css">
+    <script src="fra/fra-data.js"></script>
+    <script src="fra/fra-ai.js"></script>
+    <script src="fra/fra-reports.js"></script>
+    <script src="fra/fra-components.js"></script>
+    <script src="fra/fra-floorplan.js"></script>
+    <script src="fra/fra-app.js"></script>
 
     <style>
 /* Smooth Modal Entry */
@@ -801,6 +816,41 @@
                 <li><strong>Language Support:</strong> You can read all dropdowns and hazard options in French or German by using the 🌐 Language selector at the top right of the app.</li>
             </ul>
         </div>
+
+        <!-- Workflow 4: Fire Risk Assessment -->
+        <div class="bg-white rounded-lg border border-orange-300 p-4 mt-4">
+            <h3 class="font-bold text-slate-800 text-lg mb-3">🔥 Workflow 4: Fire Risk Assessment (FTRI Engine) — ⚡ BETA</h3>
+            <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4">
+                <p class="text-sm text-yellow-800 font-semibold">
+                    ⚠️ <strong>BETA Status:</strong> This Fire Risk Assessment module is currently in active development and requires internal approval before deployment to production.
+                    Results are for evaluation purposes and subject to change. Report issues to your EHS team.
+                </p>
+            </div>
+            <p class="text-sm text-slate-600 mb-3">
+                The Fire Risk Assessment module uses the <strong>Fire Triangle Risk Index (FTRI)</strong> — a standards-backed scoring engine built on
+                <strong>NFPA 30</strong> (Flammable &amp; Combustible Liquids), <strong>NFPA 704</strong> (Hazard Identification),
+                <strong>NFPA 101</strong> (Life Safety Code), and <strong>FM Global</strong> data sheets.
+            </p>
+            <ul class="list-disc list-inside text-sm text-slate-600 space-y-2">
+                <li>Open the <strong>🔥 Fire Risk Assessment</strong> tab at the top of the app.</li>
+                <li>Create <strong>Zones</strong> — each zone represents a physical area (e.g., solvent storage room, mixing bay, warehouse).</li>
+                <li>Upload <strong>zone photos</strong> and describe the area — then use <strong>🤖 AI Analyze</strong> to auto-populate ignition sources, fuel types, oxygen conditions, and controls.</li>
+                <li>Use the <strong>🔺 Fire Triangle Checklist</strong> to select heat, fuel, and oxygen hazards. The animated fire triangle visualizes the risk balance in real time.</li>
+                <li>Use the <strong> Chemical Inventory</strong> section to record chemicals from SDS sheets:
+                    <ul class="list-circle list-inside ml-4 mt-1 space-y-1 text-slate-600">
+                        <li><strong>Don't know the chemical name?</strong> Enter what you know ("unknown drum", "clear solvent") and use <strong>🤖 AI Lookup</strong> to auto-fill NFPA 704 ratings and flash point data</li>
+                        <li><strong>Have the SDS?</strong> Find the flash point in <em>Section 9</em> and the NFPA 704 diamond in <em>Section 14</em> or <em>16</em> — enter the values manually</li>
+                        <li>Enter the <strong>approximate quantity</strong> (number of drums, IBCs, litres, or gallons)</li>
+                        <li>The engine compares your volume to the <strong>NFPA 30 Maximum Allowable Quantity (MAQ)</strong> per control area — if you exceed the MAQ, the FTRI fuel leg score is amplified</li>
+                        <li>Tick the <strong>🚿 Sprinkler system</strong> checkbox if the area has automatic sprinklers — NFPA 30 §9.4 allows <strong>4× the MAQ</strong> in sprinklered areas, so the threshold is raised</li>
+                    </ul>
+                </li>
+                <li>Review the <strong>🛡️ Fire Protection Controls</strong> — select all controls in place. Missing mandatory controls are flagged.</li>
+                <li>Click <strong>🔥 Calculate Fire Risk Index</strong> to get the FTRI score (0–100) with full breakdown of fire triangle, control effectiveness, and consequence amplifier.</li>
+                <li>Use the <strong>🗺️ Floor Plan</strong> view to map zones onto a building layout for visual heat-map reporting.</li>
+                <li>Save, load, merge, and export as PDF or HTML — all data stays local on your device.</li>
+            </ul>
+        </div>
     </div>
 </details>
 
@@ -879,6 +929,40 @@
                 <li><strong>Enregistrer et reprendre:</strong> Vous pouvez enregistrer votre fichier de projet et reprendre le travail en le rechargeant dans l'application.</li>
                 <li><strong>Avertissement d'actualisation du navigateur:</strong> Si vous actualisez votre navigateur, vos données en mémoire sont perdues. Vous devrez recommencer depuis le début ou charger votre fichier de projet enregistré.</li>
                 <li><strong>Support multilingue:</strong> Vous pouvez lire tous les menus déroulants et les options de dangers en anglais, français ou allemand en utilisant le sélecteur de langue 🌐 en haut à droite de l'application.</li>
+            </ul>
+        </div>
+
+        <!-- Workflow 4: Fire Risk Assessment -->
+        <div class="bg-white rounded-lg border border-orange-300 p-4 mt-4">
+            <h3 class="font-bold text-slate-800 text-lg mb-3">🔥 Flux de travail 4 : Évaluation des Risques Incendie (Moteur FTRI) — ⚡ BÊTA</h3>
+            <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4">
+                <p class="text-sm text-yellow-800 font-semibold">
+                    ⚠️ <strong>Statut BÊTA :</strong> Ce module d'évaluation des risques incendie est actuellement en développement actif et nécessite l'approbation interne avant le déploiement en production.
+                    Les résultats sont à titre évaluatif et peuvent être modifiés. Signalez les problèmes à votre équipe EHS.
+                </p>
+            </div>
+            <p class="text-sm text-slate-600 mb-3">
+                Le module d'évaluation des risques incendie utilise le <strong>Fire Triangle Risk Index (FTRI)</strong> — un moteur de notation basé sur les normes
+                <strong>NFPA 30</strong> (Liquides inflammables et combustibles), <strong>NFPA 704</strong> (Identification des dangers),
+                <strong>NFPA 101</strong> (Code de sécurité des personnes) et les fiches techniques <strong>FM Global</strong>.
+            </p>
+            <ul class="list-disc list-inside text-sm text-slate-600 space-y-2">
+                <li>Ouvrez l'onglet <strong>🔥 Évaluation des Risques Incendie</strong> en haut de l'application.</li>
+                <li>Créez des <strong>Zones</strong> — chaque zone représente un espace physique (ex : local de stockage de solvants, baie de mélange, entrepôt).</li>
+                <li>Téléchargez des <strong>photos de zone</strong> et décrivez l'espace — puis utilisez <strong>🤖 Analyse IA</strong> pour remplir automatiquement les sources d'ignition, types de combustibles, conditions d'oxygène et contrôles.</li>
+                <li>Utilisez la <strong>🔺 Checklist Triangle du Feu</strong> pour sélectionner les dangers liés à la chaleur, au combustible et à l'oxygène.</li>
+                <li>Utilisez la section <strong>🧪 Inventaire Chimique</strong> pour enregistrer les produits chimiques à partir des fiches FDS :
+                    <ul class="list-circle list-inside ml-4 mt-1 space-y-1 text-slate-600">
+                        <li><strong>Nom inconnu ?</strong> Entrez ce que vous savez et utilisez <strong>🤖 Recherche IA</strong> pour remplir automatiquement les index NFPA 704 et le point d'éclair</li>
+                        <li><strong>Vous avez la FDS ?</strong> Trouvez le point d'éclair en <em>Section 9</em> et le losange NFPA 704 en <em>Section 14</em> ou <em>16</em></li>
+                        <li>Entrez la <strong>quantité approximative</strong> (nombre de fûts, conteneurs IBC, litres ou gallons)</li>
+                        <li>Le moteur compare votre volume à la <strong>Quantité Maximale Autorisée (QMA) NFPA 30</strong> par zone de contrôle</li>
+                        <li>Cochez <strong>🚿 Système de sprinklers</strong> si la zone dispose de sprinklers automatiques — NFPA 30 §9.4 autorise <strong>4× la QMA</strong> dans les zones sprinklées</li>
+                    </ul>
+                </li>
+                <li>Vérifiez les <strong>🛡️ Contrôles de Protection Incendie</strong> — les contrôles obligatoires manquants sont signalés.</li>
+                <li>Cliquez sur <strong>🔥 Calculer l'Indice de Risque Incendie</strong> pour obtenir le score FTRI (0–100).</li>
+                <li>Utilisez la vue <strong>🗺️ Plan d'Étage</strong> pour cartographier les zones sur le bâtiment.</li>
             </ul>
         </div>
     </div>
@@ -961,6 +1045,40 @@
                 <li><strong>Mehrsprachige Unterstützung:</strong> Sie können alle Dropdowns und Gefahrenoptionen auf Englisch, Französisch oder Deutsch lesen, indem Sie den Sprachwähler 🌐 oben rechts in der Anwendung verwenden.</li>
             </ul>
         </div>
+
+        <!-- Workflow 4: Brandrisikobewertung -->
+        <div class="bg-white rounded-lg border border-orange-300 p-4 mt-4">
+            <h3 class="font-bold text-slate-800 text-lg mb-3">🔥 Arbeitsablauf 4: Brandrisikobewertung (FTRI-Engine) — ⚡ BETA</h3>
+            <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4">
+                <p class="text-sm text-yellow-800 font-semibold">
+                    ⚠️ <strong>BETA-Status:</strong> Dieses Brandrisikobewertungsmodul befindet sich derzeit in aktiver Entwicklung und benötigt interne Genehmigung vor der Bereitstellung in der Produktion.
+                    Ergebnisse dienen zu Evaluierungszwecken und können sich ändern. Melden Sie Probleme Ihrem EHS-Team.
+                </p>
+            </div>
+            <p class="text-sm text-slate-600 mb-3">
+                Das Brandrisikobewertungsmodul verwendet den <strong>Fire Triangle Risk Index (FTRI)</strong> — eine normenbasierte Bewertungsengine basierend auf
+                <strong>NFPA 30</strong> (Brennbare und entzündbare Flüssigkeiten), <strong>NFPA 704</strong> (Gefahrenkennzeichnung),
+                <strong>NFPA 101</strong> (Lebensschutzkodex) und <strong>FM Global</strong>-Datenblättern.
+            </p>
+            <ul class="list-disc list-inside text-sm text-slate-600 space-y-2">
+                <li>Öffnen Sie den Reiter <strong>🔥 Brandrisikobewertung</strong> oben in der Anwendung.</li>
+                <li>Erstellen Sie <strong>Zonen</strong> — jede Zone repräsentiert einen physischen Bereich (z.B. Lösemittellager, Mischbereich, Lager).</li>
+                <li>Laden Sie <strong>Zonenfotos</strong> hoch und beschreiben Sie den Bereich — dann verwenden Sie <strong>🤖 KI-Analyse</strong> zur automatischen Erkennung von Zündquellen, Brennstoffen, Sauerstoffbedingungen und Schutzmaßnahmen.</li>
+                <li>Verwenden Sie die <strong>🔺 Feuerdreieck-Checkliste</strong> zur Auswahl von Wärme-, Brennstoff- und Sauerstoffgefahren.</li>
+                <li>Verwenden Sie den Abschnitt <strong>🧪 Chemikalieninventar</strong> um Chemikalien aus den Sicherheitsdatenblättern (SDB) zu erfassen:
+                    <ul class="list-circle list-inside ml-4 mt-1 space-y-1 text-slate-600">
+                        <li><strong>Name unbekannt?</strong> Geben Sie ein, was Sie wissen, und verwenden Sie <strong>🤖 KI-Suche</strong> zur automatischen Ergänzung der NFPA 704-Bewertungen und des Flammpunkts</li>
+                        <li><strong>SDB vorhanden?</strong> Finden Sie den Flammpunkt in <em>Abschnitt 9</em> und die NFPA 704-Raute in <em>Abschnitt 14</em> oder <em>16</em></li>
+                        <li>Geben Sie die <strong>ungefähre Menge</strong> ein (Anzahl der Fässer, IBC-Container, Liter oder Gallonen)</li>
+                        <li>Die Engine vergleicht Ihr Volumen mit der <strong>zulässigen Höchstmenge (MAQ) gemäß NFPA 30</strong> pro Brandkontrollbereich</li>
+                        <li>Aktivieren Sie <strong>🚿 Sprinkleranlage</strong>, wenn der Bereich über automatische Sprinkler verfügt — NFPA 30 §9.4 erlaubt <strong>die 4-fache MAQ</strong> in besprinklerten Bereichen</li>
+                    </ul>
+                </li>
+                <li>Überprüfen Sie die <strong>🛡️ Brandschutzkontrollen</strong> — fehlende Pflichtkontrollen werden gekennzeichnet.</li>
+                <li>Klicken Sie auf <strong>🔥 Brandrisikoindex berechnen</strong> für den FTRI-Score (0–100).</li>
+                <li>Verwenden Sie die <strong>🗺️ Grundrissansicht</strong> um Zonen auf den Gebäudeplan abzubilden.</li>
+            </ul>
+        </div>
     </div>
 </details>
 </div>
@@ -991,19 +1109,27 @@
             </div>
 
             <!-- Tab Navigation -->
-            <div class="flex border-t border-white/20 bg-gradient-to-r from-indigo-700 to-blue-800">
-                <button id="tab-rich-media" class="tab-btn flex-1 sm:flex-none px-6 py-4 text-white font-semibold text-sm sm:text-base hover:bg-white/10 transition border-b-4 border-yellow-400 bg-white/10 flex items-center justify-center gap-2" onclick="switchTab('rich-media')" data-en-text="Rich Media">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-                    Rich Media
-                </button>
-                <button id="tab-free-text" class="tab-btn flex-1 sm:flex-none px-6 py-4 text-white font-semibold text-sm sm:text-base hover:bg-white/10 transition border-b-4 border-transparent flex items-center justify-center gap-2" onclick="switchTab('free-text')" data-en-text="Free Text">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-                    Free Text
-                </button>
-                <button id="tab-excel" class="tab-btn flex-1 sm:flex-none px-6 py-4 text-white font-semibold text-sm sm:text-base hover:bg-white/10 transition border-b-4 border-transparent flex items-center justify-center gap-2" onclick="switchTab('excel')" data-en-text="Excel Sheet">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" /></svg>
-                    Excel Sheet
-                </button>
+            <div class="flex items-stretch border-t border-white/20 bg-gradient-to-r from-indigo-700 to-blue-800">
+                    <span class="self-center text-[9px] font-semibold uppercase tracking-wider text-indigo-300/60 px-2" style="letter-spacing:0.08em;">Task Based</span>
+                    <button id="tab-rich-media" class="tab-btn flex-none px-6 py-3 text-white font-semibold text-sm sm:text-base hover:bg-white/10 transition border-b-4 border-yellow-400 bg-white/10 flex items-center justify-center gap-2" onclick="switchTab('rich-media')" data-en-text="Rich Media">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                        Rich Media
+                    </button>
+                    <button id="tab-free-text" class="tab-btn flex-none px-6 py-3 text-white font-semibold text-sm sm:text-base hover:bg-white/10 transition border-b-4 border-transparent flex items-center justify-center gap-2" onclick="switchTab('free-text')" data-en-text="Free Text">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                        Free Text
+                    </button>
+                    <button id="tab-excel" class="tab-btn flex-none px-6 py-3 text-white font-semibold text-sm sm:text-base hover:bg-white/10 transition border-b-4 border-transparent flex items-center justify-center gap-2" onclick="switchTab('excel')" data-en-text="Excel Sheet">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" /></svg>
+                        Excel Sheet
+                    </button>
+                    <div class="w-px bg-white/20 my-2 mx-1"></div>
+                    <span class="self-center text-[9px] font-semibold uppercase tracking-wider text-indigo-300/60 px-2" style="letter-spacing:0.08em;">Location Based</span>
+                    <button id="tab-fire-ra" class="tab-btn flex-none px-6 py-3 text-white font-semibold text-sm sm:text-base hover:bg-white/10 transition border-b-4 border-transparent flex items-center justify-center gap-2" onclick="switchTab('fire-ra')" data-en-text="Fire Risk">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.777 17.656 7.343A7.975 7.975 0 0120 13a7.975 7.975 0 01-2.343 5.657z" /><path stroke-linecap="round" stroke-linejoin="round" d="M9.879 16.121A3 3 0 1012.015 11L11 14H9c0 .768.293 1.536.879 2.121z" /></svg>
+                        Fire Risk
+                        <span style="font-size:9px;font-weight:800;letter-spacing:0.06em;background:#fde047;color:#713f12;padding:1px 5px;border-radius:4px;line-height:1.4;vertical-align:middle;">BETA</span>
+                    </button>
             </div>
         </section>
 
@@ -1178,24 +1304,249 @@
             
             <button onclick="document.getElementById('excelImportModal').style.display='flex'" class="w-full bg-slate-600 hover:bg-slate-700 text-white font-bold py-3 px-6 rounded-lg shadow-md transition">📂 Advanced Import / Column Mapping</button>
         </section>
+
+        <!-- ═══════════════════════════════════════════════════════════ -->
+        <!-- FIRE RISK ASSESSMENT TAB                                    -->
+        <!-- ═══════════════════════════════════════════════════════════ -->
+        <section id="tab-content-fire-ra" class="tab-content bg-white rounded-2xl shadow-xl overflow-hidden hidden">
+            <!-- BETA Banner -->
+            <div style="background: repeating-linear-gradient(45deg, #fef08a, #fef08a 10px, #fde047 10px, #fde047 20px); border-top: 4px solid #ca8a04; border-bottom: 4px solid #ca8a04;"
+                class="w-full px-6 py-3 flex items-center gap-4">
+                <span style="font-size:1.75rem; line-height:1; flex-shrink:0;">⚠️</span>
+                <div class="flex-1 min-w-0">
+                    <span class="font-extrabold text-yellow-900 text-sm uppercase tracking-widest mr-2">BETA — NOT FOR PRODUCTION USE</span>
+                    <span class="text-yellow-900 text-sm font-medium">
+                        This Fire Risk Assessment module requires internal <strong>EHS approval</strong> before deployment. Results are for evaluation only and may change.
+                    </span>
+                </div>
+                <span class="flex-shrink-0 text-xs font-bold bg-yellow-900 text-yellow-100 px-3 py-1 rounded-full uppercase tracking-wide">Awaiting Approval</span>
+            </div>
+
+            <div class="p-6 sm:p-8 space-y-6">
+            <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-2">
+                <div>
+                    <h2 class="text-2xl font-bold text-slate-900">🔥 Fire Risk Assessment</h2>
+                    <p class="text-slate-600 text-sm mt-1">Location-based fire risk evaluation using the Fire Triangle Risk Index (FTRI) methodology — backed by NFPA, OSHA, and FM Global standards.</p>
+                </div>
+                <button id="fra-guide-toggle" class="flex-shrink-0 inline-flex items-center gap-2 text-sm font-semibold text-orange-700 bg-orange-50 hover:bg-orange-100 px-4 py-2 rounded-lg border border-orange-200 shadow-sm transition">
+                    <span class="text-lg">📖</span> How to Perform a Fire RA
+                </button>
+            </div>
+
+            <!-- Comprehensive Guide (collapsible) -->
+            <details id="fra-guide" class="bg-gradient-to-br from-orange-50 to-red-50 rounded-xl border border-orange-200 overflow-hidden">
+                <summary class="cursor-pointer p-5 font-bold text-orange-900 flex items-center justify-between hover:bg-orange-100/50 transition">
+                    <span>📖 Comprehensive Guide: How to Perform a Fire Risk Assessment</span>
+                    <svg class="h-5 w-5 text-orange-500 transition-transform group-open:rotate-180" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
+                </summary>
+                <div class="p-5 pt-2 space-y-6 text-sm text-slate-800 leading-relaxed">
+
+                    <!-- Overview -->
+                    <div class="bg-white rounded-lg p-4 border border-orange-100">
+                        <h4 class="font-bold text-orange-900 mb-2">🎯 What Is a Fire Risk Assessment?</h4>
+                        <p>A <strong>Fire Risk Assessment (FRA)</strong> is a systematic evaluation of a specific location or zone to determine the likelihood of a fire starting, the potential for fire spread, the effectiveness of existing fire protection controls, and the consequences to people, property, and business continuity.</p>
+                        <p class="mt-2">Unlike a task-based occupational risk assessment (which evaluates hazards per work step), a fire risk assessment evaluates an <strong>entire area or zone</strong> holistically — considering the fire triangle (heat, fuel, oxygen), passive & active fire protection, and evacuation readiness.</p>
+                    </div>
+
+                    <!-- When to Perform -->
+                    <div class="bg-white rounded-lg p-4 border border-orange-100">
+                        <h4 class="font-bold text-orange-900 mb-2">📅 When Should You Perform a Fire RA?</h4>
+                        <ul class="space-y-1 ml-4 list-disc">
+                            <li><strong>New or renovated facilities</strong> — Before occupancy or after major construction changes</li>
+                            <li><strong>Process changes</strong> — New materials, chemicals, equipment, or workflow modifications</li>
+                            <li><strong>Annual review</strong> — Required by OSHA 29 CFR 1910.39 and NFPA 1</li>
+                            <li><strong>After a fire incident or near miss</strong> — Post-incident review and lessons learned</li>
+                            <li><strong>Insurance requirements</strong> — FM Global property loss prevention audits</li>
+                            <li><strong>Regulatory inspection preparation</strong> — Pre-audit fire safety compliance check</li>
+                            <li><strong>Change in occupancy or use</strong> — Storage area converted to production, etc.</li>
+                        </ul>
+                    </div>
+
+                    <!-- The Fire Triangle -->
+                    <div class="bg-white rounded-lg p-4 border border-red-100">
+                        <h4 class="font-bold text-red-900 mb-2">🔺 Understanding the Fire Triangle</h4>
+                        <p>Fire requires three elements simultaneously. Remove any one element and fire cannot sustain:</p>
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-3">
+                            <div class="bg-red-50 rounded-lg p-3 text-center border border-red-200">
+                                <div class="text-2xl mb-1">🔥</div>
+                                <h5 class="font-bold text-red-800">HEAT (Ignition)</h5>
+                                <p class="text-xs text-red-700 mt-1">Energy source that raises material to its ignition temperature. Examples: hot work, electrical faults, friction, static discharge, open flames.</p>
+                            </div>
+                            <div class="bg-amber-50 rounded-lg p-3 text-center border border-amber-200">
+                                <div class="text-2xl mb-1">🪵</div>
+                                <h5 class="font-bold text-amber-800">FUEL (Combustibles)</h5>
+                                <p class="text-xs text-amber-700 mt-1">Any material that can burn. Examples: rubber, solvents, dust, wood, paper, plastics, flammable gases, oils.</p>
+                            </div>
+                            <div class="bg-blue-50 rounded-lg p-3 text-center border border-blue-200">
+                                <div class="text-2xl mb-1">💨</div>
+                                <h5 class="font-bold text-blue-800">OXYGEN (Atmosphere)</h5>
+                                <p class="text-xs text-blue-700 mt-1">Air or oxidizing agent supporting combustion. Normal air = 20.9% O₂. Enriched O₂ or oxidizers dramatically increase risk.</p>
+                            </div>
+                        </div>
+                        <div class="bg-red-100 rounded-lg p-3 mt-3 text-xs">
+                            <strong>Key Principle:</strong> When all three elements are strong (rated ≥6/10), they <em>compound</em> each other — the interaction multiplier increases the score because the fire triangle is fully formed and fire initiation becomes much more probable.
+                        </div>
+                    </div>
+
+                    <!-- Step-by-Step Guide -->
+                    <div class="bg-white rounded-lg p-4 border border-orange-100">
+                        <h4 class="font-bold text-orange-900 mb-3">📋 Step-by-Step Guide</h4>
+
+                        <div class="space-y-4">
+                            <!-- Step 1 -->
+                            <div class="border-l-4 border-indigo-400 pl-4">
+                                <h5 class="font-bold text-indigo-800">Step 1: Define the Zone</h5>
+                                <p class="mt-1">Walk the area and clearly define the boundaries of the zone you're assessing. Each zone should be a distinct fire compartment or functional area.</p>
+                                <ul class="mt-2 space-y-1 ml-4 list-disc text-xs text-slate-600">
+                                    <li>Name the zone descriptively (e.g., "Mixing Room — Bldg 4, Ground Floor")</li>
+                                    <li>Classify the occupancy per NFPA 101 (Factory, Storage, Assembly, etc.)</li>
+                                    <li>Record the area size (m²) and typical peak occupant count</li>
+                                    <li>Mark if the zone is business-critical (single point of failure for production)</li>
+                                    <li>Take photos to document current conditions</li>
+                                </ul>
+                            </div>
+
+                            <!-- Step 2 -->
+                            <div class="border-l-4 border-red-400 pl-4">
+                                <h5 class="font-bold text-red-800">Step 2: Identify Ignition Sources (HEAT)</h5>
+                                <p class="mt-1">Systematically survey the zone for anything that could provide enough energy to ignite combustible materials.</p>
+                                <ul class="mt-2 space-y-1 ml-4 list-disc text-xs text-slate-600">
+                                    <li>Check electrical panels, junction boxes, motors — signs of overheating, loose connections</li>
+                                    <li>Identify hot work activities (welding, grinding, brazing) — verify permit system</li>
+                                    <li>Look for friction points — conveyors, bearings, misaligned equipment</li>
+                                    <li>Check for static discharge risks — powder handling, grounding/bonding adequacy</li>
+                                    <li>Verify heating equipment controls (thermostats, high-temp cutoffs)</li>
+                                    <li>Check smoking policies and designated areas</li>
+                                </ul>
+                                <div class="bg-red-50 rounded p-2 mt-2 text-xs">
+                                    <strong>NFPA 51B:</strong> Hot work within 35 feet (11m) of combustibles requires a permit, fire watch, and a 30-minute post-work monitoring period.
+                                </div>
+                            </div>
+
+                            <!-- Step 3 -->
+                            <div class="border-l-4 border-amber-400 pl-4">
+                                <h5 class="font-bold text-amber-800">Step 3: Assess Fuel Load (FUEL)</h5>
+                                <p class="mt-1">Inventory all combustible materials in the zone. Consider both obvious and hidden fuel sources.</p>
+                                <ul class="mt-2 space-y-1 ml-4 list-disc text-xs text-slate-600">
+                                    <li>List chemical inventories — check SDS for flammability data and flash points</li>
+                                    <li>Assess dust accumulation on surfaces, rafters, ductwork, cable trays</li>
+                                    <li>Evaluate storage arrangement — separation from ignition sources (NFPA 30)</li>
+                                    <li>Check rubber stock, finished tire storage, packaging material quantities</li>
+                                    <li>Inspect under machines and in hidden areas for oil/grease buildup</li>
+                                    <li>Note proximity of fuel sources to each other (fire spread potential)</li>
+                                </ul>
+                                <div class="bg-amber-50 rounded p-2 mt-2 text-xs">
+                                    <strong>NFPA 652/654 (Critical for Goodyear):</strong> Combustible dust accumulation ≥ 1/32" (0.8mm) over 5% or more of floor area is an explosion hazard. Carbon black, rubber dust, and sulfur dust are all classified as combustible dusts.
+                                </div>
+                            </div>
+
+                            <!-- Step 4 -->
+                            <div class="border-l-4 border-blue-400 pl-4">
+                                <h5 class="font-bold text-blue-800">Step 4: Evaluate Oxygen Conditions (OXYGEN)</h5>
+                                <p class="mt-1">Assess atmospheric conditions and ventilation that could feed or limit a fire.</p>
+                                <ul class="mt-2 space-y-1 ml-4 list-disc text-xs text-slate-600">
+                                    <li>Identify forced ventilation systems — HVAC can accelerate fire spread through ducts</li>
+                                    <li>Check for oxidizer storage (peroxides, nitric acid) — NFPA 400 separation requirements</li>
+                                    <li>Assess natural draft conditions — open doors, windows, loading docks</li>
+                                    <li>Check if dust collection systems have explosion venting per NFPA 68</li>
+                                    <li>Note confined spaces or areas with potential O₂ enrichment (welding gases, medical O₂)</li>
+                                </ul>
+                            </div>
+
+                            <!-- Step 5 -->
+                            <div class="border-l-4 border-green-400 pl-4">
+                                <h5 class="font-bold text-green-800">Step 5: Audit Existing Fire Protection Controls</h5>
+                                <p class="mt-1">Check each control category thoroughly. The effectiveness of your controls directly reduces the final risk score.</p>
+                                <div class="mt-2 space-y-2 text-xs">
+                                    <p><strong>🔍 Detection:</strong> Verify smoke/heat detectors are tested (NFPA 72 requires annual testing). Check for dead spots in detector coverage. Ensure manual call points are accessible and signed.</p>
+                                    <p><strong>🧯 Suppression:</strong> Verify sprinkler system is operational and not impaired. Check extinguisher placement (max 75 ft travel distance per NFPA 10). Verify correct extinguisher types for hazards present. Check inspection tags are current.</p>
+                                    <p><strong>🧱 Compartmentation:</strong> Inspect fire doors — do they close fully? Are wedges/blocks used (violation)? Check fire stopping around cable/pipe penetrations. Verify fire walls have no unauthorized openings.</p>
+                                    <p><strong>🚪 Evacuation:</strong> Walk all egress routes — are they clear and illuminated? Test emergency lighting. Verify exit signs are lit. Check door hardware operates without keys. Verify occupant load vs. exit capacity (NFPA 101).</p>
+                                    <p><strong>📋 Management:</strong> Review hot work permits — are they being issued? Check housekeeping (dust accumulation, oil cleanup). Verify fire drill records. Review sprinkler impairment procedures. Check fire prevention plan is documented and current.</p>
+                                </div>
+                            </div>
+
+                            <!-- Step 6 -->
+                            <div class="border-l-4 border-purple-400 pl-4">
+                                <h5 class="font-bold text-purple-800">Step 6: Calculate & Interpret the FTRI Score</h5>
+                                <p class="mt-1">Click <strong>"Calculate Fire Risk Index"</strong> to generate the score. The system calculates:</p>
+                                <div class="bg-purple-50 rounded p-3 mt-2 text-xs font-mono">
+                                    FTRI = (Fire Triangle Score × (1 − Control Effectiveness) × Consequence Amplifier) / 30 × 100
+                                </div>
+                                <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-3 text-xs">
+                                    <div class="bg-red-100 rounded p-2 text-center"><strong class="text-red-800">≥ 80</strong><br>🔴 CRITICAL<br>Cease operations</div>
+                                    <div class="bg-orange-100 rounded p-2 text-center"><strong class="text-orange-800">60–79</strong><br>🟠 HIGH<br>Action in 24-48h</div>
+                                    <div class="bg-yellow-100 rounded p-2 text-center"><strong class="text-amber-800">30–59</strong><br>🟡 MEDIUM<br>Plan within 30 days</div>
+                                    <div class="bg-green-100 rounded p-2 text-center"><strong class="text-green-800">< 30</strong><br>🟢 LOW<br>Annual review</div>
+                                </div>
+                            </div>
+
+                            <!-- Step 7 -->
+                            <div class="border-l-4 border-slate-400 pl-4">
+                                <h5 class="font-bold text-slate-800">Step 7: Address Gaps & Generate Actions</h5>
+                                <p class="mt-1">Review the <strong>Gaps & Missing Controls</strong> section in the results. Items marked <span class="text-red-600 font-bold">🔴 MANDATORY MISSING</span> are code violations that must be addressed immediately. Use the zone notes to document your action plan.</p>
+                                <ul class="mt-2 space-y-1 ml-4 list-disc text-xs text-slate-600">
+                                    <li>Prioritize mandatory missing controls — these are non-negotiable code requirements</li>
+                                    <li>For HIGH/CRITICAL zones, consider adding higher-tier controls (sprinklers > extinguishers)</li>
+                                    <li>Use the "Copy Report" button to export findings for sharing with EHS and Facilities</li>
+                                    <li>Re-assess after implementing controls to verify risk reduction</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Key Standards Reference -->
+                    <div class="bg-white rounded-lg p-4 border border-orange-100">
+                        <h4 class="font-bold text-orange-900 mb-2">📚 Key Standards Reference</h4>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                            <div class="bg-slate-50 rounded p-2"><strong>NFPA 1</strong> — Fire Code (general requirements)</div>
+                            <div class="bg-slate-50 rounded p-2"><strong>NFPA 10</strong> — Portable fire extinguishers</div>
+                            <div class="bg-slate-50 rounded p-2"><strong>NFPA 13</strong> — Sprinkler systems</div>
+                            <div class="bg-slate-50 rounded p-2"><strong>NFPA 25</strong> — Inspection/testing of water-based systems</div>
+                            <div class="bg-slate-50 rounded p-2"><strong>NFPA 30</strong> — Flammable & combustible liquids</div>
+                            <div class="bg-slate-50 rounded p-2"><strong>NFPA 51B</strong> — Hot work fire prevention</div>
+                            <div class="bg-slate-50 rounded p-2"><strong>NFPA 70/70E</strong> — Electrical safety</div>
+                            <div class="bg-slate-50 rounded p-2"><strong>NFPA 72</strong> — Fire alarm systems</div>
+                            <div class="bg-slate-50 rounded p-2"><strong>NFPA 80</strong> — Fire doors and openings</div>
+                            <div class="bg-slate-50 rounded p-2"><strong>NFPA 101</strong> — Life Safety Code</div>
+                            <div class="bg-slate-50 rounded p-2"><strong>NFPA 652/654</strong> — Combustible dust (critical for manufacturing)</div>
+                            <div class="bg-slate-50 rounded p-2"><strong>NFPA 704</strong> — Hazard diamond identification</div>
+                            <div class="bg-slate-50 rounded p-2"><strong>OSHA 1910.39</strong> — Fire prevention plans</div>
+                            <div class="bg-slate-50 rounded p-2"><strong>OSHA 1910.157</strong> — Portable fire extinguishers</div>
+                            <div class="bg-slate-50 rounded p-2"><strong>FM Global DS</strong> — Property loss prevention (insurer standards)</div>
+                            <div class="bg-slate-50 rounded p-2"><strong>EN ISO 13943</strong> — Fire safety vocabulary (EU)</div>
+                        </div>
+                    </div>
+
+                    <!-- Tips -->
+                    <div class="bg-white rounded-lg p-4 border border-orange-100">
+                        <h4 class="font-bold text-orange-900 mb-2">💡 Pro Tips for Effective Fire Risk Assessments</h4>
+                        <ul class="space-y-2 ml-4 list-disc">
+                            <li><strong>Walk the floor, don't desk-assess.</strong> Photos and physical inspection reveal hazards that documents miss. Look up (cable trays, dust on beams), look down (floor drains, oil accumulation), and look behind (hidden storage, blocked exits).</li>
+                            <li><strong>Assess each zone independently.</strong> A mixing room and a finished goods warehouse have vastly different fire profiles. Don't average them.</li>
+                            <li><strong>Check impairments.</strong> A sprinkler system that's shut off for maintenance provides zero protection. Ask: "Has any system been impaired? For how long?"</li>
+                            <li><strong>Talk to operators.</strong> They know the near-misses that never get reported. Ask: "Has anything ever smoked, sparked, or overheated here?"</li>
+                            <li><strong>Consider worst-case timing.</strong> A fire at 2 AM with skeleton crew is different from 2 PM with full shift. Assess for the most vulnerable scenario.</li>
+                            <li><strong>Don't forget contractor activities.</strong> Hot work by contractors is a leading cause of industrial fires.</li>
+                            <li><strong>Re-assess after changes.</strong> New equipment, new chemicals, new layouts — any change can alter the fire triangle balance.</li>
+                        </ul>
+                    </div>
+
+                </div>
+            </details>
+
+            <!-- Fire RA App Root (populated by fire-risk-assessment.js) -->
+            <div id="fra-app-root" class="min-h-[200px]"></div>
+            </div><!-- end inner padding wrapper -->
+        </section>
         
         <hr class="border-t-2 border-dashed border-slate-300 my-8 sm:my-12">
 
         <!-- Risk Assessment Section (Works across all tabs) -->
-        <section id="risk-generator-app" class="bg-white rounded-2xl shadow-xl overflow-hidden">
-            <div class="p-6 sm:p-8 space-y-6">
-                <div class="grid grid-cols-1 lg:grid-cols-1 gap-6">
-                        <div class="bg-gradient-to-br from-amber-50 to-orange-50 p-6 rounded-lg border border-amber-200">
-                        <h3 class="text-lg font-bold text-amber-900 mb-3" data-en-text="💡 Pro Tips">💡 Pro Tips</h3>
-                        <ul class="space-y-2 text-sm text-amber-800">
-                            <li data-en-text="• Mention past incidents for more accurate scoring">• Mention past incidents for more accurate scoring</li>
-                            <li data-en-text="• Add detailed hazard descriptions in notes">• Add detailed hazard descriptions in notes</li>
-                            <li data-en-text="• Review AI suggestions before finalizing">• Review AI suggestions before finalizing</li>
-                            <li data-en-text="• Save your Project and resume your work">• Save your Project and resume your work </li>
-                        </ul>
-                    </div>
-                </div>
-            <div id="dashboard-container" style="display: none;">
+        <section id="risk-generator-app">
+            <div>
+
+            <div id="dashboard-container" class="bg-white rounded-2xl shadow-xl overflow-hidden" style="display: none;">
                 <h1 class="text-3xl font-bold text-white bg-gradient-to-r from-indigo-700 to-blue-800 p-6 sm:p-8 flex flex-col sm:flex-row items-center justify-center gap-4 text-center">
 
                     RISK ASSESSMENT
@@ -1302,8 +1653,8 @@
             <div class="lightbox-main-area flex-1 flex flex-col md:flex-row gap-5 min-h-0">
                 
                 <!-- Image panel -->
-                <div class="image-wrapper flex-auto w-full md:w-[62%] flex items-center justify-center bg-black/40 rounded-2xl overflow-hidden border border-white/5">
-                    <img id="lightboxImage" alt="Large preview for blurring" class="w-full h-auto max-h-[72vh] object-contain cursor-crosshair">
+                <div class="image-wrapper flex-auto w-full md:w-[62%] flex items-center justify-center bg-black/40 rounded-2xl overflow-hidden border border-white/5 relative">
+                    <img id="lightboxImage" alt="Large preview for annotation" class="w-full h-auto max-h-[72vh] object-contain">
                 </div>
                 
                 <!-- Form panel - glass morphism -->
@@ -1399,14 +1750,8 @@
 
                     <!-- Form footer with action buttons - always visible -->
                     <div class="px-5 py-3.5 border-t border-slate-100 bg-slate-50/80 flex items-center gap-2 flex-wrap">
-                        <button id="undoBlurBtn" disabled class="inline-flex items-center gap-1.5 text-xs font-medium text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 py-2 px-3.5 rounded-lg transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 10h10a5 5 0 010 10H9m-6-5l-3-5 3-5"/></svg>
-                            Undo Blur
-                        </button>
-                        <button id="replaceImageBtn" class="inline-flex items-center gap-1.5 text-xs font-medium text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 py-2 px-3.5 rounded-lg transition-all duration-200">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-                            Replace
-                        </button>
+                        <button id="undoBlurBtn" disabled class="hidden">Undo Blur</button>
+                        <button id="replaceImageBtn" class="hidden">Replace</button>
                         <input type="file" id="replaceImageInput" accept="image/*" class="hidden">
                         <button id="deleteLightboxBtn" class="inline-flex items-center gap-1.5 text-xs font-medium text-red-600 bg-red-50 hover:bg-red-100 border border-red-200 py-2 px-3.5 rounded-lg transition-all duration-200 ml-auto">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
@@ -2099,6 +2444,12 @@
             selectedButton.classList.remove('border-transparent');
         }
         
+        // Hide project identity bar on Fire Risk tab (not relevant there)
+        const identityBar = document.getElementById('projectIdentityBar');
+        if (identityBar) {
+            identityBar.style.display = tabName === 'fire-ra' ? 'none' : '';
+        }
+
         console.debug(`Switched to tab: ${tabName}`);
     }
 
@@ -7947,7 +8298,9 @@ window.LIKELIHOOD_SCALE = LIKELIHOOD_SCALE;
         function showLightboxImage(imageId) {
             const thumbnailElement = document.getElementById(imageId);
             if (!thumbnailElement) return;
+            const previousImageId = currentLightboxImageId;
             currentLightboxImageId = imageId;
+            window.currentLightboxImageId = imageId;
             lightboxImage.src = thumbnailElement.src;
             // Add error handling for image loading
             lightboxImage.onerror = () => {
@@ -7955,7 +8308,7 @@ window.LIKELIHOOD_SCALE = LIKELIHOOD_SCALE;
                  showCustomAlert("Error loading the preview image.", 'error');
                  closeLightboxFunc(); // Close if image fails
              }
-            undoBlurBtn.disabled = !undoHistory.has(currentLightboxImageId);
+            undoBlurBtn.disabled = !(window._imageEditorUndoMap && window._imageEditorUndoMap.has(currentLightboxImageId));
             const data = window.riskAssessmentData.get(currentLightboxImageId) || {};
             stepDescription.value = data.description || '';
             spotHazards.value = data.hazards || '';
@@ -7964,6 +8317,8 @@ window.LIKELIHOOD_SCALE = LIKELIHOOD_SCALE;
             document.getElementById('userSeverity').value = data.userSeverity || '';
             document.getElementById('userLikelihood').value = data.userLikelihood || '';
             updateLightboxGallery();
+            // Notify image editor of image change — passes previous ID so annotations get baked
+            if (window.ImageEditor) window.ImageEditor.onImageChange(previousImageId);
         }
         function updateLightboxGallery() {
             lightboxGallery.innerHTML = '';
@@ -7979,8 +8334,11 @@ window.LIKELIHOOD_SCALE = LIKELIHOOD_SCALE;
             });
         }
         function closeLightboxFunc() {
+            // Notify image editor BEFORE clearing ID so annotations get baked
+            if (window.ImageEditor) window.ImageEditor.onLightboxClose();
             lightboxModal.style.display = 'none';
             currentLightboxImageId = null;
+            window.currentLightboxImageId = null;
             lightboxGallery.innerHTML = '';
             stepDescription.value = '';
             spotHazards.value = '';
@@ -8365,6 +8723,7 @@ window.LIKELIHOOD_SCALE = LIKELIHOOD_SCALE;
                 // Open the lightbox for the new step immediately
                 lightboxModal.style.display = 'flex';
                 showLightboxImage(fileId);
+                if (window.ImageEditor) window.ImageEditor.onLightboxOpen();
 
                 showCustomAlert(`New empty step added! Add your notes below.`, 'success');
             }, 'image/png');
@@ -8614,6 +8973,7 @@ window.LIKELIHOOD_SCALE = LIKELIHOOD_SCALE;
                 } else if (event.target.tagName === 'IMG') {
                     lightboxModal.style.display = 'flex';
                     showLightboxImage(event.target.id);
+                    if (window.ImageEditor) window.ImageEditor.onLightboxOpen();
                 }
             });
 
@@ -9563,8 +9923,15 @@ ${controls}
                 }
             });
         }
-        lightboxImage.addEventListener('click', handleManualBlurOnLightbox);
-        undoBlurBtn.addEventListener('click', handleUndoBlur);
+        // Old click-to-blur replaced by image-editor.js
+        // lightboxImage.addEventListener('click', handleManualBlurOnLightbox);
+        window._oldBlurHandler = handleManualBlurOnLightbox;
+        undoBlurBtn.addEventListener('click', () => {
+            if (window.ImageEditor) window.ImageEditor.handleUndo();
+            else handleUndoBlur();
+        });
+        // Make updateLightboxGallery available to image editor
+        window.updateLightboxGallery = updateLightboxGallery;
         deleteLightboxBtn.addEventListener('click', handleDeleteLightboxImage);
         // --- NEW: Handle Replace Image ---
         if (replaceImageBtn && replaceImageInput) {
@@ -9714,6 +10081,9 @@ downloadBtn.addEventListener('click', async () => {
         showCustomAlert("Error: JSZip library not loaded.", 'error'); 
         return; 
     }
+    
+    // Bake any canvas annotations into images before export
+    if (window.ImageEditor) await window.ImageEditor.bakeAllAnnotations();
     
     statusDiv.innerText = 'Preparing images and reports for download...';
     downloadBtn.disabled = true; downloadBtn.innerText = 'Zipping...';
@@ -21750,6 +22120,31 @@ Return ONLY a valid JSON array (no explanation, no markdown):
     }
 
 })();
+</script>
+
+<!-- Fire Risk Assessment Initialization -->
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Initialize Fire RA module when its tab is first shown
+        const fraGuideToggle = document.getElementById('fra-guide-toggle');
+        if (fraGuideToggle) {
+            fraGuideToggle.addEventListener('click', function() {
+                const guide = document.getElementById('fra-guide');
+                if (guide) guide.open = !guide.open;
+            });
+        }
+
+        // Lazy-init: Initialize fire RA app when tab is clicked
+        let fraInitialized = false;
+        const origSwitchTab = window.switchTab;
+        window.switchTab = function(tabName) {
+            origSwitchTab(tabName);
+            if (tabName === 'fire-ra' && !fraInitialized && window.FireRiskAssessment) {
+                window.FireRiskAssessment.init();
+                fraInitialized = true;
+            }
+        };
+    });
 </script>
 
 </body>

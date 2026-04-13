@@ -2,3 +2,22 @@ node_modules/
 .env
 *.log
 .DS_Store
+Thumbs.db
+desktop.ini
+
+# ── Old/backup HTML versions ──────────────────────────────────
+Old files/
+Index 19032026.HTML
+Index 19Mar2026.HTML
+Index B4 GOEHS.HTML
+Index B4 MultipleGOESH upload . HTML
+Index copy.HTML
+Index GOEHS + mapper.HTML
+Index multitab cap with liteimage 2.0.HTML
+Index with GOEHS integration.HTML
+Index with GOEHS working.HTML
+Index with GOEHS.HTML
+Index with GOES batch +Column mapper .HTML
+Index_with multitab cap. 20Mar26.HTML
+Testing minimalui.HTML
+
