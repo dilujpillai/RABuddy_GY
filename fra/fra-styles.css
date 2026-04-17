@@ -15,9 +15,9 @@
 }
 .fra-zone-tab:hover { border-color: #fb923c; background: #fff7ed; }
 .fra-zone-tab.active { border-color: #ea580c; background: #fff7ed; color: #9a3412; box-shadow: 0 0 0 3px rgba(234,88,12,0.12); }
-.fra-zone-tab.floorplan { border-color: #6366f1; color: #4338ca; }
-.fra-zone-tab.floorplan:hover { background: #eef2ff; }
-.fra-zone-tab.floorplan.active { border-color: #4f46e5; background: #eef2ff; color: #312e81; box-shadow: 0 0 0 3px rgba(99,102,241,0.12); }
+.fra-zone-tab.floorplan { border-color: #002c5f; color: #002c5f; }
+.fra-zone-tab.floorplan:hover { background: #edf2f9; }
+.fra-zone-tab.floorplan.active { border-color: #002c5f; background: #edf2f9; color: #001530; box-shadow: 0 0 0 3px rgba(0,44,95,0.12); }
 
 /* Card component */
 .fra-card {
@@ -38,8 +38,8 @@
 /* Color themes for card headers */
 .fra-card.theme-orange .fra-card-header { background: linear-gradient(to right, #fff7ed, #ffedd5); color: #7c2d12; border-color: #fed7aa; }
 .fra-card.theme-orange { border-color: #fed7aa; }
-.fra-card.theme-indigo .fra-card-header { background: linear-gradient(to right, #eef2ff, #e0e7ff); color: #312e81; border-color: #c7d2fe; }
-.fra-card.theme-indigo { border-color: #c7d2fe; }
+.fra-card.theme-indigo .fra-card-header { background: linear-gradient(to right, #edf2f9, #d4e0f0); color: #001530; border-color: #a9c1e0; }
+.fra-card.theme-indigo { border-color: #a9c1e0; }
 .fra-card.theme-green .fra-card-header { background: linear-gradient(to right, #f0fdf4, #dcfce7); color: #14532d; border-color: #bbf7d0; }
 .fra-card.theme-green { border-color: #bbf7d0; }
 .fra-card.theme-slate .fra-card-header { background: linear-gradient(to right, #f8fafc, #f1f5f9); color: #1e293b; border-color: #e2e8f0; }
@@ -60,8 +60,8 @@
     border-radius: 6px;
     font-size: 10px;
     font-weight: 600;
-    background: #e0e7ff;
-    color: #4338ca;
+    background: #d4e0f0;
+    color: #002c5f;
     vertical-align: middle;
 }
 .fra-ai-badge::before { content: '🤖'; font-size: 10px; }
@@ -152,17 +152,46 @@
     margin-bottom: 16px;
 }
 .fra-toolbar-title { font-weight: 700; font-size: 14px; color: #1e293b; margin-right: auto; }
+.fra-toolbar-group {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+}
+.fra-toolbar-group + .fra-toolbar-group {
+    margin-left: 8px;
+    padding-left: 8px;
+    border-left: 1px solid #e2e8f0;
+}
 .fra-toolbar-btn {
-    padding: 6px 12px;
-    border-radius: 8px;
+    padding: 6px 14px;
+    border-radius: 6px;
     font-size: 12px;
     font-weight: 600;
+    letter-spacing: 0.02em;
     border: 1px solid;
     cursor: pointer;
     transition: all 0.15s;
     background: #fff;
+    white-space: nowrap;
 }
-.fra-toolbar-btn:hover { transform: translateY(-1px); box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+.fra-toolbar-btn:hover { transform: translateY(-1px); box-shadow: 0 2px 6px rgba(0,0,0,0.08); }
+.fra-toolbar-btn:active { transform: translateY(0); box-shadow: none; }
+
+/* Data management buttons (Save / Load / Merge) */
+.fra-toolbar-btn.fra-btn-data {
+    border-color: #cbd5e1;
+    color: #334155;
+    background: #f8fafc;
+}
+.fra-toolbar-btn.fra-btn-data:hover { border-color: #94a3b8; background: #f1f5f9; color: #1e293b; }
+
+/* Export buttons (PDF / HTML) */
+.fra-toolbar-btn.fra-btn-export {
+    border-color: #fdba74;
+    color: #9a3412;
+    background: #fff7ed;
+}
+.fra-toolbar-btn.fra-btn-export:hover { border-color: #ea580c; background: #ffedd5; color: #7c2d12; }
 
 /* Result score badge */
 .fra-score-badge {

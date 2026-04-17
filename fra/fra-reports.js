@@ -79,6 +79,46 @@
     }
 
     // ═══════════════════════════════════════════════════════════════
+    // SHARED: TERMS & DEFINITIONS (used by both PDF and HTML appendix)
+    // ═══════════════════════════════════════════════════════════════
+
+    const FRA_TERMS = [
+        { section: 'Scoring & Methodology' },
+        { term: 'FTRI (Fire Triangle Risk Index)', def: 'A composite score from 0 to 100 derived from the fire triangle leg scores, control effectiveness, and a consequence amplifier. Higher scores indicate greater fire risk.' },
+        { term: 'Fire Triangle', def: 'The three elements required for combustion: Heat (ignition source), Fuel (combustibles), and Oxygen. Removing any one element extinguishes or prevents fire.' },
+        { term: 'Heat / Ignition Score', def: 'Rated 1\u201310. Reflects the intensity and probability of ignition sources present in the zone (e.g., hot work, electrical equipment, friction).' },
+        { term: 'Fuel / Combustible Score', def: 'Rated 1\u201310. Reflects the type, quantity, and flash point of combustible or flammable materials stored or used in the zone.' },
+        { term: 'Oxygen Score', def: 'Rated 1\u201310. Reflects oxygen availability and ventilation conditions. Higher scores indicate conditions that support rapid fire spread.' },
+        { term: 'Triangle Score', def: 'The product of the three leg averages, scaled 0\u201315, multiplied by the Interaction Factor. Represents combined fire triangle intensity.' },
+        { term: 'Interaction Factor', def: 'A multiplier (1.0\u20131.5) applied when multiple high-scoring legs co-exist (Compound Risk). A minimum leg score above 6 triggers 1.30; above 8 triggers 1.50.' },
+        { term: 'Control Effectiveness', def: 'Weighted percentage (0\u2013100%) of fire protection controls in place across five NFPA categories. Mandatory controls carry higher weight.' },
+        { term: 'Consequence Amplifier', def: 'A multiplier (1.0\u20131.5) that increases the final score based on occupancy class, business criticality, and absence of sprinkler suppression.' },
+        { section: 'Risk Categories' },
+        { term: 'CRITICAL (Score 80\u2013100)', def: 'Immediate action required. Cease operations until fire risks are mitigated. Escalate to site management and EHS immediately.' },
+        { term: 'HIGH (Score 60\u201379)', def: 'Urgent mitigation required within 24\u201348 hours. Assign responsible persons and define corrective action timeline.' },
+        { term: 'MEDIUM (Score 30\u201359)', def: 'Plan and implement corrective actions within 30 days. Review controls and close gaps through the site action tracking system.' },
+        { term: 'LOW (Score 0\u201329)', def: 'Maintain current controls. Conduct annual review to confirm no changes in zone conditions.' },
+        { section: 'Standards Referenced' },
+        { term: 'NFPA 30', def: 'Standard for Flammable and Combustible Liquids. Defines Maximum Allowable Quantities (MAQ) per control area and storage requirements.' },
+        { term: 'NFPA 72', def: 'National Fire Alarm and Signaling Code. Covers smoke detectors, heat detectors, manual pull stations, and alarm notification appliances.' },
+        { term: 'NFPA 13', def: 'Standard for the Installation of Sprinkler Systems. Governs design, installation, and testing of automatic sprinkler systems.' },
+        { term: 'NFPA 101', def: 'Life Safety Code. Addresses egress, emergency lighting, EXIT signs, and occupancy classifications.' },
+        { term: 'NFPA 704', def: 'Standard System for the Identification of the Hazards of Materials for Emergency Response (the "fire diamond"). Rates health, flammability, instability, and special hazards 0\u20134.' },
+        { term: 'NFPA 51B', def: 'Standard for Fire Prevention During Welding, Cutting, and Other Hot Work. Requires permits, fire watch, and specific clearance distances.' },
+        { term: 'NFPA 652', def: 'Standard on the Fundamentals of Combustible Dust. Applies to facilities handling powders or dusts that can form explosive atmospheres.' },
+        { term: 'FM Global', def: 'Factory Mutual Global \u2014 a leading commercial and industrial property insurer whose data sheets provide engineering-based fire protection standards.' },
+        { term: 'OSHA 1910.39', def: 'US OSHA standard requiring documented Fire Prevention Plans, employee training, and identification of potential ignition sources.' },
+        { section: 'Key Technical Terms' },
+        { term: 'Flash Point', def: 'The lowest temperature at which a liquid produces sufficient vapour to ignite momentarily when an ignition source is applied (NFPA 30). Liquids with flash points below 37.8\u00b0C are Class I flammables.' },
+        { term: 'MAQ (Maximum Allowable Quantity)', def: 'The maximum amount of flammable or combustible liquid permitted in a single control area under NFPA 30. NFPA 30 \u00a79.4 allows 4\u00d7 the MAQ in sprinklered areas.' },
+        { term: 'Control Area', def: 'A building space bounded by construction capable of limiting the spread of fire and restricting the release of hazardous materials (NFPA 30).' },
+        { term: 'Hot Work', def: 'Any work involving open flames, sparks, or heat-generating operations including welding, cutting, grinding, brazing, or use of open-flame torches (NFPA 51B).' },
+        { term: 'LEL (Lower Explosive Limit)', def: 'The minimum concentration of a flammable gas or vapour in air that can sustain ignition. Concentrations below the LEL are too lean to ignite.' },
+        { term: 'ERT (Emergency Response Team)', def: 'Trained in-house personnel who lead response to fire emergencies, conduct evacuations, and coordinate with external fire services.' },
+        { term: 'Occupancy Class', def: 'A classification of a building or zone based on the nature of activities conducted (e.g., Factory \u2014 General, Assembly, Storage, Office, Laboratory). Affects the consequence amplifier.' }
+    ];
+
+    // ═══════════════════════════════════════════════════════════════
     // PDF REPORT
     // ═══════════════════════════════════════════════════════════════
 
@@ -93,7 +133,31 @@
 
         const d = D();
         const zones = state.zones;
+
+        // Strip emoji/multi-byte characters that PDFKit built-in fonts cannot render
+        const pdfSafe = (str) => String(str || '').replace(/\p{Emoji}/gu, '').replace(/\s{2,}/g, ' ').trim();
+
+        // Fetch Noto Sans TTF for professional Unicode typography (graceful fallback to Helvetica)
+        let _fontBufs = null;
+        try {
+            const [rRes, bRes] = await Promise.all([
+                fetch('https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/inter/Inter%5Bopsz%2Cwght%5D.ttf'),
+                fetch('https://cdn.jsdelivr.net/gh/rsms/inter@master/docs/font-files/Inter-Bold.ttf')
+            ]);
+            if (rRes.ok && bRes.ok)
+                _fontBufs = await Promise.all([rRes.arrayBuffer(), bRes.arrayBuffer()]);
+        } catch (e) { /* Helvetica fallback */ }
+
         const doc = new PDFDocument({ size: 'A4', margin: 50, bufferPages: true });
+        if (_fontBufs) {
+            doc.registerFont('Inter', _fontBufs[0]);
+            doc.registerFont('Inter-Bold', _fontBufs[1]);
+            // Transparently redirect all Helvetica font calls to Inter
+            const _origFont = doc.font.bind(doc);
+            doc.font = (name, ...a) => _origFont(
+                name === 'Helvetica' ? 'Inter' :
+                name === 'Helvetica-Bold' ? 'Inter-Bold' : name, ...a);
+        }
         const stream = doc.pipe(blobStream());
         const dateStr = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
         const pw = 495; // page width minus margins
@@ -109,7 +173,16 @@
             doc.fillColor('#1e293b');
         };
         // Helper: section header
-        const sectionHead = (title) => { doc.moveDown(0.4); doc.fontSize(12).font('Helvetica-Bold').fillColor('#1e293b').text(title); doc.moveDown(0.2); hr('#e2e8f0'); };
+        const sectionHead = (title) => {
+            doc.moveDown(0.5);
+            const sy = doc.y;
+            // Left accent bar
+            doc.rect(50, sy, 3, 14).fill('#ea580c');
+            doc.fontSize(12).font('Helvetica-Bold').fillColor('#1e293b')
+               .text('  ' + title, 56, sy + 1);
+            doc.moveDown(0.15);
+            hr('#e2e8f0');
+        };
 
         // ─── TITLE PAGE ───
         doc.moveDown(6);
@@ -134,35 +207,67 @@
         hr('#ea580c');
         doc.moveDown(0.3);
 
-        // Summary table
-        const colW = [30, 150, 70, 65, 65, pw - 380];
-        const tableHead = ['#', 'Zone Name', 'Score', 'Heat/Fuel/O\u2082', 'Ctrl Eff.', 'Action Required'];
+        // Summary table — col widths: #, Zone, Score, Heat/Fuel/O2, Ctrl%, Action
+        const colW = [25, 135, 85, 65, 50, pw - 360];
+        const tableHead = ['#', 'Zone Name', 'Score / Rating', 'Heat/Fuel/O2', 'Ctrl %', 'Action Required'];
+
+        // Draw header row
         doc.fontSize(8).font('Helvetica-Bold');
         let tx = 50;
-        doc.rect(50, doc.y, pw, 16).fill('#475569');
+        doc.rect(50, doc.y, pw, 18).fill('#374151');
         doc.fillColor('#fff');
-        const headY = doc.y + 4;
-        tableHead.forEach((h, i) => { doc.text(h, tx + 3, headY, { width: colW[i] - 6 }); tx += colW[i]; });
-        doc.y = headY + 14;
+        const headY = doc.y + 5;
+        tableHead.forEach((h, i) => { doc.text(h, tx + 4, headY, { width: colW[i] - 8, lineBreak: false }); tx += colW[i]; });
+        doc.y = headY + 15;
 
         zones.forEach((z, i) => {
-            if (doc.y > 720) doc.addPage();
+            if (doc.y > 710) doc.addPage();
             const r = z.result;
+
+            // Pre-calculate row height based on tallest cell
+            doc.fontSize(8).font('Helvetica');
+            const actionText = r ? r.category.action : 'Not calculated';
+            const actionH = doc.heightOfString(actionText, { width: colW[5] - 8 });
+            const zoneName = z.name || 'Zone ' + (i + 1);
+            const nameH = doc.heightOfString(zoneName, { width: colW[1] - 8 });
+            const rowH = Math.max(actionH, nameH, 20) + 8;
+
             const rowY = doc.y;
             const bg = i % 2 === 0 ? '#f8fafc' : '#ffffff';
-            doc.rect(50, rowY, pw, 18).fill(bg);
-            doc.fillColor('#1e293b').font('Helvetica').fontSize(8);
+            doc.rect(50, rowY, pw, rowH).fill(bg);
+
+            // Draw subtle row border
+            doc.moveTo(50, rowY + rowH).lineTo(545, rowY + rowH).strokeColor('#e2e8f0').lineWidth(0.3).stroke();
+
             tx = 50;
+            const scoreLabel = r ? r.category.label : '—';
+            const scoreColor = r ? r.category.color : '#64748b';
             const vals = [
-                String(i + 1),
-                z.name || 'Zone ' + (i + 1),
-                r ? r.score + '/100 ' + r.category.label : '—',
-                r ? r.heat + '/' + r.fuel + '/' + r.oxygen : '—',
-                r ? Math.round(r.controls.totalEffectiveness * 100) + '%' : '—',
-                r ? r.category.action : 'Not calculated'
+                { text: String(i + 1), color: '#64748b', bold: false },
+                { text: zoneName, color: '#1e293b', bold: true },
+                { text: r ? r.score + '/100' : '—', color: scoreColor, bold: true, sub: scoreLabel },
+                { text: r ? r.heat + ' / ' + r.fuel + ' / ' + r.oxygen : '—', color: '#1e293b', bold: false },
+                { text: r ? Math.round(r.controls.totalEffectiveness * 100) + '%' : '—', color: '#1e293b', bold: false },
+                { text: actionText, color: '#1e293b', bold: false }
             ];
-            vals.forEach((v, j) => { doc.text(v, tx + 3, rowY + 4, { width: colW[j] - 6 }); tx += colW[j]; });
-            doc.y = rowY + 18;
+
+            vals.forEach((v, j) => {
+                const cellX = tx + 4;
+                const cellW = colW[j] - 8;
+                doc.fillColor(v.color).font(v.bold ? 'Helvetica-Bold' : 'Helvetica').fontSize(8);
+                if (j === 2 && v.sub) {
+                    // Score cell: score on top, label badge below
+                    doc.text(v.text, cellX, rowY + 4, { width: cellW, lineBreak: false });
+                    doc.fontSize(7).fillColor(scoreColor + 'cc').font('Helvetica')
+                       .text(v.sub, cellX, rowY + 15, { width: cellW, lineBreak: false });
+                    doc.fontSize(8);
+                } else {
+                    doc.text(v.text, cellX, rowY + 4, { width: cellW });
+                }
+                tx += colW[j];
+            });
+
+            doc.y = rowY + rowH;
         });
         doc.moveDown(0.5);
 
@@ -197,13 +302,13 @@
             if (r) {
                 doc.moveDown(0.1);
                 doc.fontSize(11).font('Helvetica-Bold').fillColor(catColor)
-                    .text(r.category.icon + ' ' + r.category.label + ' — FTRI Score: ' + r.score + '/100');
+                    .text('[' + r.category.label + '] \u2014 FTRI Score: ' + r.score + '/100');
             }
             doc.moveDown(0.2);
             hr(catColor);
 
             // Location profile table
-            sectionHead('\uD83D\uDCCD Location Profile');
+            sectionHead('Location Profile');
             doc.fontSize(9).font('Helvetica').fillColor('#1e293b');
             const locRows = [
                 ['Building', z.building || '\u2014', 'Floor / Level', z.floor || '\u2014'],
@@ -216,7 +321,7 @@
             });
 
             // Fire Triangle
-            sectionHead('\uD83D\uDD3A Fire Triangle Analysis');
+            sectionHead('Fire Triangle Analysis');
             doc.fontSize(9).font('Helvetica').fillColor('#1e293b');
             if (r) {
                 doc.font('Helvetica-Bold').text('Heat (Ignition): ' + r.heat + '/10   |   Fuel (Combustibles): ' + r.fuel + '/10   |   Oxygen: ' + r.oxygen + '/10');
@@ -229,13 +334,13 @@
             doc.text('Oxygen Conditions: ' + (z.oxygenConditions.length > 0 ? z.oxygenConditions.join(', ') : 'None identified'));
 
             // Controls
-            sectionHead('\uD83D\uDEE1\uFE0F Fire Protection Controls');
+            sectionHead('Fire Protection Controls');
             doc.fontSize(9).font('Helvetica').fillColor('#1e293b');
             for (const [catKey, catDef] of Object.entries(d.CONTROL_CATEGORIES)) {
                 const sel = z.selectedControls[catKey] || [];
                 const total = Object.keys(catDef.items).length;
                 const pct = total > 0 ? Math.round((sel.length / total) * 100) : 0;
-                doc.font('Helvetica-Bold').text(catDef.label + ' (' + sel.length + '/' + total + ' \u2014 ' + pct + '%)', { continued: false });
+                doc.font('Helvetica-Bold').text(pdfSafe(catDef.label) + ' (' + sel.length + '/' + total + ' \u2014 ' + pct + '%)', { continued: false });
                 if (sel.length > 0) {
                     doc.font('Helvetica').fontSize(8).text('   ' + sel.join('; '));
                 } else {
@@ -247,9 +352,9 @@
 
             // FTRI Result
             if (r) {
-                sectionHead('\uD83D\uDCCA FTRI Result');
+                sectionHead('FTRI Result');
                 doc.fontSize(10).font('Helvetica-Bold').fillColor(catColor);
-                doc.text(r.category.icon + '  Score: ' + r.score + '/100  \u2014  ' + r.category.label);
+                doc.text('[' + r.category.label + ']  Score: ' + r.score + '/100');
                 doc.fontSize(9).font('Helvetica').fillColor('#1e293b');
                 doc.text('Action Required: ' + r.category.action);
                 doc.text('Control Effectiveness: ' + Math.round(r.controls.totalEffectiveness * 100) + '%   |   Consequence Amplifier: \u00d7' + r.consequence.toFixed(2));
@@ -261,11 +366,17 @@
 
                 if (r.controls.gaps.length > 0) {
                     doc.moveDown(0.4);
-                    doc.fontSize(10).font('Helvetica-Bold').fillColor('#991b1b').text('\u26A0 Gaps & Missing Controls');
+                    doc.fontSize(10).font('Helvetica-Bold').fillColor('#991b1b').text('Gaps & Missing Controls');
                     doc.fontSize(8).font('Helvetica');
                     r.controls.gaps.forEach(g => {
                         doc.fillColor(g.startsWith('MANDATORY') ? '#7f1d1d' : '#854d0e');
-                        doc.text('  ' + (g.startsWith('MANDATORY') ? '\uD83D\uDD34' : '\uD83D\uDFE1') + ' ' + g);
+                        const gText = g.replace(/^MANDATORY MISSING:\s*/, '');
+                        if (g.startsWith('MANDATORY')) {
+                            doc.font('Helvetica-Bold').text('        \u2022  ', { continued: true })
+                               .font('Helvetica').text(gText);
+                        } else {
+                            doc.font('Helvetica').text('        \u2013  ' + gText);
+                        }
                     });
                     doc.fillColor('#1e293b');
                 }
@@ -273,14 +384,14 @@
 
             // Notes
             if (z.notes) {
-                sectionHead('\uD83D\uDCDD Notes & Observations');
+                sectionHead('Notes & Observations');
                 doc.fontSize(9).font('Helvetica').text(z.notes);
             }
 
             // Photos
             if (z.photos && z.photos.length > 0) {
                 if (doc.y > 500) doc.addPage();
-                sectionHead('\uD83D\uDCF7 Zone Photos');
+                sectionHead('Zone Photos');
                 let photoX = 50;
                 z.photos.forEach((photo, pi) => {
                     if (doc.y > 580) { doc.addPage(); photoX = 50; }
@@ -299,6 +410,44 @@
                 doc.moveDown(0.5);
             }
         });
+
+        // ─── APPENDIX A — TERMS & DEFINITIONS ───
+        doc.addPage();
+        doc.fontSize(18).font('Helvetica-Bold').fillColor('#1e293b').text('Appendix A \u2014 Terms & Definitions');
+        doc.moveDown(0.3);
+        hr('#ea580c');
+        doc.moveDown(0.3);
+        doc.fontSize(9).font('Helvetica').fillColor('#475569')
+           .text('The following terms are used throughout this Fire Risk Assessment report. Definitions are based on NFPA standards, OSHA regulations, and FM Global engineering guidelines.');
+        doc.moveDown(0.5);
+
+        FRA_TERMS.forEach(entry => {
+            if (doc.y > 750) doc.addPage();
+            if (entry.section) {
+                // Section sub-heading
+                doc.moveDown(0.4);
+                const sy = doc.y;
+                doc.rect(50, sy, 3, 12).fill('#ea580c');
+                doc.fontSize(10).font('Helvetica-Bold').fillColor('#1e293b').text('  ' + entry.section, 56, sy + 1);
+                doc.moveDown(0.1);
+                doc.moveTo(50, doc.y).lineTo(545, doc.y).strokeColor('#e2e8f0').lineWidth(0.4).stroke();
+                doc.moveDown(0.3);
+            } else {
+                // Term + definition row
+                const termY = doc.y;
+                doc.fontSize(8).font('Helvetica-Bold').fillColor('#1e293b')
+                   .text(entry.term, 54, termY, { width: 160, lineBreak: true });
+                const termEndY = doc.y;
+                doc.fontSize(8).font('Helvetica').fillColor('#374151')
+                   .text(entry.def, 220, termY, { width: 320, lineBreak: true });
+                const defEndY = doc.y;
+                doc.y = Math.max(termEndY, defEndY) + 3;
+                // Light row divider
+                doc.moveTo(54, doc.y).lineTo(540, doc.y).strokeColor('#f1f5f9').lineWidth(0.3).stroke();
+                doc.y += 2;
+            }
+        });
+        doc.moveDown(0.5);
 
         // ─── FOOTER on each page ───
         const pageCount = doc.bufferedPageRange().count;
@@ -330,6 +479,50 @@
     // ═══════════════════════════════════════════════════════════════
     // HTML REPORT
     // ═══════════════════════════════════════════════════════════════
+
+    // Generates an animated circular SVG fire badge for HTML export
+    function fireBadgeSVGString(score, color, label) {
+        const t = score / 100;
+        const cr   = Math.round(44 + t * 24);   // radius 44→68px
+        const pad  = 14;
+        const lH   = 24;
+        const lW   = Math.round(cr * 2.2);
+        const W    = (cr + pad) * 2;
+        const H    = (cr + pad) * 2 + lH + 7;
+        const cxv  = W / 2;
+        const cyv  = cr + pad;
+        const fSz  = Math.round(cr * 0.90);
+        const sFsz = Math.round(cr * 0.36);
+        const lFsz = Math.round(9 + t * 4);
+        const lX   = (W - lW) / 2;
+        const lY   = cyv + cr + 7;
+        const rW   = (2.5 + t * 4).toFixed(1);
+        const uid  = 'fra' + score + Math.random().toString(36).slice(2, 6);
+        const pDur = (1.3 + (1 - t) * 0.7).toFixed(2) + 's';
+        const fDur = (1.5 + (1 - t) * 0.6).toFixed(2) + 's';
+        return '<svg width="' + W + '" height="' + H + '" viewBox="0 0 ' + W + ' ' + H + '" xmlns="http://www.w3.org/2000/svg" style="overflow:visible;display:block;">' +
+            '<defs>' +
+              '<radialGradient id="' + uid + 'rg" cx="50%" cy="45%" r="55%"><stop offset="0%" stop-color="#fff"/><stop offset="78%" stop-color="#fff"/><stop offset="100%" stop-color="' + color + '" stop-opacity="0.2"/></radialGradient>' +
+              '<filter id="' + uid + 'halo" x="-80%" y="-80%" width="260%" height="260%"><feGaussianBlur stdDeviation="' + (12 + t * 14) + '"/></filter>' +
+              '<filter id="' + uid + 'shadow" x="-40%" y="-40%" width="180%" height="200%"><feDropShadow dx="0" dy="' + (2 + t * 5) + '" stdDeviation="' + (4 + t * 7) + '" flood-color="' + color + '" flood-opacity="' + (0.55 + t * 0.3).toFixed(2) + '"/></filter>' +
+              '<filter id="' + uid + 'glow" x="-70%" y="-70%" width="240%" height="240%"><feGaussianBlur stdDeviation="' + (3 + t * 4) + '" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>' +
+              '<linearGradient id="' + uid + 'lg" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="' + color + '"/><stop offset="100%" stop-color="' + color + '" stop-opacity="0.82"/></linearGradient>' +
+            '</defs>' +
+            // Halo
+            '<circle cx="' + cxv + '" cy="' + cyv + '" r="' + (cr + 10) + '" fill="' + color + '" opacity="' + (0.28 + t * 0.3).toFixed(2) + '" filter="url(#' + uid + 'halo)"/>' +
+            // Pulsing ring
+            '<circle cx="' + cxv + '" cy="' + cyv + '" r="' + (cr + 6) + '" fill="none" stroke="' + color + '" stroke-width="' + (2 + t * 3).toFixed(1) + '" opacity="0.6" style="animation:fra-ring-pulse ' + pDur + ' ease-in-out infinite;transform-origin:' + cxv + 'px ' + cyv + 'px"/>' +
+            // Main circle
+            '<circle cx="' + cxv + '" cy="' + cyv + '" r="' + cr + '" fill="url(#' + uid + 'rg)" stroke="' + color + '" stroke-width="' + rW + '" filter="url(#' + uid + 'shadow)"/>' +
+            // Flame
+            '<text x="' + cxv + '" y="' + (cyv - cr * 0.07) + '" font-size="' + fSz + '" text-anchor="middle" dominant-baseline="middle" filter="url(#' + uid + 'glow)" style="animation:fra-flame-bounce ' + fDur + ' ease-in-out infinite;transform-origin:' + cxv + 'px ' + (cyv - cr * 0.07) + 'px">&#x1F525;</text>' +
+            // Score
+            '<text x="' + cxv + '" y="' + (cyv + cr * 0.62) + '" font-size="' + sFsz + '" font-weight="900" text-anchor="middle" dominant-baseline="middle" fill="' + color + '" font-family="system-ui,sans-serif">' + score + '<tspan font-size="' + Math.round(sFsz * 0.62) + '" font-weight="600" fill="' + color + '" opacity="0.7">/100</tspan></text>' +
+            // Label pill
+            '<rect x="' + lX + '" y="' + lY + '" width="' + lW + '" height="' + lH + '" rx="' + (lH / 2) + '" fill="url(#' + uid + 'lg)" filter="url(#' + uid + 'shadow)"/>' +
+            '<text x="' + cxv + '" y="' + (lY + lH / 2 + 0.5) + '" font-size="' + lFsz + '" font-weight="800" text-anchor="middle" dominant-baseline="middle" fill="#fff" font-family="system-ui,sans-serif" letter-spacing="2">' + (label || '').toUpperCase() + '</text>' +
+            '</svg>';
+    }
 
     async function generateFRAHTML(state) {
         const d = D();
@@ -390,9 +583,7 @@
                 (r ? r.category.border : '#e2e8f0') + ';border-radius:12px;padding:20px;margin-bottom:20px;background:' +
                 catBg + ';">' +
                 '<div style="display:flex;align-items:center;gap:16px;margin-bottom:16px;">' +
-                (r ? '<div style="width:80px;height:80px;border-radius:50%;background:' + catColor +
-                    ';color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;font-weight:900;">' +
-                    '<span style="font-size:24px;">' + r.score + '</span><span style="font-size:10px;opacity:0.8;">/100</span></div>' : '') +
+                (r ? fireBadgeSVGString(r.score, r.category.color, r.category.label) : '') +
                 '<div><h2 style="margin:0;color:' + catColor + ';">Zone ' + (i + 1) + ': ' + esc(z.name) + '</h2>' +
                 '<div style="color:' + catColor + ';font-weight:600;font-size:14px;">' + catLabel + '</div>' +
                 (r ? '<div style="font-size:12px;color:' + catColor + ';">' + r.category.action + '</div>' : '') +
@@ -424,14 +615,40 @@
                 '</div>';
         });
 
+        // Build appendix HTML
+        let appendixRows = '';
+        FRA_TERMS.forEach(entry => {
+            if (entry.section) {
+                appendixRows += '<tr><td colspan="2" style="padding:10px 12px 4px;background:#f8fafc;border-bottom:2px solid #ea580c;">' +
+                    '<span style="display:inline-block;width:3px;height:12px;background:#ea580c;margin-right:8px;vertical-align:middle;border-radius:2px;"></span>' +
+                    '<strong style="font-size:12px;color:#1e293b;">' + entry.section + '</strong></td></tr>';
+            } else {
+                appendixRows += '<tr>' +
+                    '<td style="padding:6px 12px;border-bottom:1px solid #f1f5f9;vertical-align:top;width:220px;font-size:11px;font-weight:700;color:#1e293b;">' + entry.term + '</td>' +
+                    '<td style="padding:6px 12px;border-bottom:1px solid #f1f5f9;vertical-align:top;font-size:11px;color:#374151;line-height:1.6;">' + entry.def + '</td>' +
+                    '</tr>';
+            }
+        });
+        const appendixHTML = '<div style="break-inside:avoid;margin-top:32px;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;">' +
+            '<div style="background:#1e293b;padding:14px 20px;">' +
+            '<h2 style="margin:0;color:#fff;font-size:16px;">Appendix A \u2014 Terms &amp; Definitions</h2>' +
+            '<p style="margin:4px 0 0;color:#94a3b8;font-size:11px;">Based on NFPA standards, OSHA regulations, and FM Global engineering guidelines.</p>' +
+            '</div>' +
+            '<table style="width:100%;border-collapse:collapse;background:#fff;">' + appendixRows + '</table>' +
+            '</div>';
+
         const htmlStr = '<!DOCTYPE html>\n<html lang="en">\n<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">' +
             '<title>Fire Risk Assessment Report \u2014 ' + dateStr + '</title>' +
-            '<style>body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;max-width:900px;margin:0 auto;padding:20px;background:#f8fafc;color:#1e293b;}h1{text-align:center;color:#7f1d1d;}.meta{text-align:center;color:#64748b;font-size:13px;margin-bottom:24px;}@media print{body{background:#fff;padding:0;}.no-print{display:none;}}</style>' +
+            '<style>body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;max-width:900px;margin:0 auto;padding:20px;background:#f8fafc;color:#1e293b;}h1{text-align:center;color:#7f1d1d;}.meta{text-align:center;color:#64748b;font-size:13px;margin-bottom:24px;}@media print{body{background:#fff;padding:0;}.no-print{display:none;}}' +
+            '@keyframes fra-ring-pulse{0%,100%{opacity:.55;transform:scale(1)}50%{opacity:.9;transform:scale(1.12)}}' +
+            '@keyframes fra-flame-bounce{0%,100%{transform:scale(1) translateY(0)}50%{transform:scale(1.15) translateY(-4px)}}' +
+            '</style>' +
             '</head><body>' +
             '<h1>\ud83d\udd25 Fire Risk Assessment Report</h1>' +
             '<div class="meta">' + dateStr + ' \u2022 ' + zones.length + ' zone(s) assessed \u2022 Methodology: FTRI (NFPA/OSHA)</div>' +
             heatMapHTML +
             zonesHTML +
+            appendixHTML +
             '<div style="text-align:center;font-size:11px;color:#94a3b8;margin-top:24px;padding-top:12px;border-top:1px solid #e2e8f0;">Generated by Risk Assessment Buddy Smart 3.0 \u2014 Fire Triangle Risk Index (FTRI)</div>' +
             '</body></html>';
 

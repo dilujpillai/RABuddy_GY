@@ -13,7 +13,48 @@
             theme: {
                 extend: {
                     fontFamily: {
-                        sans: ['Inter', 'Segoe UI', 'Roboto', 'Arial', 'sans-serif'],
+                        sans: ['"Segoe UI"', 'Inter', 'Roboto', 'Arial', 'sans-serif'],
+                    },
+                    colors: {
+                        indigo: {
+                            50:  '#edf2f9',
+                            100: '#d4e0f0',
+                            200: '#a9c1e0',
+                            300: '#7ea1d1',
+                            400: '#5382c1',
+                            500: '#1a5faa',
+                            600: '#002c5f',
+                            700: '#00234d',
+                            800: '#001a3d',
+                            900: '#001530',
+                            950: '#000d20',
+                        },
+                        blue: {
+                            50:  '#edf3fa',
+                            100: '#d4e3f3',
+                            200: '#a9c7e6',
+                            300: '#7eaad9',
+                            400: '#538ecc',
+                            500: '#2871bf',
+                            600: '#003d82',
+                            700: '#002c5f',
+                            800: '#001a3d',
+                            900: '#001530',
+                            950: '#000d20',
+                        },
+                        yellow: {
+                            50:  '#fffef0',
+                            100: '#fff9d6',
+                            200: '#fff0a3',
+                            300: '#ffe566',
+                            400: '#ffd100',
+                            500: '#e6bc00',
+                            600: '#cc9f00',
+                            700: '#997b00',
+                            800: '#665100',
+                            900: '#4d3f00',
+                            950: '#332a00',
+                        },
                     },
                 },
             },
@@ -44,6 +85,9 @@
     <script src="fra/fra-components.js"></script>
     <script src="fra/fra-floorplan.js"></script>
     <script src="fra/fra-app.js"></script>
+    <script src="workflow-guides.js"></script>
+    <script src="how-to-guide.js"></script>
+    <script src="best-practices.js"></script>
 
     <style>
 /* Smooth Modal Entry */
@@ -115,7 +159,7 @@
             cursor: grab; 
             transition: all 0.2s; 
         }
-        .gy-source-item:hover { border-color: #a5b4fc; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); }
+        .gy-source-item:hover { border-color: #a9c1e0; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); }
         
         /* The Image Inside */
         .gy-source-item img {
@@ -203,17 +247,17 @@
 .gy-card-body { padding: 15px; display: flex; flex-direction: column; gap: 10px; }
 .gy-textarea { width: 100%; box-sizing: border-box; border: 1px solid #e0e0e0; border-radius: 6px; padding: 8px; font-size: 0.9rem; min-height: 50px; background: #fafafa; }
 .gy-main-btn { background: #27ae60; color: white; border: none; padding: 15px 40px; font-size: 1.2rem; border-radius: 50px; cursor: pointer; }
-        .btn-indigo { background: linear-gradient(135deg, #4f46e5 0%, #4338ca 100%); color: white; border: none; padding: 12px 24px; font-weight: 600; border-radius: 8px; cursor: pointer; transition: all 0.3s ease; box-shadow: 0 4px 15px rgba(79, 70, 229, 0.3); }
-        .btn-indigo:hover { background: linear-gradient(135deg, #4338ca 0%, #3730a3 100%); transform: translateY(-2px); box-shadow: 0 6px 20px rgba(79, 70, 229, 0.4); }
+        .btn-indigo { background: linear-gradient(135deg, #002c5f 0%, #001a3d 100%); color: white; border: none; padding: 12px 24px; font-weight: 600; border-radius: 8px; cursor: pointer; transition: all 0.3s ease; box-shadow: 0 4px 15px rgba(0, 44, 95, 0.3); }
+        .btn-indigo:hover { background: linear-gradient(135deg, #001a3d 0%, #001530 100%); transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0, 44, 95, 0.4); }
         .btn-indigo:disabled { opacity: 0.5; cursor: not-allowed; }
-        .btn-white { background: white; color: #4f46e5; border: 2px solid #4f46e5; padding: 10px 20px; font-weight: 600; border-radius: 8px; cursor: pointer; transition: all 0.3s ease; }
-        .btn-white:hover { background: #f5f3ff; border-color: #4338ca; }
+        .btn-white { background: white; color: #002c5f; border: 2px solid #002c5f; padding: 10px 20px; font-weight: 600; border-radius: 8px; cursor: pointer; transition: all 0.3s ease; }
+        .btn-white:hover { background: #edf2f9; border-color: #001a3d; }
 
         /* Mini Column Mapping Fields */
         .gy-map-field-mini { display: flex; flex-direction: column; gap: 2px; }
         .gy-map-field-mini label { font-size: 0.6rem; font-weight: 600; color: #64748b; text-transform: uppercase; }
         .gy-map-field-mini input { width: 100%; padding: 4px 6px; border: 1px solid #cbd5e1; border-radius: 4px; text-align: center; font-weight: 700; font-size: 0.75rem; background: white; transition: all 0.2s; }
-        .gy-map-field-mini input:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2); }
+        .gy-map-field-mini input:focus { outline: none; border-color: #002c5f; box-shadow: 0 0 0 2px rgba(0, 44, 95, 0.2); }
         
         /* Excel Preview Table Styles */
         #gyExcelPreviewTable th { padding: 4px 8px; font-size: 0.65rem; font-weight: 600; text-align: left; cursor: pointer; transition: background 0.2s; white-space: nowrap; }
@@ -230,11 +274,11 @@
         .gy-card-img img { max-width: 100%; max-height: 100%; object-fit: contain; }
         .gy-card-body { flex: 1; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
         .gy-textarea { width: 100%; box-sizing: border-box; border: 1px solid #e2e8f0; border-radius: 6px; padding: 8px 10px; font-size: 0.85rem; min-height: 48px; background: #fafafa; resize: vertical; transition: all 0.2s; }
-        .gy-textarea:focus { outline: none; border-color: #3b82f6; background: white; box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.15); }
+        .gy-textarea:focus { outline: none; border-color: #002c5f; background: white; box-shadow: 0 0 0 2px rgba(0, 44, 95, 0.15); }
         
         /* Source Image Thumbnails */
         .gy-source-thumb { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 8px; cursor: grab; border: 2px solid transparent; transition: all 0.2s; background: white; }
-        .gy-source-thumb:hover { border-color: #f59e0b; transform: scale(1.05); }
+        .gy-source-thumb:hover { border-color: #ffd100; transform: scale(1.05); }
         .gy-source-thumb.dragging { opacity: 0.5; cursor: grabbing; }
 
         /* Custom styles for Google Charts transparency */
@@ -536,8 +580,8 @@
         }
 
         .modern-hover-cell:hover {
-            background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%) !important;
-            box-shadow: inset 0 0 0 2px rgba(59, 130, 246, 0.4), 0 2px 8px rgba(59, 130, 246, 0.15) !important;
+            background: linear-gradient(135deg, #edf2f9 0%, #d4e0f0 100%) !important;
+            box-shadow: inset 0 0 0 2px rgba(0, 44, 95, 0.4), 0 2px 8px rgba(0, 44, 95, 0.15) !important;
         }
 
         .modern-hover-cell:hover::after {
@@ -554,8 +598,8 @@
         .ehs-freq-row:hover,
         .ehs-sev-row:hover,
         .ehs-like-row:hover {
-            background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%) !important;
-            box-shadow: inset 0 0 0 2px rgba(59, 130, 246, 0.3), 0 2px 12px rgba(59, 130, 246, 0.12) !important;
+            background: linear-gradient(135deg, #edf2f9 0%, #d4e0f0 100%) !important;
+            box-shadow: inset 0 0 0 2px rgba(0, 44, 95, 0.3), 0 2px 12px rgba(0, 44, 95, 0.12) !important;
         }
 
         /* EHS Value Cell (F, S, L numbers) Hover Effect */
@@ -565,9 +609,9 @@
         }
 
         .select-ehs-value:hover {
-            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%) !important;
+            background: linear-gradient(135deg, #002c5f 0%, #001a3d 100%) !important;
             color: white !important;
-            box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.3), 0 4px 12px rgba(59, 130, 246, 0.35) !important;
+            box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.3), 0 4px 12px rgba(0, 44, 95, 0.35) !important;
             font-weight: 600;
         }
 
@@ -641,10 +685,10 @@
             display: inline-block; padding: 1px 6px; border-radius: 4px;
             font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: .3px;
         }
-        .fix-field-hazardList  { background: #dbeafe; color: #1e40af; }
+        .fix-field-hazardList  { background: #d4e0f0; color: #002c5f; }
         .fix-field-hazardGroup { background: #fce7f3; color: #9d174d; }
         .fix-field-consequence { background: #fef3c7; color: #92400e; }
-        .fix-field-cmLadder    { background: #e0e7ff; color: #3730a3; }
+        .fix-field-cmLadder    { background: #d4e0f0; color: #001530; }
         .fix-select {
             width: 100%; box-sizing: border-box;
             padding: 3px 6px; border: 1px solid #cbd5e1; border-radius: 5px;
@@ -657,34 +701,34 @@
         }
         .fix-btn-del:hover { opacity: 1; }
         /* Batch Column Mapper */
-        .bcm-panel { background: linear-gradient(135deg, #eff6ff 0%, #e0f2fe 100%); border: 1px solid #93c5fd; border-radius: 10px; padding: 12px 16px; margin-bottom: 12px; }
+        .bcm-panel { background: linear-gradient(135deg, #edf2f9 0%, #d4e3f3 100%); border: 1px solid #a9c1e0; border-radius: 10px; padding: 12px 16px; margin-bottom: 12px; }
         .bcm-toggle { cursor: pointer; display: flex; align-items: center; justify-content: space-between; user-select: none; }
-        .bcm-toggle h4 { font-size: 13px; font-weight: 700; color: #1e40af; margin: 0; }
-        .bcm-toggle .bcm-arrow { font-size: 14px; color: #3b82f6; transition: transform 0.2s; }
+        .bcm-toggle h4 { font-size: 13px; font-weight: 700; color: #002c5f; margin: 0; }
+        .bcm-toggle .bcm-arrow { font-size: 14px; color: #002c5f; transition: transform 0.2s; }
         .bcm-toggle .bcm-arrow.open { transform: rotate(180deg); }
         .bcm-body { margin-top: 10px; }
         .bcm-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 6px; }
         .bcm-field label { display: block; font-size: 10px; font-weight: 600; color: #475569; margin-bottom: 2px; }
         .bcm-field input { width: 100%; padding: 4px 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 12px; text-align: center; text-transform: uppercase; }
-        .bcm-field input:focus { border-color: #3b82f6; outline: none; box-shadow: 0 0 0 2px rgba(59,130,246,0.2); }
+        .bcm-field input:focus { border-color: #002c5f; outline: none; box-shadow: 0 0 0 2px rgba(0,44,95,0.2); }
         .bcm-field input.bcm-mapped { border-color: #10b981; background: #f0fdf4; }
-        .bcm-field input.bcm-auto { border-color: #93c5fd; background: #eff6ff; border-style: dashed; }
-        .bcm-field input.bcm-mapped.bcm-auto { border-color: #93c5fd; background: #eff6ff; border-style: dashed; }
+        .bcm-field input.bcm-auto { border-color: #a9c1e0; background: #edf2f9; border-style: dashed; }
+        .bcm-field input.bcm-mapped.bcm-auto { border-color: #a9c1e0; background: #edf2f9; border-style: dashed; }
         .bcm-preset-row { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; flex-wrap: wrap; }
         .bcm-preset-row label { font-size: 11px; font-weight: 600; color: #334155; white-space: nowrap; }
-        .bcm-preset-row select { padding: 4px 8px; border: 1px solid #93c5fd; border-radius: 6px; font-size: 11px; background: white; }
+        .bcm-preset-row select { padding: 4px 8px; border: 1px solid #a9c1e0; border-radius: 6px; font-size: 11px; background: white; }
         .bcm-preset-row .bcm-hint { font-size: 10px; color: #64748b; margin-left: auto; }
         /* Excel Preview Table */
         .bcm-preview-wrap { max-height: 200px; overflow: auto; border: 1px solid #cbd5e1; border-radius: 8px; margin-bottom: 10px; background: #fff; }
         .bcm-preview-table { width: 100%; border-collapse: collapse; font-size: 10px; font-family: 'Consolas', monospace; }
-        .bcm-preview-table th { position: sticky; top: 0; background: #1e40af; color: #fff; padding: 4px 6px; text-align: center; font-weight: 700; font-size: 9px; letter-spacing: 0.5px; z-index: 1; }
+        .bcm-preview-table th { position: sticky; top: 0; background: #002c5f; color: #fff; padding: 4px 6px; text-align: center; font-weight: 700; font-size: 9px; letter-spacing: 0.5px; z-index: 1; }
         .bcm-preview-table td { padding: 3px 6px; border-bottom: 1px solid #e2e8f0; white-space: nowrap; max-width: 150px; overflow: hidden; text-overflow: ellipsis; }
-        .bcm-preview-table tr:hover td { background: #eff6ff; }
+        .bcm-preview-table tr:hover td { background: #edf2f9; }
         .bcm-preview-table tr.bcm-header-row td { background: #fef3c7; font-weight: 700; }
         .bcm-preview-table td.bcm-col-highlight { background: #dcfce7; border: 1px solid #86efac; }
         .bcm-preview-table .bcm-row-num { background: #f1f5f9; color: #64748b; font-weight: 600; text-align: center; width: 30px; min-width: 30px; position: sticky; left: 0; z-index: 1; }
-        .bcm-remap-btn { background: linear-gradient(135deg, #3b82f6, #2563eb); color: #fff; border: none; border-radius: 8px; padding: 6px 14px; font-size: 11px; font-weight: 700; cursor: pointer; transition: all 0.15s; }
-        .bcm-remap-btn:hover { background: linear-gradient(135deg, #2563eb, #1d4ed8); transform: translateY(-1px); box-shadow: 0 2px 8px rgba(37,99,235,0.3); }
+        .bcm-remap-btn { background: linear-gradient(135deg, #002c5f, #001a3d); color: #fff; border: none; border-radius: 8px; padding: 6px 14px; font-size: 11px; font-weight: 700; cursor: pointer; transition: all 0.15s; }
+        .bcm-remap-btn:hover { background: linear-gradient(135deg, #001a3d, #001530); transform: translateY(-1px); box-shadow: 0 2px 8px rgba(0,44,95,0.3); }
         .bcm-remap-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
         .batch-progress-bar {
             height: 6px; background: #e2e8f0; border-radius: 3px; overflow: hidden;
@@ -697,20 +741,20 @@
             width: 100%; border-collapse: collapse; font-size: 11px; margin-top: 8px;
         }
         .batch-review-table th {
-            background: #eef2ff; padding: 5px 6px; text-align: left;
-            font-weight: 700; border-bottom: 2px solid #c7d2fe; color: #3730a3;
+            background: #edf2f9; padding: 5px 6px; text-align: left;
+            font-weight: 700; border-bottom: 2px solid #a9c1e0; color: #001530;
             position: sticky; top: 0; white-space: nowrap; font-size: 10px;
         }
         .batch-review-table td {
             padding: 3px 4px; border-bottom: 1px solid #e2e8f0; vertical-align: top;
         }
-        .batch-review-table tr:hover { background: #f5f3ff; }
+        .batch-review-table tr:hover { background: #edf2f9; }
         .batch-review-table input, .batch-review-table select {
             width: 100%; font-size: 11px; padding: 2px 4px;
             border: 1px solid #e2e8f0; border-radius: 4px; background: #fff;
         }
         .batch-review-table input:focus, .batch-review-table select:focus {
-            border-color: #818cf8; outline: none; box-shadow: 0 0 0 2px rgba(129,140,248,0.2);
+            border-color: #5382c1; outline: none; box-shadow: 0 0 0 2px rgba(0,44,95,0.2);
         }
         .batch-review-table .row-num { color: #94a3b8; font-family: monospace; text-align: center; width: 28px; }
         .batch-review-table .cm-cell { min-width: 180px; }
@@ -739,7 +783,7 @@
 </head>
 <body class="bg-slate-100 font-sans text-slate-800" onload="setTimeout(function(){ regenerateProjectId(); updateFilenamePreview(); }, 100)">
     <main class="mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8 space-y-8">
-<div id="howToUseContainer">
+<div id="howToUseContainer" style="display:none">
 <details class="bg-indigo-50 rounded-lg border border-indigo-200 mb-8 group overflow-hidden" id="howToUse-en" data-lang="en" style="display: block;">
     <summary class="p-6 flex justify-between items-center cursor-pointer list-none">
         <h2 class="text-xl font-semibold text-indigo-900">How to Use This App 🚀</h2>
@@ -1081,9 +1125,10 @@
         </div>
     </div>
 </details>
+
 </div>
         <!-- Modern Tab Interface Header -->
-        <section class="bg-gradient-to-r from-indigo-600 to-blue-700 rounded-t-2xl shadow-lg overflow-hidden">
+        <section class="bg-gradient-to-r from-indigo-600 to-blue-700 rounded-t-2xl shadow-lg overflow-hidden" style="border-bottom: 4px solid #ffd100;">
             <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 p-6 sm:p-8 text-white">
                 <div>
                     <h1 class="text-3xl sm:text-4xl font-bold mb-2">Risk Assessment Buddy (SMART 2.0)</h1>
@@ -1161,7 +1206,12 @@
         <section id="tab-content-rich-media" class="tab-content bg-white rounded-b-2xl shadow-xl p-6 sm:p-8 space-y-6">
             <!-- Rich Media Stream Content -->
             <div id="face-blurrer-app">
-                <h2 class="text-2xl font-bold text-slate-900 mb-4">📸 Upload Images & Videos</h2>
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-2xl font-bold text-slate-900">📸 Upload Images & Videos</h2>
+                    <button onclick="showWorkflowGuide('rich-media')" class="inline-flex items-center gap-1.5 text-sm font-semibold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-lg border border-indigo-200 shadow-sm transition" title="How does Rich Media work?">
+                        <span class="text-base">❓</span> How to?
+                    </button>
+                </div>
                 <p class="text-slate-600 mb-6">Upload media files. Faces will be automatically blurred. Click thumbnails to add risk descriptions, hazards, and controls.</p>
                 
                 <div class="space-y-6">
@@ -1198,9 +1248,9 @@
                 </div>
                 <div class="mt-6 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
                     <button id="downloadBtn" style="display: none;" class="w-full bg-green-600 text-white font-semibold py-3 px-5 rounded-lg shadow-md hover:bg-green-700 transition duration-300 disabled:opacity-50">Download All Images and Reports as ZIP</button>
-                    <button id="generateAiReportBtn" style="display: none;" class="w-full bg-amber-500 text-black font-semibold py-3 px-5 rounded-lg shadow-md hover:bg-amber-600 transition duration-300 disabled:opacity-50">Generate AI Risk Assessment from Image Notes</button>
-                    <button id="saveProjectBtn" style="display: none;" class="w-full bg-blue-600 text-white font-semibold py-3 px-5 rounded-lg shadow-md hover:bg-blue-700 transition duration-300">Save Project</button>
-                    <button id="loadProjectBtn" class="w-full bg-purple-600 text-white font-semibold py-3 px-5 rounded-lg shadow-md hover:bg-purple-700 transition duration-300">Load Project</button>
+                    <button id="generateAiReportBtn" style="display: none;" class="w-full bg-yellow-400 text-indigo-900 font-bold py-3 px-5 rounded-lg shadow-md hover:bg-yellow-500 transition duration-300 disabled:opacity-50">Generate AI Risk Assessment from Image Notes</button>
+                    <button id="saveProjectBtn" style="display: none;" class="w-full bg-yellow-400 text-indigo-900 font-bold py-3 px-5 rounded-lg shadow-md hover:bg-yellow-500 transition duration-300">💾 Save Project</button>
+                    <button id="loadProjectBtn" class="w-full bg-white border-2 border-indigo-600 text-indigo-600 font-semibold py-3 px-5 rounded-lg shadow-sm hover:bg-indigo-50 transition duration-300">📂 Load Project</button>
                 </div>
                 <input type="file" id="projectFileInput" accept=".json" class="hidden">
                 <canvas id="manualBlurCanvas" style="display: none;"></canvas>
@@ -1209,7 +1259,12 @@
 
         <section id="tab-content-free-text" class="tab-content bg-white rounded-2xl shadow-xl p-6 sm:p-8 space-y-6 hidden">
             <!-- Free Text Stream Content -->
-            <h2 class="text-2xl font-bold text-slate-900">✍️ Describe Your Task</h2>
+            <div class="flex items-center justify-between">
+                <h2 class="text-2xl font-bold text-slate-900">✍️ Describe Your Task</h2>
+                <button onclick="showWorkflowGuide('free-text')" class="inline-flex items-center gap-1.5 text-sm font-semibold text-violet-600 bg-violet-50 hover:bg-violet-100 px-3 py-1.5 rounded-lg border border-violet-200 shadow-sm transition" title="How does Free Text work?">
+                    <span class="text-base">❓</span> How to?
+                </button>
+            </div>
             <p class="text-slate-600">Write a detailed description of the work process. Mention any previous incidents for better risk scoring.</p>
             
             <div class="bg-gradient-to-br from-indigo-50 to-blue-50 p-6 rounded-lg border border-indigo-200">
@@ -1220,15 +1275,11 @@
 
         <section id="tab-content-excel" class="tab-content bg-white rounded-2xl shadow-xl p-6 sm:p-8 space-y-6 hidden">
             <!-- Excel Sheet Stream Content -->
-            <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                    <h2 class="text-2xl font-bold text-slate-900">📊 Import Excel File</h2>
-                    <p class="text-slate-600">Choose the workflow that matches the state of your sheets.</p>
-                </div>
-                <button type="button" onclick="document.getElementById('workflowTipsModal').style.display='flex'" class="inline-flex items-center gap-2 text-sm font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 px-4 py-2 rounded-lg border border-slate-200 shadow-sm transition">
-                    <span class="text-lg">💡</span>
-                    Workflow Tips
-                </button>
+            <div>
+                <h2 class="text-2xl font-bold text-slate-900 mb-1">📊 Import Excel File</h2>
+                <p class="text-slate-500 text-sm mb-4">Not sure which to pick? Tap <strong>How to?</strong> on the workflow you need.</p>
+
+
             </div>
             
             <!-- Workflow Selection Cards -->
@@ -1237,8 +1288,9 @@
                 <!-- Option 1: Legacy Workflow (AI-Assisted) -->
                 <div class="bg-gradient-to-br from-blue-50 to-indigo-50 p-6 rounded-xl border-2 border-blue-200 hover:border-blue-400 hover:shadow-lg transition cursor-pointer" onclick="document.getElementById('excelUpload').click()">
                     <div class="flex items-center gap-3 mb-4">
-                        <div class="bg-blue-600 text-white rounded-full w-10 h-10 flex items-center justify-center font-bold">1</div>
-                        <h3 class="text-lg font-bold text-blue-900">Legacy Excel → AI Processing </h3>
+                        <div class="bg-blue-600 text-white rounded-full w-10 h-10 flex items-center justify-center font-bold flex-shrink-0">1</div>
+                        <h3 class="text-lg font-bold text-blue-900">Legacy Excel → AI Processing</h3>
+                        <button onclick="event.stopPropagation(); showWorkflowGuide('excel-legacy')" class="ml-auto inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-blue-200 bg-white hover:border-blue-400 hover:shadow-sm transition text-xs font-bold text-blue-700 flex-shrink-0">❓ How to?</button>
                     </div>
                     <p class="text-blue-800 text-sm mb-4">Best for inherited, non-standard Excel sheets that need AI clean-up before export. Turn messy data into the latest GOEHS-acceptable format.</p>
                     <ul class="text-xs text-blue-700 space-y-1 mb-4">
@@ -1259,8 +1311,9 @@
                 <!-- Option 2: Direct GOEHS Upload (Pre-formatted RA 2025 Template) -->
                 <div class="bg-gradient-to-br from-orange-50 to-red-50 p-6 rounded-xl border-2 border-orange-200 hover:border-orange-400 hover:shadow-lg transition cursor-pointer" onclick="document.getElementById('directGoehsUpload').click()">
                     <div class="flex items-center gap-3 mb-4">
-                        <div class="bg-orange-600 text-white rounded-full w-10 h-10 flex items-center justify-center font-bold">2</div>
-                        <h3 class="text-lg font-bold text-orange-900"> RA 2025 Template (1 file) →  GOEHS Export</h3>
+                        <div class="bg-orange-600 text-white rounded-full w-10 h-10 flex items-center justify-center font-bold flex-shrink-0">2</div>
+                        <h3 class="text-lg font-bold text-orange-900">RA 2025 Template (1 file) → GOEHS Export</h3>
+                        <button onclick="event.stopPropagation(); showWorkflowGuide('excel-ra2025')" class="ml-auto inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-orange-200 bg-white hover:border-orange-400 hover:shadow-sm transition text-xs font-bold text-orange-700 flex-shrink-0">❓ How to?</button>
                     </div>
                     <p class="text-orange-800 text-sm mb-4">Drop in a single, clean RA 2025 template and send it straight to the main table. Perfect for translation work or deeper tweaks before GOEHS.</p>
                     <ul class="text-xs text-orange-700 space-y-1 mb-4">
@@ -1281,8 +1334,9 @@
                 <!-- Option 3: Batch RA 2025 → GOEHS Export (up to 20 files) -->
                 <div class="bg-gradient-to-br from-emerald-50 to-teal-50 p-6 rounded-xl border-2 border-emerald-200 hover:border-emerald-400 hover:shadow-lg transition cursor-pointer" onclick="document.getElementById('batchRA2025Upload').click()">
                     <div class="flex items-center gap-3 mb-4">
-                        <div class="bg-emerald-600 text-white rounded-full w-10 h-10 flex items-center justify-center font-bold">3</div>
-                        <h3 class="text-lg font-bold text-emerald-900"> Batch RA 2025 (~20 files) → GOEHS Export</h3>
+                        <div class="bg-emerald-600 text-white rounded-full w-10 h-10 flex items-center justify-center font-bold flex-shrink-0">3</div>
+                        <h3 class="text-lg font-bold text-emerald-900">Batch RA 2025 (~20 files) → GOEHS Export</h3>
+                        <button onclick="event.stopPropagation(); showWorkflowGuide('excel-batch')" class="ml-auto inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-emerald-200 bg-white hover:border-emerald-400 hover:shadow-sm transition text-xs font-bold text-emerald-700 flex-shrink-0">❓ How to?</button>
                     </div>
                     <p class="text-emerald-800 text-sm mb-4">Queue multiple RA 2025 workbooks and export GOEHS-ready packages in one shot. Errors are surfaced upfront so you can fix them fast.</p>
                     <ul class="text-xs text-emerald-700 space-y-1 mb-4">
@@ -1532,6 +1586,98 @@
                         </ul>
                     </div>
 
+                    <!-- Terms & Definitions (collapsible, closed by default) -->
+                    <details class="rounded-xl border border-slate-200 overflow-hidden" id="termsDefinitions">
+                        <summary class="cursor-pointer p-4 flex items-center justify-between hover:bg-slate-50 transition select-none" style="background:#f8fafc;border-bottom:1px solid #e2e8f0;">
+                            <div class="flex items-center gap-3">
+                                <span style="display:inline-block;width:3px;height:16px;background:#94a3b8;border-radius:2px;flex-shrink:0;"></span>
+                                <span class="font-semibold text-sm" style="color:#475569;">📖 Appendix A &mdash; Terms &amp; Definitions</span>
+                                <span class="text-xs font-medium px-2 py-0.5 rounded-full" style="background:#f1f5f9;color:#64748b;border:1px solid #e2e8f0;">Reference</span>
+                            </div>
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 flex-shrink-0 transform transition-transform duration-200" style="color:#94a3b8;" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/>
+                            </svg>
+                        </summary>
+                        <div class="p-5 bg-white">
+                            <p class="text-xs text-slate-500 mb-4">All terms used in this application and in generated reports. Based on NFPA standards, OSHA regulations, and FM Global engineering guidelines.</p>
+
+                            <style>
+                            .terms-section-head{display:flex;align-items:center;gap:8px;margin:18px 0 6px;padding-bottom:5px;border-bottom:2px solid #ea580c;}
+                            .terms-section-head span{font-size:12px;font-weight:700;color:#1e293b;}
+                            .terms-table{width:100%;border-collapse:collapse;font-size:12px;}
+                            .terms-table td{padding:6px 10px;vertical-align:top;border-bottom:1px solid #f1f5f9;}
+                            .terms-table td:first-child{width:210px;font-weight:700;color:#1e293b;white-space:nowrap;}
+                            .terms-table td:last-child{color:#374151;line-height:1.65;}
+                            .terms-table tr:hover td{background:#fafafa;}
+                            </style>
+
+                            <!-- SCORING & METHODOLOGY -->
+                            <div class="terms-section-head">
+                                <span style="display:inline-block;width:3px;height:12px;background:#ea580c;border-radius:2px;"></span>
+                                <span>Scoring &amp; Methodology</span>
+                            </div>
+                            <table class="terms-table">
+                                <tr><td>FTRI</td><td>Fire Triangle Risk Index — a composite score 0–100 derived from the fire triangle leg scores, control effectiveness, and a consequence amplifier. Higher = greater risk.</td></tr>
+                                <tr><td>Fire Triangle</td><td>The three elements required for combustion: <strong>Heat</strong> (ignition source), <strong>Fuel</strong> (combustibles), and <strong>Oxygen</strong>. Removing any one element extinguishes or prevents fire.</td></tr>
+                                <tr><td>Heat / Ignition Score</td><td>Rated 1–10. Reflects the intensity and probability of ignition sources present (e.g. hot work, electrical equipment, friction).</td></tr>
+                                <tr><td>Fuel / Combustible Score</td><td>Rated 1–10. Reflects the type, quantity, and flash point of combustible or flammable materials stored or used in the zone.</td></tr>
+                                <tr><td>Oxygen Score</td><td>Rated 1–10. Reflects oxygen availability and ventilation conditions that support rapid fire spread.</td></tr>
+                                <tr><td>Triangle Score</td><td>Product of the three leg averages scaled 0–15, multiplied by the Interaction Factor.</td></tr>
+                                <tr><td>Interaction Factor</td><td>Multiplier (1.0–1.5) applied when multiple high-scoring legs co-exist. Minimum leg ≥ 6 → ×1.30; minimum leg ≥ 8 → ×1.50 (Compound Risk).</td></tr>
+                                <tr><td>Control Effectiveness</td><td>Weighted % (0–100%) of fire protection controls in place across five NFPA categories. Mandatory controls carry higher weight.</td></tr>
+                                <tr><td>Consequence Amplifier</td><td>Multiplier (1.0–1.5) based on occupancy class, business criticality, and absence of sprinkler suppression.</td></tr>
+                            </table>
+
+                            <!-- RISK CATEGORIES -->
+                            <div class="terms-section-head" style="margin-top:20px;">
+                                <span style="display:inline-block;width:3px;height:12px;background:#ea580c;border-radius:2px;"></span>
+                                <span>Risk Categories</span>
+                            </div>
+                            <table class="terms-table">
+                                <tr><td><span style="display:inline-flex;align-items:center;gap:6px;"><span style="width:9px;height:9px;border-radius:50%;background:#7f1d1d;display:inline-block;"></span>CRITICAL (80–100)</span></td><td>Immediate action required. Cease operations until mitigated. Escalate to site management and EHS immediately.</td></tr>
+                                <tr><td><span style="display:inline-flex;align-items:center;gap:6px;"><span style="width:9px;height:9px;border-radius:50%;background:#9a3412;display:inline-block;"></span>HIGH (60–79)</span></td><td>Urgent mitigation required within 24–48 hours. Assign responsible persons and corrective action timeline.</td></tr>
+                                <tr><td><span style="display:inline-flex;align-items:center;gap:6px;"><span style="width:9px;height:9px;border-radius:50%;background:#854d0e;display:inline-block;"></span>MEDIUM (30–59)</span></td><td>Plan corrective actions within 30 days. Close gaps through the site action tracking system.</td></tr>
+                                <tr><td><span style="display:inline-flex;align-items:center;gap:6px;"><span style="width:9px;height:9px;border-radius:50%;background:#166534;display:inline-block;"></span>LOW (0–29)</span></td><td>Maintain current controls. Annual review to confirm no changes in zone conditions.</td></tr>
+                            </table>
+
+                            <!-- STANDARDS -->
+                            <div class="terms-section-head" style="margin-top:20px;">
+                                <span style="display:inline-block;width:3px;height:12px;background:#ea580c;border-radius:2px;"></span>
+                                <span>Standards Referenced</span>
+                            </div>
+                            <table class="terms-table">
+                                <tr><td>NFPA 30</td><td>Flammable and Combustible Liquids Code. Defines Maximum Allowable Quantities (MAQ) per control area and storage requirements.</td></tr>
+                                <tr><td>NFPA 72</td><td>National Fire Alarm and Signaling Code. Covers smoke/heat detectors, manual pull stations, and alarm notification appliances.</td></tr>
+                                <tr><td>NFPA 13</td><td>Standard for the Installation of Sprinkler Systems. Governs design, installation, and testing of automatic sprinkler systems.</td></tr>
+                                <tr><td>NFPA 101</td><td>Life Safety Code. Addresses egress, emergency lighting, EXIT signs, and occupancy classifications.</td></tr>
+                                <tr><td>NFPA 704</td><td>The "fire diamond" — rates Health (blue), Flammability (red), Instability (yellow), Special hazards (white), each 0–4. Found in SDS Section 14 or 16.</td></tr>
+                                <tr><td>NFPA 51B</td><td>Fire Prevention During Hot Work. Requires permits, fire watch, and 30-min post-work monitoring within 11m (35ft) of combustibles.</td></tr>
+                                <tr><td>NFPA 652 / 654</td><td>Combustible Dust fundamentals and prevention. Dust ≥ 1/32" (0.8mm) over 5%+ of floor area is an explosion hazard (critical for rubber dust, carbon black, sulfur).</td></tr>
+                                <tr><td>FM Global</td><td>Factory Mutual Global — insurer data sheets providing engineering-based fire protection standards for industrial property.</td></tr>
+                                <tr><td>OSHA 1910.39</td><td>Requires documented Fire Prevention Plans, employee training, and identification of ignition sources.</td></tr>
+                            </table>
+
+                            <!-- KEY TERMS -->
+                            <div class="terms-section-head" style="margin-top:20px;">
+                                <span style="display:inline-block;width:3px;height:12px;background:#ea580c;border-radius:2px;"></span>
+                                <span>Key Technical Terms</span>
+                            </div>
+                            <table class="terms-table">
+                                <tr><td>Flash Point</td><td>Lowest temperature at which a liquid produces sufficient vapour to ignite momentarily (NFPA 30). Below 37.8°C = Class I flammable.</td></tr>
+                                <tr><td>MAQ</td><td><strong>Maximum Allowable Quantity</strong> — max flammable liquid permitted per control area (NFPA 30). 4× MAQ allowed in sprinklered areas (§9.4).</td></tr>
+                                <tr><td>Control Area</td><td>Building space bounded by construction limiting fire spread and restricting hazardous material release (NFPA 30).</td></tr>
+                                <tr><td>Hot Work</td><td>Any work with open flames, sparks, or heat-generating operations: welding, cutting, grinding, brazing, open-flame torches (NFPA 51B).</td></tr>
+                                <tr><td>LEL</td><td><strong>Lower Explosive Limit</strong> — minimum concentration of a flammable gas/vapour in air that can sustain ignition. Below LEL = too lean to ignite.</td></tr>
+                                <tr><td>SDS (Safety Data Sheet)</td><td>Required under GHS/OSHA HazCom. Flash point in Section 9; NFPA 704 diamond in Section 14 or 16.</td></tr>
+                                <tr><td>IBCs</td><td><strong>Intermediate Bulk Containers</strong> — large liquid containers (typically 1,000–1,250 L / 275–330 US gal) for flammable liquids.</td></tr>
+                                <tr><td>ERT</td><td><strong>Emergency Response Team</strong> — trained in-house personnel who lead fire response and coordinate with external fire services.</td></tr>
+                                <tr><td>Occupancy Class</td><td>Classification per NFPA 101 based on zone activity (e.g. Factory – General, Assembly, Storage, Office, Laboratory). Affects consequence amplifier.</td></tr>
+                            </table>
+
+                            <p class="text-xs text-slate-400 mt-4 text-right">Sources: NFPA 30, 72, 13, 101, 704, 51B, 652 &bull; OSHA 1910 &bull; FM Global &bull; GHS/HazCom</p>
+                        </div>
+                    </details>
+
                 </div>
             </details>
 
@@ -1617,13 +1763,13 @@
                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" /></svg>
                                 GOEHS Integration
                             </button>
-                            <button id="saveProjectBtn2" class="flex-1 sm:flex-none bg-purple-600 text-white font-semibold py-3 px-6 rounded-lg shadow-md hover:bg-purple-700 transition duration-300" data-en-text="Save Project">💾 Save Project</button>
+                            <button id="saveProjectBtn2" class="flex-1 sm:flex-none bg-yellow-400 text-indigo-900 font-bold py-3 px-6 rounded-lg shadow-md hover:bg-yellow-500 transition duration-300" data-en-text="Save Project">💾 Save Project</button>
                         </div>
                         
                         <!-- Secondary Actions -->
                         <div class="flex gap-3 w-full flex-wrap">
                             <button id="downloadProjectZipBtn" class="flex-1 sm:flex-none bg-blue-600 text-white font-semibold py-2 px-6 rounded-lg shadow-md hover:bg-blue-700 transition duration-300">📦 Download ZIP</button>
-                            <button id="translateTableBtn" class="flex-1 sm:flex-none bg-amber-600 text-white font-semibold py-2 px-6 rounded-lg shadow-md hover:bg-amber-700 transition duration-300">🌐 Translate</button>
+                            <button id="translateTableBtn" class="flex-1 sm:flex-none bg-slate-600 text-white font-semibold py-2 px-6 rounded-lg shadow-md hover:bg-slate-700 transition duration-300">🌐 Translate</button>
                             <button id="remapColumnsBtn" class="flex-1 sm:flex-none bg-slate-600 text-white font-semibold py-2 px-6 rounded-lg shadow-md hover:bg-slate-700 transition duration-300" style="display:none;" title="Re-map Excel columns if data wasn't imported correctly">🗺️ Remap Columns</button>
                         </div>
                     </div>
@@ -1634,7 +1780,11 @@
         </section>
     </main>
     <footer class="text-center py-8 text-slate-500">
-        <button id="privacyBtn" class="text-indigo-600 hover:text-indigo-800 hover:underline font-medium transition">Privacy Policy</button>
+        <div class="flex items-center justify-center gap-4 flex-wrap">
+            <button id="howToUseBtn" class="text-indigo-600 hover:text-indigo-800 hover:underline font-medium transition">How to Use This App 🚀</button>
+            <span class="text-slate-300" aria-hidden="true">|</span>
+            <button id="privacyBtn" class="text-indigo-600 hover:text-indigo-800 hover:underline font-medium transition">Privacy Policy</button>
+        </div>
     </footer>
     <div id="lightboxModal" class="lightbox-overlay hidden fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-md items-center justify-center" style="display: none;">
         <!-- Close button - pill style -->
@@ -1804,7 +1954,7 @@
                     <!-- Warmup loader overlay -->
                     <div id="videoWarmupOverlay" class="absolute inset-0 flex flex-col items-center justify-center rounded-lg" style="z-index:20; background: rgba(0,0,0,0.75); display: none;">
                         <div class="flex flex-col items-center gap-4">
-                            <div style="width:48px;height:48px;border:4px solid rgba(255,255,255,0.2);border-top-color:#818cf8;border-radius:50%;animation:warmup-spin 0.8s linear infinite;"></div>
+                            <div style="width:48px;height:48px;border:4px solid rgba(255,255,255,0.2);border-top-color:#ffd100;border-radius:50%;animation:warmup-spin 0.8s linear infinite;"></div>
                             <p class="text-white text-lg font-semibold">Preparing for image scrubbing...</p>
                             <p class="text-indigo-300 text-sm">Loading face detection model for first use</p>
                         </div>
@@ -1902,76 +2052,7 @@
         </div>
     </div>
 
-    <!-- Best Practices Modal -->
-    <div id="bestPracticesModal" class="modal-overlay hidden fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm p-4 items-center justify-center" style="display: none;">
-        <div class="modal-content bg-white m-auto p-6 sm:p-8 rounded-lg shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto relative">
-            <span id="closeBestPracticesModal" class="close-btn absolute top-4 right-5 text-slate-400 text-3xl font-bold cursor-pointer hover:text-slate-600 transition">&times;</span>
-            <h2 class="text-2xl font-bold text-slate-900 mb-2 flex items-center gap-2">
-                <span class="text-3xl">💡</span>
-                <span data-en-text="Best Practices: AI-Powered Collaborative Risk Assessment">Best Practices: AI-Powered Collaborative Risk Assessment</span>
-            </h2>
-            <p class="text-sm text-indigo-600 font-medium mb-6" data-en-text="Keeping the human element at the heart of safety">Keeping the human element at the heart of safety</p>
-
-            <div class="space-y-5 text-slate-700">
-                <!-- Core Principle -->
-                <div class="p-4 bg-gradient-to-r from-indigo-50 to-blue-50 border-l-4 border-indigo-500 rounded-r-lg">
-                    <h3 class="text-lg font-bold text-indigo-900 mb-2" data-en-text="🎯 Core Principle">🎯 Core Principle</h3>
-                    <p class="text-sm" data-en-text="This tool, while powered by AI, stays true to one of the fundamental tenets of safety risk assessment: collaboration and engagement with the operational team. AI helps reduce administrative burden, but YOU and your team are the drivers of meaningful change. Blind automation will never bring actionable results.">This tool, while powered by AI, stays true to one of the fundamental tenets of safety risk assessment: <strong>collaboration and engagement with the operational team</strong>. AI helps reduce administrative burden, but <strong>YOU and your team are the drivers of meaningful change</strong>. Blind automation will never bring actionable results.</p>
-                </div>
-
-                <!-- Step 1 -->
-                <div class="p-4 bg-green-50 border border-green-200 rounded-lg">
-                    <h3 class="text-lg font-semibold text-green-900 mb-2" data-en-text="📹 Step 1: Capture Your Process">📹 Step 1: Capture Your Process</h3>
-                    <p class="text-sm" data-en-text="Start by collecting rich media (video or photos) of your process from start to end. Split each process into respective task steps and document what can go wrong. This is your first collaborative touchpoint.">Start by collecting <strong>rich media</strong> (video or photos) of your process from start to end. Split each process into respective task steps and document what can go wrong. This is your <strong>first collaborative touchpoint</strong>.</p>
-                </div>
-
-                <!-- Step 2 -->
-                <div class="p-4 bg-amber-50 border border-amber-200 rounded-lg">
-                    <h3 class="text-lg font-semibold text-amber-900 mb-2" data-en-text="👥 Step 2: Engage Your Team">👥 Step 2: Engage Your Team</h3>
-                    <p class="text-sm" data-en-text="Bring the operational team together. Ask them: What are the hazards? What could go wrong? What existing controls do you have? Share details about any previous incidents that the EHS team is aware of. This sparks great conversations and ideas — the essence of effective risk assessment.">Bring the operational team together. Ask them: <em>What are the hazards? What could go wrong? What existing controls do you have?</em> Share details about any previous incidents that the EHS team is aware of. This sparks <strong>great conversations and ideas</strong> — the essence of effective risk assessment.</p>
-                </div>
-
-                <!-- Step 3 -->
-                <div class="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                    <h3 class="text-lg font-semibold text-blue-900 mb-2" data-en-text="🤖 Step 3: Generate AI Baseline">🤖 Step 3: Generate AI Baseline</h3>
-                    <p class="text-sm" data-en-text="Once hazard identification is complete, use the AI to generate a baseline risk assessment. The AI analyzes your inputs and produces a structured table with hazard groups, risk scores, and categories. This saves hours of manual work.">Once hazard identification is complete, use the AI to generate a <strong>baseline risk assessment</strong>. The AI analyzes your inputs and produces a structured table with hazard groups, risk scores, and categories. This saves hours of manual work.</p>
-                </div>
-
-                <!-- Step 4 -->
-                <div class="p-4 bg-purple-50 border border-purple-200 rounded-lg">
-                    <h3 class="text-lg font-semibold text-purple-900 mb-2" data-en-text="🔍 Step 4: Review and Re-evaluate">🔍 Step 4: Review and Re-evaluate</h3>
-                    <p class="text-sm" data-en-text="Click on the images or task steps to open the detailed review modal. Take time to re-evaluate the risk ratings with your team. During this collaborative review, Operations and EHS can propose multiple actions — record them in the Actions panel.">Click on the images or task steps to open the detailed review modal. Take time to <strong>re-evaluate the risk ratings</strong> with your team. During this collaborative review, Operations and EHS can propose multiple actions — record them in the <strong>Actions panel</strong>.</p>
-                </div>
-
-                <!-- Step 5 -->
-                <div class="p-4 bg-teal-50 border border-teal-200 rounded-lg">
-                    <h3 class="text-lg font-semibold text-teal-900 mb-2" data-en-text="📊 Step 5: See Risk Evolution">📊 Step 5: See Risk Evolution</h3>
-                    <p class="text-sm" data-en-text="Using safety science and math, each action is beautifully standardized to give you a predictive/projected risk rating. The Risk Evolution visualization shows the live impact your proposed actions could have — transforming discussions into data-driven decisions.">Using <strong>safety science and math</strong>, each action is beautifully standardized to give you a predictive/projected risk rating. The <strong>Risk Evolution</strong> visualization shows the live impact your proposed actions could have — transforming discussions into data-driven decisions.</p>
-                </div>
-
-                <!-- Step 6 -->
-                <div class="p-4 bg-rose-50 border border-rose-200 rounded-lg">
-                    <h3 class="text-lg font-semibold text-rose-900 mb-2" data-en-text="📥 Step 6: Export and Track">📥 Step 6: Export and Track</h3>
-                    <p class="text-sm" data-en-text="When you download the project file, you get the proposed actions as a CSV file which you can import into your existing tracking system. The collaboration extends from hazard identification to risk evaluation and action tracking.">When you download the project file, you get the proposed actions as a <strong>CSV file</strong> which you can import into your existing tracking system. The collaboration extends from hazard identification to risk evaluation and action tracking.</p>
-                </div>
-
-                <!-- Key Benefit -->
-                <div class="p-4 bg-gradient-to-r from-emerald-50 to-green-50 border-2 border-emerald-300 rounded-lg">
-                    <h3 class="text-lg font-bold text-emerald-900 mb-2" data-en-text="✅ The Key Benefit">✅ The Key Benefit</h3>
-                    <p class="text-sm" data-en-text="Because actions are proposed by the operational team themselves, you get genuine buy-in and agreement. This tool extends traditional risk assessment into a powerful brainstorming and collaboration platform — keeping the core tenets of Risk Assessment Methodology while leveraging AI's intelligence to offload administrative burden.">Because actions are proposed by the operational team themselves, you get <strong>genuine buy-in and agreement</strong>. This tool extends traditional risk assessment into a powerful <strong>brainstorming and collaboration platform</strong> — keeping the core tenets of Risk Assessment Methodology while leveraging AI's intelligence to offload administrative burden.</p>
-                </div>
-
-                <!-- Remember -->
-                <div class="p-3 bg-slate-100 rounded-lg text-center">
-                    <p class="text-sm font-semibold text-slate-700" data-en-text="💡 Remember: You are the driver. AI is your co-pilot, not the captain.">💡 <strong>Remember:</strong> You are the driver. AI is your co-pilot, not the captain.</p>
-                </div>
-            </div>
-
-            <div class="mt-6 text-center">
-                <button onclick="document.getElementById('bestPracticesModal').style.display='none'" class="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-6 rounded-lg transition" data-en-text="Got it!">Got it!</button>
-            </div>
-        </div>
-    </div>
+    <!-- Best Practices Modal — handled by best-practices.js -->
 
     <!-- Translation Dialog Modal -->
     <div id="translationModal" class="modal-overlay hidden fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm p-4 flex items-center justify-center" style="display: none;">
@@ -2376,10 +2457,10 @@
         <p style="margin:0 0 18px 0;font-size:0.9rem;color:#475569;">Use this guide to pick the exact path that matches the current state of your Excel file, whether you are rescuing messy legacy data or batch-exporting clean 2025 files.</p>
         <div style="display:flex;flex-direction:column;gap:14px;font-size:0.85rem;color:#1f2937;">
             <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:12px;padding:14px;">
-                <div style="font-weight:700;color:#1d4ed8;margin-bottom:6px;">1. Legacy Excel → AI Processing</div>
-                <p style="margin:4px 0 6px 0;color:#1e3a8a;"><strong>Ideal for:</strong> Older, unstructured Excel files where you need to extract, replace, or add images.</p>
-                <p style="margin:0 0 6px 0;color:#1e3a8a;"><strong>How it works:</strong> Let AI normalize hazards, controls, and ratings. Original ratings are preserved and new additions are flagged for review. This is the only workflow that supports image management.</p>
-                <p style="margin:0;color:#1e3a8a;"><strong>Best for:</strong> Modernizing messy spreadsheets and updating outdated photos before pushing to GOEHS.</p>
+                <div style="font-weight:700;color:#002c5f;margin-bottom:6px;">1. Legacy Excel → AI Processing</div>
+                <p style="margin:4px 0 6px 0;color:#001a3d;"><strong>Ideal for:</strong> Older, unstructured Excel files where you need to extract, replace, or add images.</p>
+                <p style="margin:0 0 6px 0;color:#001a3d;"><strong>How it works:</strong> Let AI normalize hazards, controls, and ratings. Original ratings are preserved and new additions are flagged for review. This is the only workflow that supports image management.</p>
+                <p style="margin:0;color:#001a3d;"><strong>Best for:</strong> Modernizing messy spreadsheets and updating outdated photos before pushing to GOEHS.</p>
             </div>
             <div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:12px;padding:14px;">
                 <div style="font-weight:700;color:#c2410c;margin-bottom:6px;">2. RA 2025 Template → Main Table</div>
@@ -5931,7 +6012,7 @@ data.forEach((row, index) => {
              }
         }
         function generateColors(count) {
-            const baseColors = ['#4f46e5', '#0ea5e9', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#3b82f6', '#22c55e', '#eab308', '#ec4899'];
+            const baseColors = ['#002c5f', '#0ea5e9', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#003d82', '#22c55e', '#eab308', '#ec4899'];
             const colors = []; for (let i = 0; i < count; i++) { colors.push(baseColors[i % baseColors.length]); } return colors;
         }
         // --- Enhanced Table Image Modal with Editable Fields ---
@@ -6098,7 +6179,7 @@ data.forEach((row, index) => {
             if (display) {
                 display.textContent = `✓ Selected: ${controlType}`;
                 display.style.background = '#dbeafe';
-                display.style.color = '#1e40af';
+                display.style.color = '#002c5f';
                 display.style.fontWeight = 'bold';
             }
         }
@@ -7465,14 +7546,14 @@ function generateRiskEvolutionVisualization(initialScore, currentScore, projecte
     if (showProjected) {
         html += `
             <!-- Arrow -->
-            <div style="color: #3b82f6; font-size: 18px; font-weight: bold;">➜</div>
+            <div style="color: #002c5f; font-size: 18px; font-weight: bold;">➜</div>
             
             <!-- Projected/Target Risk -->
             <div style="flex: 1; min-width: 90px; border: 3px solid ${projColor}; background: linear-gradient(135deg, #eff6ff, #ffffff); border-radius: 8px; padding: 10px 8px; text-align: center; position: relative; box-shadow: 0 2px 8px ${projColor}30;">
-                <div style="font-size: 9px; font-weight: 700; color: #1e40af; text-transform: uppercase;">Target</div>
+                <div style="font-size: 9px; font-weight: 700; color: #002c5f; text-transform: uppercase;">Target</div>
                 <div style="font-size: 24px; font-weight: 900; color: ${projColor};">${Math.round(projectedScore)}</div>
                 ${totalReduction > 0 ? `<div style="position: absolute; top: -8px; right: -8px; background: #dcfce7; color: #15803d; border: 2px solid #22c55e; font-size: 9px; font-weight: 800; padding: 2px 5px; border-radius: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.2);">-${totalReduction}%</div>` : ''}
-                <div style="position: absolute; bottom: -18px; left: 0; width: 100%; font-size: 9px; color: #3b82f6; font-weight: 600; white-space: nowrap;">(${controlCount} pending)</div>
+                <div style="position: absolute; bottom: -18px; left: 0; width: 100%; font-size: 9px; color: #002c5f; font-weight: 600; white-space: nowrap;">(${controlCount} pending)</div>
             </div>`;
     } else if (!hasControls) {
         html += `
@@ -7650,22 +7731,22 @@ function generateRiskReductionVisualization(currentRiskScore, selectedControls, 
 
     // Build HTML
     let html = `
-        <div style="border: 1px solid #bfdbfe; border-radius: 8px; padding: 10px; background: linear-gradient(to right, #eff6ff, #ffffff); box-shadow: 0 2px 4px rgba(59,130,246,0.1); font-size: 11px;">
+        <div style="border: 1px solid #a9c1e0; border-radius: 8px; padding: 10px; background: linear-gradient(to right, #edf2f9, #ffffff); box-shadow: 0 2px 4px rgba(0,44,95,0.1); font-size: 11px;">
             <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
                 <div>
-                    <div style="font-size: 9px; font-weight: 700; color: #1e40af; text-transform: uppercase;">${t('Predicted Risk')}</div>
-                    <div style="font-size: 9px; color: #60a5fa;">${totalControls} ${t(totalControls !== 1 ? 'controls' : 'control')}</div>
+                    <div style="font-size: 9px; font-weight: 700; color: #002c5f; text-transform: uppercase;">${t('Predicted Risk')}</div>
+                    <div style="font-size: 9px; color: #5382c1;">${totalControls} ${t(totalControls !== 1 ? 'controls' : 'control')}</div>
                 </div>
                 <div style="display: flex; align-items: center; gap: 10px;">
                     <div style="font-size: 28px; font-weight: 800; color: #94a3b8; opacity: 0.6;">${currentRiskScore}</div>
-                    <div style="font-size: 18px; color: #3b82f6;">→</div>
+                    <div style="font-size: 18px; color: #002c5f;">→</div>
                     <div style="position: relative;">
                         <div style="font-size: 32px; font-weight: 900; color: ${projectedColor};">${projectedScore}</div>
                         ${reduction > 0 ? `<div style="position: absolute; top: -8px; right: -16px; background: #dcfce7; color: #166534; font-size: 9px; font-weight: 800; padding: 2px 6px; border-radius: 10px; border: 2px solid #86efac;">-${reductionPercent}%</div>` : ''}
                     </div>
                 </div>
             </div>
-            ${totalControls > 0 ? `<div style="margin-top: 8px; padding: 8px; background: #f0f9ff; border-radius: 6px; border-left: 3px solid #0ea5e9; font-size: 10px; color: #1e40af; line-height: 1.4;">${message}</div>` : `<div style="margin-top: 8px; padding: 8px; background: #f3f4f6; border-radius: 6px; font-size: 10px; color: #6b7280; text-align: center;">${message}</div>`}
+            ${totalControls > 0 ? `<div style="margin-top: 8px; padding: 8px; background: #edf2f9; border-radius: 6px; border-left: 3px solid #002c5f; font-size: 10px; color: #002c5f; line-height: 1.4;">${message}</div>` : `<div style="margin-top: 8px; padding: 8px; background: #f3f4f6; border-radius: 6px; font-size: 10px; color: #6b7280; text-align: center;">${message}</div>`}
         </div>
     `;
 
@@ -8107,45 +8188,9 @@ window.LIKELIHOOD_SCALE = LIKELIHOOD_SCALE;
             if (event.target == privacyModal) privacyModal.style.display = 'none';
         });
 
-        // Best Practices Modal Triggers
-        const bestPracticesModal = document.getElementById('bestPracticesModal');
-        const bestPracticesBtn = document.getElementById('bestPracticesBtn');
-        const closeBestPracticesModal = document.getElementById('closeBestPracticesModal');
-        
-        if (bestPracticesBtn && bestPracticesModal) {
-            bestPracticesBtn.onclick = () => {
-                bestPracticesModal.style.display = 'flex';
-                // Update translations for the modal content
-                updateBestPracticesModalTranslations();
-            };
-        }
-        if (closeBestPracticesModal && bestPracticesModal) {
-            closeBestPracticesModal.onclick = () => bestPracticesModal.style.display = 'none';
-        }
-        window.addEventListener('click', (event) => {
-            if (event.target == bestPracticesModal) bestPracticesModal.style.display = 'none';
-        });
+        // How to Use Modal — handled by how-to-guide.js (tabbed version)
 
-        // Function to update Best Practices modal translations
-        function updateBestPracticesModalTranslations() {
-            const elements = bestPracticesModal.querySelectorAll('[data-en-text]');
-            elements.forEach(el => {
-                const englishText = el.getAttribute('data-en-text');
-                if (englishText) {
-                    if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') {
-                        el.placeholder = t(englishText);
-                    } else {
-                        // Preserve HTML formatting for text with <strong>, <em> etc
-                        const translatedText = t(englishText);
-                        if (el.innerHTML.includes('<strong>') || el.innerHTML.includes('<em>')) {
-                            el.innerHTML = translatedText;
-                        } else {
-                            el.innerText = translatedText;
-                        }
-                    }
-                }
-            });
-        }
+        // Best Practices Modal — handled by best-practices.js
 
         // Translation Modal Triggers
         const translationModal = document.getElementById('translationModal');
@@ -11172,7 +11217,7 @@ downloadBtn.addEventListener('click', async () => {
         <div id="sheetPickerList" style="max-height: 340px; overflow-y: auto; display:flex; flex-direction:column; gap:6px; margin-bottom:18px;"></div>
         <div style="display:flex; gap:10px; justify-content:center;">
             <button id="sheetPickerSelectAll" style="padding:6px 14px; border-radius:8px; border:1px solid #cbd5e1; background:#f1f5f9; color:#334155; font-size:0.82rem; cursor:pointer;">Select All</button>
-            <button id="sheetPickerConfirm" style="padding:8px 28px; border-radius:8px; background:#2563eb; color:white; font-weight:600; font-size:0.95rem; border:none; cursor:pointer;">Import Selected</button>
+            <button id="sheetPickerConfirm" style="padding:8px 28px; border-radius:8px; background:#002c5f; color:white; font-weight:600; font-size:0.95rem; border:none; cursor:pointer;">Import Selected</button>
         </div>
     </div>
 </div>
@@ -11188,7 +11233,7 @@ downloadBtn.addEventListener('click', async () => {
         </div>
 
         <!-- Sheet Tabs Bar -->
-        <div id="gySheetTabsBar" style="display:none; flex-shrink:0; margin-bottom:12px; background:linear-gradient(135deg,#1e40af 0%,#1e3a8a 100%); border-radius:10px; padding:6px 10px; overflow-x:auto; white-space:nowrap;">
+        <div id="gySheetTabsBar" style="display:none; flex-shrink:0; margin-bottom:12px; background:linear-gradient(135deg,#002c5f 0%,#001a3d 100%); border-radius:10px; padding:6px 10px; overflow-x:auto; white-space:nowrap;">
             <span style="color:#93c5fd; font-size:0.7rem; font-weight:600; margin-right:10px; vertical-align:middle;">📑 Sheets:</span>
             <span id="gySheetTabsList" style="display:inline-flex; gap:4px;"></span>
         </div>
@@ -11212,7 +11257,7 @@ downloadBtn.addEventListener('click', async () => {
                         <button id="gyCopyMappingBtn" type="button" title="Copy current column mapping — then switch to the next tab and click Paste" style="background:linear-gradient(135deg,#0ea5e9,#0284c7);color:white;border:none;padding:4px 10px;border-radius:6px;cursor:pointer;font-size:0.68rem;font-weight:600;transition:all 0.2s;" onmouseover="this.style.transform='translateY(-1px)';this.style.boxShadow='0 2px 8px rgba(14,165,233,0.35)'" onmouseout="this.style.transform='';this.style.boxShadow=''">📋 Copy Mapping</button>
                         <button id="gyPasteMappingBtn" type="button" title="Paste the copied mapping into this tab" disabled style="background:#e2e8f0;color:#94a3b8;border:none;padding:4px 10px;border-radius:6px;cursor:not-allowed;font-size:0.68rem;font-weight:600;transition:all 0.2s;">📌 Paste</button>
                         <button id="gyApplyMappingAll" type="button" title="Apply this mapping to ALL other tabs at once" style="display:none;background:linear-gradient(135deg,#f59e0b,#d97706);color:white;border:none;padding:4px 10px;border-radius:6px;cursor:pointer;font-size:0.68rem;font-weight:600;transition:all 0.2s;" onmouseover="this.style.transform='translateY(-1px)';this.style.boxShadow='0 2px 8px rgba(245,158,11,0.35)'" onmouseout="this.style.transform='';this.style.boxShadow=''">📋 Apply to All Tabs</button>
-                        <button id="gyRefreshBtn" type="button" style="background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); color: white; border: none; padding: 4px 10px; border-radius: 6px; cursor: pointer; font-size: 0.7rem; font-weight: 600;">↻ Refresh</button>
+                        <button id="gyRefreshBtn" type="button" style="background: linear-gradient(135deg, #002c5f 0%, #001a3d 100%); color: white; border: none; padding: 4px 10px; border-radius: 6px; cursor: pointer; font-size: 0.7rem; font-weight: 600;">↻ Refresh</button>
                     </div>
                 </div>
                 <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px;">
@@ -11231,7 +11276,7 @@ downloadBtn.addEventListener('click', async () => {
             
             <!-- Excel Preview Panel -->
             <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; display: flex; flex-direction: column;">
-                <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: linear-gradient(135deg, #1e40af 0%, #1e3a8a 100%); color: white;">
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: linear-gradient(135deg, #002c5f 0%, #001a3d 100%); color: white;">
                     <h4 style="font-size: 0.75rem; font-weight: 600; margin: 0;">📋 Excel Data Preview</h4>
                     <div style="display: flex; gap: 8px; align-items: center;">
                         <label style="font-size: 0.65rem;">Header Row:</label>
@@ -11338,7 +11383,7 @@ downloadBtn.addEventListener('click', async () => {
                 </div>
                 <div id="ra2025PreviewContainer" style="flex: 1; overflow: auto; border: 1px solid #e2e8f0; border-radius: 8px; background: #f8fafc;">
                     <table id="ra2025PreviewTable" style="width: 100%; border-collapse: collapse; font-size: 11px;">
-                        <thead id="ra2025PreviewHead" style="background: #1e40af; color: white; position: sticky; top: 0;"></thead>
+                        <thead id="ra2025PreviewHead" style="background: #002c5f; color: white; position: sticky; top: 0;"></thead>
                         <tbody id="ra2025PreviewBody"></tbody>
                     </table>
                 </div>
@@ -11441,7 +11486,7 @@ downloadBtn.addEventListener('click', async () => {
                 <button onclick="tryAutoDetectRA2025()" style="padding: 10px 20px; background: #fef3c7; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; color: #92400e;">
                     🔄 Re-try Auto-Detect
                 </button>
-                <button onclick="parseWithManualMapping()" style="padding: 10px 20px; background: #2563eb; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; color: white;">
+                <button onclick="parseWithManualMapping()" style="padding: 10px 20px; background: #002c5f; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; color: white;">
                     ✓ Parse & Load to Table
                 </button>
             </div>
@@ -11472,8 +11517,8 @@ downloadBtn.addEventListener('click', async () => {
 }
 .ra2025-col-input:focus {
     outline: none;
-    border-color: #2563eb;
-    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+    border-color: #002c5f;
+    box-shadow: 0 0 0 3px rgba(0, 44, 95, 0.1);
 }
 .ra2025-col-input.mapped {
     background: #ecfdf5;
@@ -11493,11 +11538,11 @@ downloadBtn.addEventListener('click', async () => {
     cursor: pointer;
     transition: background 0.2s;
     white-space: nowrap;
-    background: #1e40af;
+    background: #002c5f;
     color: white;
 }
 #ra2025PreviewTable th:hover {
-    background: #1e3a8a;
+    background: #001a3d;
 }
 #ra2025PreviewTable th.selected-col {
     background: #16a34a !important;
@@ -12217,7 +12262,7 @@ async function loadFile(file) {
         // 1. NEW: Handle Project JSON File
         if (file.name.toLowerCase().endsWith('.json')) {
             statusEl.textContent = 'Loading Project...';
-            statusEl.style.color = '#3b82f6'; // Blue
+            statusEl.style.color = '#002c5f'; // Blue
             await loadGyProject(file);
             return;
         }
@@ -12353,7 +12398,7 @@ async function loadFile(file) {
             btn.style.cssText = 'padding:5px 14px; border:none; border-radius:6px; font-size:0.75rem; font-weight:600; cursor:pointer; transition:all 0.2s; white-space:nowrap;';
             if (s.index === gyActiveSheetIdx) {
                 btn.style.background = '#fff';
-                btn.style.color = '#1e40af';
+                btn.style.color = '#002c5f';
                 btn.style.boxShadow = '0 1px 4px rgba(0,0,0,0.15)';
             } else {
                 btn.style.background = 'rgba(255,255,255,0.15)';
@@ -12436,7 +12481,7 @@ async function loadFile(file) {
             updateRestoreButton();
             
             statusEl.textContent = `Switching to "${sheet.name}"... loading images...`;
-            statusEl.style.color = '#3b82f6';
+            statusEl.style.color = '#002c5f';
             
             await loadSourceImages(sheetIdx);
             renderUI();
@@ -12456,7 +12501,7 @@ async function loadFile(file) {
             updateGyExcelPreview();
             
             statusEl.textContent = `Switching to "${sheet.name}"... extracting images...`;
-            statusEl.style.color = '#3b82f6';
+            statusEl.style.color = '#002c5f';
             
             await loadSourceImages(sheetIdx);
             await extractImagesToMap(sheetIdx);
@@ -13102,7 +13147,7 @@ async function loadFile(file) {
                     <!-- Header with Step Number & Actions -->
                     <div style="display:flex; justify-content:space-between; align-items:center; padding-bottom:8px; border-bottom:2px solid #e2e8f0;">
                         <div style="display:flex; align-items:center; gap:10px;">
-                            <span style="background:linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); color:white; padding:6px 14px; border-radius:8px; font-weight:700; font-size:0.9rem;">Step ${item.step || '?'}</span>
+                            <span style="background:linear-gradient(135deg, #002c5f 0%, #001a3d 100%); color:white; padding:6px 14px; border-radius:8px; font-weight:700; font-size:0.9rem;">Step ${item.step || '?'}</span>
                             <span style="color:#64748b; font-size:0.75rem;">Row ${item.row}</span>
                         </div>
                         <button onclick="gyRemoveRow('${item.id}')" style="background:#fee2e2; color:#dc2626; border:none; padding:6px 12px; border-radius:6px; cursor:pointer; font-size:0.75rem; font-weight:600; transition:all 0.2s;" onmouseover="this.style.background='#fecaca'" onmouseout="this.style.background='#fee2e2'">🗑️ Delete</button>
@@ -13147,8 +13192,8 @@ async function loadFile(file) {
                             </select>
                         </div>
                         <div>
-                            <label style="font-size:0.65rem; font-weight:700; color:#64748b; text-transform:uppercase; margin-bottom:3px; display:block;">Likelihood ${item.userLikelihood ? '<span style="color:#2563eb; font-weight:800;">(' + item.userLikelihood + ')</span>' : ''}</label>
-                            <select class="gy-textarea" style="padding:6px 8px; height:auto; min-height:auto; font-size:0.8rem; background:#eff6ff; border-color:#93c5fd;" onchange="gyUpdateItem('${item.id}','userLikelihood',this.value)">
+                            <label style="font-size:0.65rem; font-weight:700; color:#64748b; text-transform:uppercase; margin-bottom:3px; display:block;">Likelihood ${item.userLikelihood ? '<span style="color:#002c5f; font-weight:800;">(' + item.userLikelihood + ')</span>' : ''}</label>
+                            <select class="gy-textarea" style="padding:6px 8px; height:auto; min-height:auto; font-size:0.8rem; background:#edf2f9; border-color:#a9c1e0;" onchange="gyUpdateItem('${item.id}','userLikelihood',this.value)">
                                 ${likeHtml}
                             </select>
                         </div>
@@ -13567,7 +13612,7 @@ async function loadSourceImages(sheetIndex) {
         overlay.innerHTML = `
 <div id="gyWizPanel" style="background:#fff;border-radius:16px;width:95vw;max-width:1200px;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 25px 80px rgba(0,0,0,0.35);overflow:hidden;">
   <!-- Header with steps indicator -->
-  <div style="background:linear-gradient(135deg,#0f172a 0%,#334155 100%);padding:20px 28px;color:white;">
+  <div style="background:linear-gradient(135deg,#002c5f 0%,#001530 100%);padding:20px 28px;color:white;">
     <div style="display:flex;align-items:center;justify-content:space-between;">
       <h3 style="margin:0;font-size:1.2rem;">⚡ Batch Process All Tabs</h3>
       <button id="gyWizClose" style="background:rgba(255,255,255,0.2);border:none;color:white;width:32px;height:32px;border-radius:50%;cursor:pointer;font-size:1.1rem;">✕</button>
@@ -13591,7 +13636,7 @@ async function loadSourceImages(sheetIndex) {
     <span id="gyWizInfo" style="font-size:0.8rem;color:#64748b;"></span>
     <div style="display:flex;gap:10px;">
       <button id="gyWizBack" style="display:none;background:#e2e8f0;color:#475569;border:none;padding:9px 22px;border-radius:8px;font-weight:600;cursor:pointer;font-size:0.85rem;">← Back</button>
-      <button id="gyWizNext" style="background:linear-gradient(135deg,#475569,#334155);color:white;border:none;padding:9px 28px;border-radius:8px;font-weight:700;cursor:pointer;font-size:0.85rem;">Send to AI →</button>
+      <button id="gyWizNext" style="background:linear-gradient(135deg,#002c5f,#001530);color:white;border:none;padding:9px 28px;border-radius:8px;font-weight:700;cursor:pointer;font-size:0.85rem;">Send to AI →</button>
     </div>
   </div>
 </div>
@@ -14608,8 +14653,8 @@ You are a world-class safety and risk assessment expert. Analyze each entry and 
             html += '<label style="display:flex;align-items:center;gap:3px;cursor:pointer;"><input type="checkbox" id="gyChaControl" style="cursor:pointer;"> Current Control</label>';
             html += '</div>';
             html += '<button id="gyTranslateBtn" style="background:linear-gradient(135deg,#0369a1,#075985);color:white;border:none;padding:6px 14px;border-radius:6px;font-weight:600;font-size:0.75rem;cursor:pointer;opacity:0.5;" disabled>🌐 Translate</button>';
-            html += '<button id="gyFixAll" style="background:linear-gradient(135deg,#475569,#334155);color:white;border:none;padding:6px 16px;border-radius:6px;font-weight:600;font-size:0.78rem;cursor:pointer;">✨ Auto-Fix All</button>';
-            html += '<button id="gyRunAiAgain" style="background:linear-gradient(135deg,#3b82f6,#1d4ed8);color:white;border:none;padding:6px 14px;border-radius:6px;font-weight:600;font-size:0.75rem;cursor:pointer;">🔄 Re-run AI</button>';
+            html += '<button id="gyFixAll" style="background:linear-gradient(135deg,#002c5f,#001530);color:white;border:none;padding:6px 16px;border-radius:6px;font-weight:600;font-size:0.78rem;cursor:pointer;">✨ Auto-Fix All</button>';
+            html += '<button id="gyRunAiAgain" style="background:linear-gradient(135deg,#002c5f,#001a3d);color:white;border:none;padding:6px 14px;border-radius:6px;font-weight:600;font-size:0.75rem;cursor:pointer;">🔄 Re-run AI</button>';
             html += '</div>';
             html += '</div>';
 
@@ -15283,7 +15328,7 @@ You are a world-class safety and risk assessment expert. Analyze each entry and 
                             <p class="text-slate-600">Add tasks for this assessment. Each task can have multiple hazards in Tool 3.</p>
                         </div>
                         <div class="flex gap-2 flex-wrap">
-                            <button type="button" onclick="aiPopulateTaskFields()" class="bg-purple-600 text-white font-medium py-2 px-4 rounded-lg hover:bg-purple-700 transition flex items-center gap-2 text-sm" title="Use keyword matching to suggest Core Activity and Job Title">
+                            <button type="button" onclick="aiPopulateTaskFields()" class="bg-indigo-600 text-white font-medium py-2 px-4 rounded-lg hover:bg-indigo-700 transition flex items-center gap-2 text-sm" title="Use keyword matching to suggest Core Activity and Job Title">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
                                 ⚡ Intelligent Fill
                             </button>
@@ -15338,7 +15383,7 @@ You are a world-class safety and risk assessment expert. Analyze each entry and 
                             <p class="text-slate-600 text-sm">Hazard data is displayed in table format matching the CSV output. Scroll horizontally to see all columns.</p>
                         </div>
                         <div class="flex gap-2 flex-wrap">
-                            <button type="button" onclick="aiPopulateHazardFields()" class="bg-purple-600 text-white font-medium py-2 px-4 rounded-lg hover:bg-purple-700 transition flex items-center gap-2 text-sm" title="Use keyword matching to suggest Countermeasure Ladder">
+                            <button type="button" onclick="aiPopulateHazardFields()" class="bg-indigo-600 text-white font-medium py-2 px-4 rounded-lg hover:bg-indigo-700 transition flex items-center gap-2 text-sm" title="Use keyword matching to suggest Countermeasure Ladder">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
                                 ⚡ Intelligent Fill
                             </button>
@@ -15687,7 +15732,7 @@ function showSheetPickerForRA2025(file, sheetList, mode, batchFileIndex) {
         cb.type = 'checkbox';
         cb.value = sheet.index;
         cb.checked = idx === 0; // Check first by default
-        cb.style.cssText = 'width:18px; height:18px; accent-color:#2563eb; cursor:pointer;';
+        cb.style.cssText = 'width:18px; height:18px; accent-color:#002c5f; cursor:pointer;';
         cb.addEventListener('change', () => {
             row.style.background = cb.checked ? '#eff6ff' : '#f8fafc';
             row.style.borderColor = cb.checked ? '#93c5fd' : '#e2e8f0';
@@ -20042,7 +20087,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 <span id="bcm-remap-status-${fId}" style="font-size:11px;color:#64748b;"></span>
                 <span style="font-size:10px;color:#94a3b8;margin-left:auto;">Auto-reparses on changes</span>
             </div>
-            <p style="font-size:10px;color:#64748b;margin:8px 0 0;">💡 <span style="border-bottom:1px dashed #93c5fd;color:#3b82f6;">Blue dashed</span> = auto-detected, <span style="border-bottom:1px solid #10b981;color:#059669;">green solid</span> = manually set. Edit any field to override. Changes auto-reparse after 600ms.</p>
+            <p style="font-size:10px;color:#64748b;margin:8px 0 0;">💡 <span style="border-bottom:1px dashed #a9c1e0;color:#002c5f;">Blue dashed</span> = auto-detected, <span style="border-bottom:1px solid #10b981;color:#059669;">green solid</span> = manually set. Edit any field to override. Changes auto-reparse after 600ms.</p>
         </div>`;
 
         // Auto-select detected language in dropdown (but never overwrite existing overrides)
@@ -21209,7 +21254,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (cmMMs.length > 0) {
             const resolvedCM = cmMMs.filter(isResolved).length;
             html += `<div class="fix-panel-hdr" style="margin-top:14px;">
-                <h4 style="color:#3730a3;">🎯 Missing Countermeasure Ladder</h4>
+                <h4 style="color:#001530;">🎯 Missing Countermeasure Ladder</h4>
                 <span style="font-size:11px;color:#64748b;">${resolvedCM}/${cmMMs.length} resolved</span>
             </div>
             <div style="max-height:280px;overflow-y:auto;overflow-x:hidden;">

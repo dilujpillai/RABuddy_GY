@@ -30,75 +30,105 @@
         const cx = rx + rw / 2;
         const cy = ry + rh / 2;
 
-        // Scale: score 1→100 maps card half-width 28→72px (very visible range)
         const t = score / 100;
-        const cardW = 56 + t * 88;   // 56px (score≈0) → 144px (score=100)
-        const cardH = cardW * 0.62;
-        const cornerR = cardH * 0.22;
-        const fireSize = 18 + t * 32; // 18px → 50px emoji
-        const borderW = 2 + t * 4;    // 2px → 6px border
+        const cr = Math.round(28 + t * 26);   // circle radius: 28 → 54px
+        const ringW = 2.5 + t * 3.5;           // border width
+        const fireSize = Math.round(cr * 0.90);
+        const scoreFsz = Math.round(cr * 0.38);
+        const labelH = Math.round(cr * 0.44);
+        const labelW = Math.round(cr * 2.2);
 
         ctx.save();
 
-        // ── Drop shadow (category-colored) ───────────────────────
+        // ── Colored blurred halo behind circle ────────────────────
+        ctx.save();
         ctx.shadowColor = categoryColor;
-        ctx.shadowBlur = 18 + t * 20;
+        ctx.shadowBlur = 18 + t * 18;
         ctx.shadowOffsetX = 0;
-        ctx.shadowOffsetY = 2 + t * 4;
-
-        // ── Outer glow ring (score-color) ────────────────────────
+        ctx.shadowOffsetY = 0;
+        ctx.globalAlpha = 0.55 + t * 0.3;
         ctx.beginPath();
-        roundRect(ctx, cx - cardW/2 - borderW, cy - cardH/2 - borderW,
-                  cardW + borderW*2, cardH + borderW*2, cornerR + borderW);
+        ctx.arc(cx, cy - labelH * 0.6, cr, 0, Math.PI * 2);
         ctx.fillStyle = categoryColor;
-        ctx.globalAlpha = 0.45 + t * 0.4;
-        ctx.fill();
-        ctx.globalAlpha = 1;
-        ctx.shadowColor = 'transparent';
-
-        // ── White card face ───────────────────────────────────────
-        ctx.beginPath();
-        roundRect(ctx, cx - cardW/2, cy - cardH/2, cardW, cardH, cornerR);
-        ctx.fillStyle = 'rgba(255,255,255,0.97)';
-        ctx.fill();
-
-        // ── Colored top strip (fills top 38% of card) ────────────
-        ctx.save();
-        ctx.beginPath();
-        roundRect(ctx, cx - cardW/2, cy - cardH/2, cardW, cardH * 0.38, cornerR);
-        ctx.fillStyle = categoryColor;
-        ctx.globalAlpha = 0.90;
         ctx.fill();
         ctx.restore();
 
-        // ── Colored border ────────────────────────────────────────
+        // ── Outer ring pulse (static, two-tone) ───────────────────
+        ctx.save();
         ctx.beginPath();
-        roundRect(ctx, cx - cardW/2, cy - cardH/2, cardW, cardH, cornerR);
+        ctx.arc(cx, cy - labelH * 0.6, cr + 5 + t * 4, 0, Math.PI * 2);
         ctx.strokeStyle = categoryColor;
-        ctx.lineWidth = borderW;
+        ctx.globalAlpha = 0.35 + t * 0.25;
+        ctx.lineWidth = 2 + t * 2;
         ctx.stroke();
+        ctx.restore();
 
-        // ── Fire emoji (centered in top strip) ───────────────────
+        // ── Main white circle ─────────────────────────────────────
+        ctx.save();
+        ctx.shadowColor = categoryColor;
+        ctx.shadowBlur = 10 + t * 10;
+        ctx.shadowOffsetY = 2 + t * 4;
+        ctx.beginPath();
+        ctx.arc(cx, cy - labelH * 0.6, cr, 0, Math.PI * 2);
+        // Radial-style fill: solid white centre
+        const grad = ctx.createRadialGradient(cx, cy - labelH * 0.6 - cr * 0.2, cr * 0.1,
+                                               cx, cy - labelH * 0.6, cr);
+        grad.addColorStop(0,   '#ffffff');
+        grad.addColorStop(0.78,'#ffffff');
+        grad.addColorStop(1,   categoryColor.replace(')', ',0.18)').replace('rgb', 'rgba').replace('##', '#'));
+        ctx.fillStyle = grad;
+        ctx.fill();
+        ctx.strokeStyle = categoryColor;
+        ctx.lineWidth = ringW;
+        ctx.stroke();
+        ctx.restore();
+
+        // ── Fire emoji (upper-center of circle) ───────────────────
         ctx.font = fireSize + 'px serif';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillText('🔥', cx, cy - cardH/2 + cardH * 0.19);
+        ctx.fillText('🔥', cx, cy - labelH * 0.6 - cr * 0.08);
 
-        // ── Score number (big, bold) ──────────────────────────────
-        const scoreFontSize = Math.round(11 + t * 18); // 11→29px
-        ctx.font = 'bold ' + scoreFontSize + 'px sans-serif';
+        // ── Score (lower third of circle) ─────────────────────────
+        ctx.font = 'bold ' + scoreFsz + 'px "Segoe UI",sans-serif';
         ctx.fillStyle = categoryColor;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillText(score + '/100', cx, cy + cardH * 0.12);
+        ctx.fillText(score + '/100', cx, cy - labelH * 0.6 + cr * 0.62);
 
-        // ── Category label (e.g. LOW / MEDIUM / HIGH / CRITICAL) ─
-        const labelFontSize = Math.max(8, Math.round(7 + t * 7)); // 7→14px
-        ctx.font = 'bold ' + labelFontSize + 'px sans-serif';
-        ctx.fillStyle = '#64748b';
+        // ── Colored label pill below circle ───────────────────────
+        const pillY = cy - labelH * 0.6 + cr + 5;
+        const pillX = cx - labelW / 2;
+        ctx.save();
+        ctx.shadowColor = categoryColor;
+        ctx.shadowBlur = 8;
+        ctx.shadowOffsetY = 2;
+        ctx.beginPath();
+        ctx.roundRect
+            ? ctx.roundRect(pillX, pillY, labelW, labelH, labelH / 2)
+            : (function() {
+                const r2 = labelH / 2;
+                ctx.moveTo(pillX + r2, pillY);
+                ctx.lineTo(pillX + labelW - r2, pillY);
+                ctx.quadraticCurveTo(pillX + labelW, pillY, pillX + labelW, pillY + r2);
+                ctx.lineTo(pillX + labelW, pillY + labelH - r2);
+                ctx.quadraticCurveTo(pillX + labelW, pillY + labelH, pillX + labelW - r2, pillY + labelH);
+                ctx.lineTo(pillX + r2, pillY + labelH);
+                ctx.quadraticCurveTo(pillX, pillY + labelH, pillX, pillY + labelH - r2);
+                ctx.lineTo(pillX, pillY + r2);
+                ctx.quadraticCurveTo(pillX, pillY, pillX + r2, pillY);
+                ctx.closePath();
+              })();
+        ctx.fillStyle = categoryColor;
+        ctx.fill();
+        ctx.restore();
+
+        const labelFsz = Math.max(8, Math.round(labelH * 0.52));
+        ctx.font = 'bold ' + labelFsz + 'px "Segoe UI",sans-serif';
+        ctx.fillStyle = '#ffffff';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillText((categoryLabel || '').toUpperCase(), cx, cy + cardH * 0.38);
+        ctx.fillText((categoryLabel || '').toUpperCase(), cx, pillY + labelH / 2);
 
         ctx.restore();
     }

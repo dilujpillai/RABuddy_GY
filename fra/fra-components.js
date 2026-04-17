@@ -1341,11 +1341,15 @@
         return html`
         <div className="fra-toolbar">
             <span className="fra-toolbar-title"> </span>
-            <button type="button" className="fra-toolbar-btn" style=${{ borderColor: '#93c5fd', color: '#1e40af' }} onClick=${onSave}>💾 Save</button>
-            <button type="button" className="fra-toolbar-btn" style=${{ borderColor: '#93c5fd', color: '#1e40af' }} onClick=${onLoad}>📂 Load</button>
-            <button type="button" className="fra-toolbar-btn" style=${{ borderColor: '#b2b4b3', color: '#065f46' }} onClick=${onMerge}>➕ Merge</button>
-            <button type="button" className="fra-toolbar-btn" style=${{ borderColor: '#fca5a5', color: '#991b1b' }} onClick=${onPDF}>📄 PDF</button>
-            <button type="button" className="fra-toolbar-btn" style=${{ borderColor: '#c4b5fd', color: '#5b21b6' }} onClick=${onHTML}>🌐 HTML</button>
+            <div className="fra-toolbar-group">
+                <button type="button" className="fra-toolbar-btn fra-btn-data" onClick=${onSave}>Save</button>
+                <button type="button" className="fra-toolbar-btn fra-btn-data" onClick=${onLoad}>Load</button>
+                <button type="button" className="fra-toolbar-btn fra-btn-data" onClick=${onMerge}>Merge</button>
+            </div>
+            <div className="fra-toolbar-group">
+                <button type="button" className="fra-toolbar-btn fra-btn-export" onClick=${onPDF}>PDF</button>
+                <button type="button" className="fra-toolbar-btn fra-btn-export" onClick=${onHTML}>HTML</button>
+            </div>
         </div>`;
     }
 
