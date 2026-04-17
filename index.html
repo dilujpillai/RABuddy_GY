@@ -781,7 +781,7 @@
 
     </style>
 </head>
-<body class="bg-slate-100 font-sans text-slate-800" onload="setTimeout(function(){ regenerateProjectId(); updateFilenamePreview(); }, 100)">
+<body class="bg-slate-100 font-sans text-slate-800" onload="setTimeout(function(){ updateFilenamePreview(); }, 100)">
     <main class="mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8 space-y-8">
 <div id="howToUseContainer" style="display:none">
 <details class="bg-indigo-50 rounded-lg border border-indigo-200 mb-8 group overflow-hidden" id="howToUse-en" data-lang="en" style="display: block;">
@@ -1178,34 +1178,31 @@
             </div>
         </section>
 
-        <!-- Project Identity Bar -->
-        <div id="projectIdentityBar" class="bg-gradient-to-r from-slate-50 to-indigo-50 border border-indigo-200 rounded-lg p-4 sm:p-5 shadow-sm">
-            <div class="flex flex-col sm:flex-row items-start sm:items-end gap-3 sm:gap-4">
-                <div class="flex-1 min-w-0">
-                    <label for="projectPlantInput" class="block text-xs font-bold text-indigo-700 uppercase tracking-wider mb-1" data-en-text="Plant / Site">Plant / Site</label>
-                    <input type="text" id="projectPlantInput" placeholder="e.g. Colmar-Berg, Luxembourg" 
-                        class="w-full p-2 border border-slate-300 rounded-md bg-white focus:ring-2 focus:ring-indigo-500 transition text-sm font-medium text-slate-800" />
-                </div>
-                <div class="flex-1 min-w-0">
-                    <label for="projectNameInput" class="block text-xs font-bold text-indigo-700 uppercase tracking-wider mb-1" data-en-text="Dept / Process Name">Dept / Process Name</label>
-                    <input type="text" id="projectNameInput" placeholder="e.g. Tire Building - Line 3" 
-                        class="w-full p-2 border border-slate-300 rounded-md bg-white focus:ring-2 focus:ring-indigo-500 transition text-sm font-medium text-slate-800" />
-                </div>
-                <div class="flex-shrink-0">
-                    <label class="block text-xs font-bold text-indigo-700 uppercase tracking-wider mb-1" data-en-text="Project ID">Project ID</label>
-                    <div id="projectUniqueId" class="p-2 bg-indigo-100 border border-indigo-300 rounded-md text-sm font-mono font-bold text-indigo-800 select-all cursor-pointer whitespace-nowrap" title="Auto-generated unique ID (click to copy)"></div>
-                </div>
-                <button onclick="regenerateProjectId()" class="flex-shrink-0 p-2 bg-white border border-slate-300 rounded-md hover:bg-slate-50 transition" title="Generate new Project ID">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
-                </button>
+        <!-- Project Identity Strip (shared, rendered once, moved between tabs by JS) -->
+        <div id="projectIdentityStrip" class="flex flex-wrap items-center gap-2 px-4 py-2.5 mb-4 rounded-lg border border-slate-200 bg-gradient-to-r from-slate-50/80 to-indigo-50/60 shadow-sm" style="max-width:100%">
+            <div class="flex items-center gap-1.5 min-w-0 flex-1" style="max-width:240px">
+                <label for="projectPlantInput" class="text-[10px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap" data-en-text="Plant">Plant</label>
+                <input type="text" id="projectPlantInput" placeholder="e.g. Colmar-Berg"
+                    class="flex-1 min-w-0 px-2 py-1 border border-slate-300 rounded-md bg-white text-xs font-medium text-slate-800 focus:ring-1 focus:ring-indigo-400 focus:border-indigo-400 transition" />
             </div>
-            <p class="text-xs text-slate-500 mt-2 italic"><span data-en-text="This info prefixes all your downloaded files. Example:">This info prefixes all your downloaded files. Example:</span> <span id="projectFilenamePreview" class="font-mono text-indigo-600 font-medium">Complete_Risk_Project.zip</span></p>
+            <div class="flex items-center gap-1.5 min-w-0 flex-1" style="max-width:280px">
+                <label for="projectNameInput" class="text-[10px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap" data-en-text="Process">Process</label>
+                <input type="text" id="projectNameInput" placeholder="e.g. Tire Building - Line 3"
+                    class="flex-1 min-w-0 px-2 py-1 border border-slate-300 rounded-md bg-white text-xs font-medium text-slate-800 focus:ring-1 focus:ring-indigo-400 focus:border-indigo-400 transition" />
+            </div>
+            <div class="flex items-center gap-1.5 flex-shrink-0">
+                <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider" data-en-text="ID">ID</span>
+                <span id="projectUniqueId" class="px-2 py-1 bg-indigo-50 border border-indigo-200 rounded-md text-[11px] font-mono font-bold text-indigo-700 select-all cursor-pointer whitespace-nowrap" title="Click to copy"></span>
+            </div>
+            <span class="hidden sm:inline text-[10px] text-slate-400 italic truncate" style="max-width:260px"><span data-en-text="File:">File:</span> <span id="projectFilenamePreview" class="font-mono text-indigo-500 font-medium">Complete_Risk_Project.zip</span></span>
         </div>
 
         <!-- Tab Content Panels -->
         <section id="tab-content-rich-media" class="tab-content bg-white rounded-b-2xl shadow-xl p-6 sm:p-8 space-y-6">
             <!-- Rich Media Stream Content -->
             <div id="face-blurrer-app">
+                <!-- Project ID strip mount point -->
+                <div id="pid-mount-rich-media"></div>
                 <div class="flex items-center justify-between mb-4">
                     <h2 class="text-2xl font-bold text-slate-900">📸 Upload Images & Videos</h2>
                     <button onclick="showWorkflowGuide('rich-media')" class="inline-flex items-center gap-1.5 text-sm font-semibold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-lg border border-indigo-200 shadow-sm transition" title="How does Rich Media work?">
@@ -1259,6 +1256,7 @@
 
         <section id="tab-content-free-text" class="tab-content bg-white rounded-2xl shadow-xl p-6 sm:p-8 space-y-6 hidden">
             <!-- Free Text Stream Content -->
+            <div id="pid-mount-free-text"></div>
             <div class="flex items-center justify-between">
                 <h2 class="text-2xl font-bold text-slate-900">✍️ Describe Your Task</h2>
                 <button onclick="showWorkflowGuide('free-text')" class="inline-flex items-center gap-1.5 text-sm font-semibold text-violet-600 bg-violet-50 hover:bg-violet-100 px-3 py-1.5 rounded-lg border border-violet-200 shadow-sm transition" title="How does Free Text work?">
@@ -1275,6 +1273,7 @@
 
         <section id="tab-content-excel" class="tab-content bg-white rounded-2xl shadow-xl p-6 sm:p-8 space-y-6 hidden">
             <!-- Excel Sheet Stream Content -->
+            <div id="pid-mount-excel"></div>
             <div>
                 <h2 class="text-2xl font-bold text-slate-900 mb-1">📊 Import Excel File</h2>
                 <p class="text-slate-500 text-sm mb-4">Not sure which to pick? Tap <strong>How to?</strong> on the workflow you need.</p>
@@ -2525,10 +2524,16 @@
             selectedButton.classList.remove('border-transparent');
         }
         
-        // Hide project identity bar on Fire Risk tab (not relevant there)
-        const identityBar = document.getElementById('projectIdentityBar');
-        if (identityBar) {
-            identityBar.style.display = tabName === 'fire-ra' ? 'none' : '';
+        // Move project identity strip into this tab (or hide for fire-ra)
+        const pidStrip = document.getElementById('projectIdentityStrip');
+        if (pidStrip) {
+            const mount = document.getElementById('pid-mount-' + tabName);
+            if (mount) {
+                mount.appendChild(pidStrip);
+                pidStrip.style.display = '';
+            } else {
+                pidStrip.style.display = 'none';
+            }
         }
 
         console.debug(`Switched to tab: ${tabName}`);
@@ -2562,12 +2567,20 @@
         return `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
     }
 
-    function regenerateProjectId() {
+    let _projectIdStamped = false;
+    function stampProjectId() {
+        if (_projectIdStamped) return;
         const el = document.getElementById('projectUniqueId');
         if (el) {
             el.textContent = generateProjectId();
+            _projectIdStamped = true;
             updateFilenamePreview();
         }
+    }
+
+    function regenerateProjectId() {
+        // Legacy compat — just stamp once
+        stampProjectId();
     }
 
     function sanitizeForFilename(text) {
@@ -2586,7 +2599,8 @@
     function getProjectFilePrefix() {
         const plant = sanitizeForFilename(document.getElementById('projectPlantInput')?.value);
         const dept = sanitizeForFilename(document.getElementById('projectNameInput')?.value);
-        const uid = (document.getElementById('projectUniqueId')?.textContent || '').trim();
+        let uid = (document.getElementById('projectUniqueId')?.textContent || '').trim();
+        if (uid === '—') uid = '';
         const parts = [plant, dept, uid].filter(Boolean);
         return parts.length > 0 ? parts.join('_') : '';
     }
@@ -2620,21 +2634,37 @@
 
     // Initialize project ID on page load and wire up live preview
     document.addEventListener('DOMContentLoaded', function() {
-        setTimeout(function() {
-            regenerateProjectId();
-            updateFilenamePreview();
-        }, 50);
+        // Show empty placeholder until user types
+        const uidEl = document.getElementById('projectUniqueId');
+        if (uidEl && !uidEl.textContent.trim()) {
+            uidEl.textContent = '—';
+        }
+        updateFilenamePreview();
+
         const plantInput = document.getElementById('projectPlantInput');
         const deptInput = document.getElementById('projectNameInput');
-        if (plantInput) plantInput.addEventListener('input', updateFilenamePreview);
-        if (deptInput) deptInput.addEventListener('input', updateFilenamePreview);
+
+        // Auto-stamp Project ID on first keystroke in either field
+        function onFirstKeystroke() {
+            stampProjectId();
+            updateFilenamePreview();
+        }
+        if (plantInput) {
+            plantInput.addEventListener('input', function() { onFirstKeystroke(); updateFilenamePreview(); });
+        }
+        if (deptInput) {
+            deptInput.addEventListener('input', function() { onFirstKeystroke(); updateFilenamePreview(); });
+        }
+
         // Click to copy project ID
-        const uidEl = document.getElementById('projectUniqueId');
         if (uidEl) {
             uidEl.addEventListener('click', function() {
-                navigator.clipboard.writeText(uidEl.textContent).then(() => {
-                    showCustomAlert && showCustomAlert('Project ID copied!', 'success');
-                });
+                const txt = uidEl.textContent;
+                if (txt && txt !== '—') {
+                    navigator.clipboard.writeText(txt).then(() => {
+                        showCustomAlert && showCustomAlert('Project ID copied!', 'success');
+                    });
+                }
             });
         }
     });
@@ -10629,7 +10659,7 @@ async function loadProject(file) {
             const uidEl = document.getElementById('projectUniqueId');
             if (plantEl && pi.plant) plantEl.value = pi.plant;
             if (deptEl && pi.deptProcess) deptEl.value = pi.deptProcess;
-            if (uidEl && pi.uniqueId) uidEl.textContent = pi.uniqueId;
+            if (uidEl && pi.uniqueId) { uidEl.textContent = pi.uniqueId; _projectIdStamped = true; }
             if (typeof updateFilenamePreview === 'function') updateFilenamePreview();
         }
         
