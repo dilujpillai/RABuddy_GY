@@ -1,0 +1,71 @@
+/* ============================================================
+   BUTTON ENGINE — Risk Assessment Buddy SMART 3.0
+   Central stylesheet for all action buttons.
+   Edit sizes/colours here instead of touching inline classes.
+   ============================================================ */
+
+/* ---- Base action button ---- */
+.rab-btn {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 6px !important;
+    font-family: inherit !important;
+    font-weight: 600 !important;
+    font-size: 13px !important;
+    line-height: 1 !important;
+    white-space: nowrap !important;
+    border: none !important;
+    cursor: pointer !important;
+    padding: 7px 16px !important;
+    height: 32px !important;
+    border-radius: 6px !important;
+    box-sizing: border-box !important;
+    vertical-align: middle !important;
+    text-decoration: none !important;
+    transition: background 0.15s, box-shadow 0.15s, opacity 0.15s !important;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.12) !important;
+}
+.rab-btn:hover {
+    box-shadow: 0 2px 6px rgba(0,0,0,0.18) !important;
+}
+.rab-btn:disabled {
+    opacity: 0.45 !important;
+    cursor: not-allowed !important;
+}
+.rab-btn svg {
+    width: 14px !important;
+    height: 14px !important;
+    flex-shrink: 0 !important;
+}
+
+/* ---- Colour: emerald (Download ZIP) ---- */
+.rab-c-emerald       { background: #059669 !important; color: #fff !important; }
+.rab-c-emerald:hover { background: #047857 !important; }
+
+/* ---- Colour: yellow (Generate AI / Save / Load) ---- */
+.rab-c-yellow       { background: #ffd100 !important; color: #001530 !important; }
+.rab-c-yellow:hover { background: #ffe566 !important; }
+
+/* ---- Colour: orange (GOEHS Integration) ---- */
+.rab-c-orange       { background: #ea580c !important; color: #fff !important; }
+.rab-c-orange:hover { background: #c2410c !important; }
+
+/* ---- Colour: blue (Download Project ZIP) ---- */
+.rab-c-blue       { background: #2563eb !important; color: #fff !important; }
+.rab-c-blue:hover { background: #1d4ed8 !important; }
+
+/* ---- Colour: slate (Translate, Remap) ---- */
+.rab-c-slate       { background: #475569 !important; color: #fff !important; }
+.rab-c-slate:hover { background: #334155 !important; }
+
+/* ---- Visibility toggle ---- */
+.rab-hidden { display: none !important; }
+
+/* ---- Wrapper for button rows ---- */
+.rab-row {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 8px !important;
+    align-items: center !important;
+}
