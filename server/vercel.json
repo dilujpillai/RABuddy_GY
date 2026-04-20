@@ -3,6 +3,9 @@
   "builds": [
     { "src": "api/**/*.js", "use": "@vercel/node" }
   ],
+  "functions": {
+    "api/**/*.js": { "maxDuration": 300 }
+  },
   "routes": [
     {
       "src": "/api/(.*)",

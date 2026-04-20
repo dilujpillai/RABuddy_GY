@@ -85,6 +85,11 @@
     <script src="fra/fra-components.js"></script>
     <script src="fra/fra-floorplan.js"></script>
     <script src="fra/fra-app.js"></script>
+    <!-- Cost-Benefit Analyzer — modular files -->
+    <script src="cba/cba-baseline.js"></script>
+    <script src="cba/cba-engine.js"></script>
+    <script src="cba/cba-ai.js"></script>
+    <script src="cba/cba-ui.js"></script>
     <link rel="stylesheet" href="buttons.css">
     <script src="workflow-guides.js"></script>
     <script src="how-to-guide.js"></script>
@@ -1183,6 +1188,13 @@
                         Fire Risk
                         <span style="font-size:9px;font-weight:800;letter-spacing:0.06em;background:#fde047;color:#713f12;padding:1px 5px;border-radius:4px;line-height:1.4;vertical-align:middle;">BETA</span>
                     </button>
+                    <div class="w-px bg-white/20 my-2 mx-1"></div>
+                    <span class="self-center text-[9px] font-semibold uppercase tracking-wider text-indigo-300/60 px-2" style="letter-spacing:0.08em;">Analysis</span>
+                    <button id="tab-cost-benefit" class="tab-btn flex-none px-6 py-3 text-white font-semibold text-sm sm:text-base hover:bg-white/10 transition border-b-4 border-transparent flex items-center justify-center gap-2" onclick="switchTab('cost-benefit')" data-en-text="Cost-Benefit">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l3 9a5.002 5.002 0 01-6.001 0M18 7l-3 9m0-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3" /></svg>
+                        Cost-Benefit
+                        <span style="font-size:9px;font-weight:800;letter-spacing:0.06em;background:#fde047;color:#713f12;padding:1px 5px;border-radius:4px;line-height:1.4;vertical-align:middle;">BETA</span>
+                    </button>
             </div>
         </section>
 
@@ -1716,6 +1728,28 @@
             <!-- Fire RA App Root (populated by fire-risk-assessment.js) -->
             <div id="fra-app-root" class="min-h-[200px]"></div>
             </div><!-- end inner padding wrapper -->
+        </section>
+
+        <!-- ═══════════════════════════════════════════════════════════ -->
+        <!-- COST-BENEFIT ANALYZER TAB                                  -->
+        <!-- ═══════════════════════════════════════════════════════════ -->
+        <section id="tab-content-cost-benefit" class="tab-content bg-white rounded-2xl shadow-xl overflow-hidden hidden">
+            <!-- BETA Banner -->
+            <div style="background: repeating-linear-gradient(45deg, #fef08a, #fef08a 10px, #fde047 10px, #fde047 20px); border-top: 4px solid #ca8a04; border-bottom: 4px solid #ca8a04;"
+                class="w-full px-6 py-3 flex items-center gap-4">
+                <span style="font-size:1.75rem; line-height:1; flex-shrink:0;">⚠️</span>
+                <div class="flex-1 min-w-0">
+                    <span class="font-extrabold text-yellow-900 text-sm uppercase tracking-widest mr-2">BETA — NOT FOR PRODUCTION USE</span>
+                    <span class="text-yellow-900 text-sm font-medium">
+                        This ALARP Cost-Benefit Analyzer requires internal <strong>EHS approval</strong> before deployment. Results are for evaluation only and may change.
+                    </span>
+                </div>
+                <span class="flex-shrink-0 text-xs font-bold bg-yellow-900 text-yellow-100 px-3 py-1 rounded-full uppercase tracking-wide">Awaiting Approval</span>
+            </div>
+
+            <div class="p-6 sm:p-8">
+                <div id="cba-app-mount" class="min-h-[200px]"></div>
+            </div>
         </section>
         
         <hr class="border-t-2 border-dashed border-slate-300 my-8 sm:my-12">
@@ -4972,6 +5006,16 @@ data.forEach((row, index) => {
                 nilBtn.innerHTML = '🛡️ Nil';
                 nilBtn.onclick = () => openTableImageModal('', parseInt(rowIndex));
                 actionsCell.appendChild(nilBtn);
+            }
+
+            // Add CBA button if module is loaded
+            if (window.CostBenefitAnalyzer) {
+                const cbaBtn = document.createElement('span');
+                cbaBtn.className = 'inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700 cursor-pointer hover:bg-blue-200 transition ml-1';
+                cbaBtn.title = 'Run ALARP Cost-Benefit Analysis for this row';
+                cbaBtn.innerHTML = '⚖️ CBA';
+                cbaBtn.onclick = (e) => { e.stopPropagation(); window.CostBenefitAnalyzer.analyzeRow(parseInt(rowIndex)); };
+                actionsCell.appendChild(cbaBtn);
             }
         }
         
@@ -10611,7 +10655,13 @@ async function saveProject() {
         console.warn('Could not persist deleted rows state:', e);
     }
     
+    // Include CBA data if available
+    if (window.CostBenefitAnalyzer && window.CBA && window.CBA.engine) {
+        projectData.cbaData = window.CBA.engine.exportData();
+    }
+
     const jsonBlob = new Blob([JSON.stringify(projectData, null, 2)], { type: 'application/json' });
+
     const url = URL.createObjectURL(jsonBlob);
     const link = document.createElement('a');
     link.href = url;
@@ -10815,6 +10865,11 @@ if (projectData.tableData && projectData.tableData.counterMeasures) {
         console.warn('Could not restore counter measures from project file:', e);
     }
 }
+
+        // Restore CBA data if available
+        if (projectData.cbaData && window.CostBenefitAnalyzer && window.CBA && window.CBA.engine) {
+            window.CostBenefitAnalyzer.importData(projectData.cbaData);
+        }
         
         updateResults();
         downloadBtn.classList.remove('rab-hidden');
@@ -22192,12 +22247,17 @@ Return ONLY a valid JSON array (no explanation, no markdown):
 
         // Lazy-init: Initialize fire RA app when tab is clicked
         let fraInitialized = false;
+        let cbaInitialized = false;
         const origSwitchTab = window.switchTab;
         window.switchTab = function(tabName) {
             origSwitchTab(tabName);
             if (tabName === 'fire-ra' && !fraInitialized && window.FireRiskAssessment) {
                 window.FireRiskAssessment.init();
                 fraInitialized = true;
+            }
+            if (tabName === 'cost-benefit' && !cbaInitialized && window.CostBenefitAnalyzer) {
+                window.CostBenefitAnalyzer.init('cba-app-mount');
+                cbaInitialized = true;
             }
         };
     });

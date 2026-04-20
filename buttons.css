@@ -59,6 +59,10 @@
 .rab-c-slate       { background: #475569 !important; color: #fff !important; }
 .rab-c-slate:hover { background: #334155 !important; }
 
+/* ---- Colour: indigo (Download Report) ---- */
+.rab-c-indigo       { background: #4f46e5 !important; color: #fff !important; }
+.rab-c-indigo:hover { background: #4338ca !important; }
+
 /* ---- Visibility toggle ---- */
 .rab-hidden { display: none !important; }
 
