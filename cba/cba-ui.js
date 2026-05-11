@@ -20,23 +20,121 @@
         { value: 'anthropic/claude-sonnet-4-6', label: 'Claude Sonnet 4.6 (Best reasoning)' },
     ];
 
+    const SOURCE_URLS = {
+        AAA_STATS: 'https://gouvernement.lu/fr/actualites/toutes_actualites/communiques/2025/09-septembre/26-aaa-rapport.html',
+        AAA_REPORT: 'https://aaa.public.lu/fr/aaa/Rapport-annuel.html',
+        AAA_BONUS: 'https://aaa.public.lu/fr/prestations-cotisations/cotisations/bonusmalus.html',
+        MDE_AFFILIATION: 'https://mde.public.lu/fr/affiliation-financement/affiliation-employeurs.html',
+        MDE_FINANCING: 'https://mde.public.lu/fr/affiliation-financement/financement.html',
+        ITM_REPORT_PDF: 'https://itm.public.lu/dam-assets/fr/publications/rapports-annuels/rapport-annuel-2024.pdf',
+        STATEC_PORTAL: 'https://statistiques.public.lu/fr.html',
+        ISSA_ROP: 'https://www.britsafe.org/media/5pgnkhzr/the-business-benefits-health-and-safety-literature-review.pdf'
+    };
+
     let root = null;
     let step = 'landing';
     let resultsPanel = null;
 
     let uiState = {
-        aiLoading: false, aiError: null, locationDetected: false,
+        aiLoading: false, aiError: null, locationDetected: true,   // Luxembourg: always detected
         freshDescription: '', selectedRow: null, aiNotes: '',
         recurringPeriod: 'year', aiModel: 'anthropic/claude-sonnet-4-6',
         // Labour parameters: process frequency (per week) and effective task duration
         processFrequencyPerWeek: null,      // number of times task is performed per week
         processTimeMinutesPerTask: null,    // calculated effective minutes per task (480 / freq)
         taskBreakdownMinutes: 10,           // minimum task duration threshold for cost breakdown granularity
-        avgHourlyWage: null,                // auto-filled from location, editable
+        avgHourlyWage: 28,                  // Luxembourg median hourly wage (STATEC 2024: €58,126/yr ÷ 2080hrs = €27.94/hr)
         baselineRefreshing: false,           // true while AI baseline refresh is running
+        summaryLoading: false,               // true while executive summary helper is generating
+        executiveSummary: null,              // last generated executive summary helper payload
         aiSnapshot: null,                    // deep copy of last AI-returned values (for revert)
-        viewingMeasureIndex: null            // index of saved measure being viewed (null = fresh)
+        viewingMeasureIndex: null,           // index of saved measure being viewed (null = fresh)
+        baselineApplied: false,              // true after "Apply Baseline to Table" has been used
+        baselineBackStep: 'landing',         // where baseline editor navigates back to
+        openCalcPanels: {},                  // remembers expanded breakdown panels by card key
+        suppressNextAnalyzeFade: false,      // disables one render-cycle fade for in-place structure updates
+        suppressNextRiskFade: false,         // disables one render-cycle fade for score dropdown edits on Step 1
+        newBreakdownRow: null,               // one-shot marker for subtle enter animation on newly added split rows
+        suppressNextResultsMotion: false,    // disables one results refresh cycle animation (projected risk dropdown edits)
+        lastAddedRowHint: null               // fallback row-add animation marker { panelKey, at }
     };
+
+    const RISK_SCALE_OPTIONS = {
+        frequency: [
+            { value: 1, label: 'RARELY', definition: 'Day: -, Week: -, Month: <0.5 day, Year: 1 day' },
+            { value: 1.25, label: 'OCCASIONAL', definition: 'Day: <30 min, Week: <2 hours, Month: <1 day, Year: <5 days' },
+            { value: 1.5, label: 'INTERMEDIATE', definition: 'Day: 30-120 min, Week: 2-8 hours, Month: 1-4 days, Year: 5 days to 2 months' },
+            { value: 1.75, label: 'FREQUENTLY', definition: 'Day: 2-5 hours, Week: 1-3 days, Month: 4-15 days, Year: 2-5 months' },
+            { value: 2, label: 'PERMANENT', definition: 'Day: >5 hours, Week: >3 days, Month: >15 days, Year: >5 months' }
+        ],
+        severity: [
+            { value: 1, label: 'No potential of injury', definition: 'Most probable injury: No treatment needed' },
+            { value: 3, label: 'Potential of FIRST AID', definition: 'Most probable injury: Non-prescription medication' },
+            { value: 5, label: 'Potential of MEDICAL TREATMENT', definition: 'Most probable injury: Prescription medications' },
+            { value: 7, label: 'Potential of DART', definition: 'Most probable injury: Temporary disability' },
+            { value: 9, label: 'Potential of SIA', definition: 'Most probable injury: Amputation' },
+            { value: 10, label: 'Potential of Fatality', definition: 'Most probable injury: Death' }
+        ],
+        likelihood: [
+            { value: 1, label: 'Almost impossible', definition: 'Machinery: hazard not reachable per ISO 13857 + compliant with 13849. IH: no Class 1 / Class 2-3 with CML 1-3. Other H&S: CML 4-5 with no known event.' },
+            { value: 3, label: 'Very unlikely', definition: 'Machinery: hazard not reachable per ISO 13857. IH: Class 1 with CML 1-3 / Class 2-3 with CML 1 and 3. Other H&S: CML 4 with 1 event in 5 years or CML 1-3 with no known event.' },
+            { value: 5, label: 'Possible to happen', definition: 'Machinery: reachable and all apply (speed <250 cm/s, obvious hazard, room/time to escape, low task complexity). IH: Class 1 with CML 1 and 3 / Class 2-3 without CML. Other H&S: CML 1-3 with 1 event in 3 years or CML 1-2 with no known event.' },
+            { value: 8, label: 'Likely to happen', definition: 'Machinery: reachable and all apply (speed 251 to 100 mm/s, obvious hazard, room/time to escape). IH: Class 1 with CML 1 or higher. Other H&S: CML 1 OR 2 OR 3 in place with 1 event over the past 3 years.' },
+            { value: 10, label: 'Very likely to happen', definition: 'Machinery: reachable with speed >100 mm/s OR no room/time to escape. IH: record of confirmed occupational disease. Other H&S: 2 or more events over the past 3 years.' }
+        ]
+    };
+
+    function formatScaleValue(v) {
+        const n = Number(v);
+        if (!isFinite(n)) return '0';
+        return Number.isInteger(n) ? String(n) : n.toFixed(2).replace(/\.00$/, '').replace(/0$/, '');
+    }
+
+    function normalizeScaleValue(type, raw, fallback) {
+        if (E && typeof E.normalizeToScaleValue === 'function') {
+            return E.normalizeToScaleValue(type, raw, fallback);
+        }
+        const list = (RISK_SCALE_OPTIONS[type] || []).map(x => x.value);
+        const fb = fallback != null ? Number(fallback) : (list.length ? list[0] : 1);
+        const n = Number(raw);
+        if (!isFinite(n) || !list.length) return fb;
+        let best = list[0];
+        let bestDiff = Math.abs(n - best);
+        list.slice(1).forEach((val) => {
+            const diff = Math.abs(n - val);
+            if (diff < bestDiff) {
+                best = val;
+                bestDiff = diff;
+            }
+        });
+        return best;
+    }
+
+    function normalizeRiskState(riskObj) {
+        riskObj.frequency = normalizeScaleValue('frequency', riskObj.frequency, 1);
+        riskObj.severity = normalizeScaleValue('severity', riskObj.severity, 1);
+        riskObj.likelihood = normalizeScaleValue('likelihood', riskObj.likelihood, 1);
+        riskObj.score = E.calcRiskScore(riskObj.frequency, riskObj.severity, riskObj.likelihood);
+        riskObj.category = E.getRiskCategory(riskObj.score);
+    }
+
+    function getScaleEntry(type, value) {
+        const normalized = normalizeScaleValue(type, value, 1);
+        return (RISK_SCALE_OPTIONS[type] || []).find(x => x.value === normalized) || null;
+    }
+
+    function toBaselineSeverityLevel(severityValue) {
+        const s = normalizeScaleValue('severity', severityValue, 1);
+        if (s <= 1) return 1;
+        if (s <= 3) return 2;
+        if (s <= 5) return 3;
+        if (s <= 8) return 4;
+        return 5;
+    }
+
+    function baselineSeverityName(level) {
+        return ({ 1: 'Negligible', 2: 'Minor', 3: 'Moderate', 4: 'Major', 5: 'Catastrophic' })[level] || 'Selected';
+    }
 
     // ═══════════════════════════════════════════════════════════════════════
     // PROGRESS MODAL
@@ -155,26 +253,24 @@
         const B = window.CBA.baseline;
         if (!B) { alert('Baseline module not loaded.'); return; }
 
-        const locStr = s.location && s.location.country
-            ? `${s.location.region ? s.location.region + ', ' : ''}${s.location.country}`
-            : '';
-        const currency = (s.location && s.location.currency) || 'USD';
+        const locStr = 'Luxembourg';
+        const currency = 'EUR';
         const severity = s.currentRisk && s.currentRisk.severity ? s.currentRisk.severity : 3;
         const model = modelOverride || uiState.aiModel;
 
         const STEPS = [
-            'Gathering location & industry context',
-            'Researching OSHA / BLS incident rate benchmarks',
-            'Fetching days-away-from-work (DAFW) averages',
-            'Calibrating medical & total injury cost benchmarks',
-            'Checking insurance premium & regulatory fine data',
-            `Localising values for ${locStr || 'your location'} (${currency})`,
-            'Updating local baseline registry'
+            'Loading Luxembourg OSH framework context',
+            'Researching AAA 2024 accident rates & direct costs (€4,053 avg)',
+            'Fetching Lohnfortzahlung / MDE absenteeism baselines (80% rule)',
+            'Calibrating AAA Bonus-Malus premium impact anchors',
+            'Checking ITM fine data (avg €5,530; max €4,000/worker)',
+            'Applying STATEC wage data (median €28/hr) & ISSA ROP 2.2',
+            'Updating Luxembourg baseline registry'
         ];
 
         const modal = showProgressModal(
-            'Refreshing Safety Cost Baselines',
-            `AI is researching OSHA, BLS & regulatory benchmarks${locStr ? ' for ' + locStr : ''}…`,
+            'Refreshing Luxembourg Safety Cost Baselines',
+            `AI is researching AAA, MDE, ITM & STATEC benchmarks for Luxembourg…`,
             STEPS
         );
 
@@ -219,8 +315,347 @@
         }
     }
 
+    function seedManualBreakdownRows(cat, displayTotal, source, sourceUrl, qtyReason) {
+        const val = Math.max(0, parseFloat(displayTotal) || 0);
+        const unit = cat.recurring
+            ? (uiState.recurringPeriod === 'month' ? 'per month' : 'per year')
+            : 'one-off';
+        const row = {
+            label: `${cat.label} component`,
+            qty: val > 0 ? 1 : 0,
+            qtyReason: qtyReason || 'Manual split created by user. Edit qty and rate to match your site conditions.',
+            rate: Math.round(val),
+            unit,
+            source: source || 'Manual user split',
+            sourceUrl: sourceUrl || '',
+            noteDetails: {
+                definition: `${cat.label} component`,
+                basis: 'Manual split created by user. Edit qty and rate to match your site conditions.',
+                parameters: '',
+                formula: 'Qty x Rate',
+                autoParams: true
+            }
+        };
+        syncRowQtyReasonFromNote(row, currencySymbol());
+        return [row];
+    }
+
+    function buildExecutiveSummaryContext(s, sym) {
+        const costRows = E.COST_CATEGORIES.map(cat => ({
+            key: cat.key,
+            label: cat.label,
+            recurring: cat.recurring,
+            amountAnnual: Math.round(parseFloat(s.proposedMeasure.costItems[cat.key]) || 0),
+            amountShown: Math.round(toDisplay(parseFloat(s.proposedMeasure.costItems[cat.key]) || 0, cat.recurring)),
+            rationale: (s.proposedMeasure.costRationales || {})[cat.key] || '',
+            breakdownCount: ((s.proposedMeasure.costBreakdowns || {})[cat.key] || []).length
+        }));
+        const benefitRows = E.BENEFIT_CATEGORIES.map(cat => ({
+            key: cat.key,
+            label: cat.label,
+            recurring: cat.recurring,
+            amountAnnual: Math.round(parseFloat(s.benefits.items[cat.key]) || 0),
+            amountShown: Math.round(toDisplay(parseFloat(s.benefits.items[cat.key]) || 0, cat.recurring)),
+            rationale: (s.benefits.rationales || {})[cat.key] || '',
+            breakdownCount: ((s.benefits.breakdowns || {})[cat.key] || []).length
+        }));
+
+        return {
+            location: {
+                country: s.location.country || 'Luxembourg',
+                region: s.location.region || '',
+                currency: s.location.currency || 'EUR',
+                currencySymbol: sym,
+                recurringShown: uiState.recurringPeriod
+            },
+            hazard: {
+                description: s.currentRisk.description || '',
+                hazards: (s.currentRisk.hazards || []).slice(0, 8),
+                score: s.currentRisk.score || E.calcRiskScore(s.currentRisk.frequency, s.currentRisk.severity, s.currentRisk.likelihood),
+                category: s.currentRisk.category || E.getRiskCategory(E.calcRiskScore(s.currentRisk.frequency, s.currentRisk.severity, s.currentRisk.likelihood)),
+                frequency: s.currentRisk.frequency || 1,
+                severity: s.currentRisk.severity || 1,
+                likelihood: s.currentRisk.likelihood || 1
+            },
+            measure: {
+                description: s.proposedMeasure.description || '',
+                controlLevel: s.proposedMeasure.controlLevel || null,
+                timeHorizonYears: s.proposedMeasure.timeHorizon || 5
+            },
+            projectedRisk: {
+                frequency: s.projectedRisk.frequency || 1,
+                severity: s.projectedRisk.severity || 1,
+                likelihood: s.projectedRisk.likelihood || 1,
+                score: E.calcRiskScore(s.projectedRisk.frequency || 1, s.projectedRisk.severity || 1, s.projectedRisk.likelihood || 1),
+                category: E.getRiskCategory(E.calcRiskScore(s.projectedRisk.frequency || 1, s.projectedRisk.severity || 1, s.projectedRisk.likelihood || 1))
+            },
+            costs: costRows,
+            benefits: benefitRows,
+            aiNotes: uiState.aiNotes || '',
+            userInputs: {
+                processFrequencyPerWeek: uiState.processFrequencyPerWeek || null,
+                processTimeMinutesPerTask: uiState.processTimeMinutesPerTask || null,
+                avgHourlyWage: uiState.avgHourlyWage || null
+            }
+        };
+    }
+
+    function normalizeExecutiveSummary(raw) {
+        const x = raw || {};
+        return {
+            headline: String(x.headline || 'Executive Summary'),
+            overview: String(x.overview || ''),
+            costDrivers: Array.isArray(x.costDrivers) ? x.costDrivers : [],
+            benefitDrivers: Array.isArray(x.benefitDrivers) ? x.benefitDrivers : [],
+            assumptions: Array.isArray(x.assumptions) ? x.assumptions : [],
+            nextSteps: Array.isArray(x.nextSteps) ? x.nextSteps : []
+        };
+    }
+
+    function cacheExecutiveSummary(summaryRaw, isFallback, contextRaw) {
+        const safeSummary = normalizeExecutiveSummary(summaryRaw);
+        let safeContext = null;
+        try {
+            safeContext = contextRaw ? JSON.parse(JSON.stringify(contextRaw)) : null;
+        } catch (e) {
+            safeContext = null;
+        }
+
+        uiState.executiveSummary = {
+            summary: safeSummary,
+            isFallback: !!isFallback,
+            model: uiState.aiModel || '',
+            generatedAt: new Date().toISOString(),
+            context: safeContext
+        };
+        return safeSummary;
+    }
+
+    function buildFallbackExecutiveSummary(ctx, sym) {
+        const topCosts = (ctx.costs || []).filter(i => i.amountAnnual > 0).sort((a, b) => b.amountAnnual - a.amountAnnual).slice(0, 3);
+        const topBenefits = (ctx.benefits || []).filter(i => i.amountAnnual > 0).sort((a, b) => b.amountAnnual - a.amountAnnual).slice(0, 3);
+        const hazardText = ctx.hazard && ctx.hazard.description ? ctx.hazard.description : 'No hazard description entered yet.';
+
+        return {
+            headline: 'Executive Summary (Quick Guide)',
+            overview: `Main hazard: ${hazardText} Current risk is ${ctx.hazard.category} (${ctx.hazard.score}). The table is fully manual, so each line can be tuned to your site data. Start by validating top cost drivers, then confirm the largest benefits with your baseline assumptions.`,
+            costDrivers: topCosts.map(c => ({
+                item: c.label,
+                amount: `${sym}${formatNum(c.amountAnnual)} /yr`,
+                explanation: 'This is one of the biggest cost contributors in your current table.',
+                userCanEdit: 'Edit total directly or use Split to adjust component qty and rates.'
+            })),
+            benefitDrivers: topBenefits.map(b => ({
+                item: b.label,
+                amount: `${sym}${formatNum(b.amountAnnual)} /yr`,
+                explanation: 'This is one of the biggest expected gains from the measure.',
+                userCanEdit: 'Tune assumptions in breakdown rows to match your process reality.'
+            })),
+            assumptions: [
+                'Recurring entries are converted between monthly and yearly display automatically.',
+                'Risk score and control level should match the real task conditions.'
+            ],
+            nextSteps: [
+                'Use Split on key lines and enter your own quantities and rates.',
+                'Review rationale text so each figure is traceable and auditable.',
+                'Re-check projected risk after editing before final save.'
+            ]
+        };
+    }
+
+    function openExecutiveSummaryModal() {
+        const old = document.getElementById('cba-summary-overlay');
+        if (old) old.remove();
+
+        const overlay = el('div', {
+            id: 'cba-summary-overlay',
+            style: 'position:fixed;inset:0;background:rgba(15,23,42,0.72);z-index:10010;display:flex;align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(4px);'
+        });
+        const card = el('div', {
+            style: 'background:#fff;border-radius:18px;width:min(960px,98vw);max-height:88vh;overflow:auto;box-shadow:0 30px 90px rgba(0,0,0,0.28);border:1px solid #e2e8f0;'
+        });
+        const hdr = el('div', { style: 'display:flex;align-items:center;gap:10px;position:sticky;top:0;background:#f8fafc;border-bottom:1px solid #e2e8f0;padding:14px 16px;z-index:1;' });
+        hdr.appendChild(el('div', { style: 'font-size:15px;font-weight:800;color:#0f172a;flex:1;' }, 'Executive Summary Helper'));
+        const closeBtn = el('button', {
+            style: 'border:none;background:#e2e8f0;color:#0f172a;border-radius:8px;padding:6px 10px;font-size:12px;font-weight:700;cursor:pointer;',
+            onClick: () => overlay.remove()
+        }, 'Close');
+        hdr.appendChild(closeBtn);
+        card.appendChild(hdr);
+
+        const body = el('div', { style: 'padding:16px;display:flex;flex-direction:column;gap:12px;' });
+        card.appendChild(body);
+        overlay.appendChild(card);
+        document.body.appendChild(overlay);
+
+        function setLoading(message) {
+            body.innerHTML = '';
+            const row = el('div', { style: 'display:flex;align-items:center;gap:10px;color:#334155;background:#eff6ff;border:1px solid #bfdbfe;border-radius:12px;padding:12px;' });
+            row.appendChild(svgSpinner(16, '#2563eb'));
+            row.appendChild(el('span', { style: 'font-size:13px;font-weight:600;' }, message || 'Generating plain-language summary...'));
+            body.appendChild(row);
+        }
+
+        function renderDriverSection(title, items, tone) {
+            const panel = el('div', { style: `border:1px solid ${tone === 'cost' ? '#fecaca' : '#a7f3d0'};background:${tone === 'cost' ? '#fff7f7' : '#f0fdf4'};border-radius:12px;padding:12px;` });
+            panel.appendChild(el('div', { style: 'font-size:13px;font-weight:800;color:#0f172a;margin-bottom:8px;' }, title));
+            if (!items || items.length === 0) {
+                panel.appendChild(el('div', { style: 'font-size:12px;color:#64748b;' }, 'No non-zero entries yet. Add values in the table to see a richer summary.'));
+                return panel;
+            }
+            items.forEach(d => {
+                const item = el('div', { style: 'border-top:1px dashed rgba(148,163,184,.5);padding-top:8px;margin-top:8px;' });
+                item.appendChild(el('div', { style: 'font-size:12px;font-weight:700;color:#1e293b;' }, `${d.item || 'Item'} ${d.amount ? `(${d.amount})` : ''}`));
+                if (d.explanation) item.appendChild(el('div', { style: 'font-size:12px;color:#334155;margin-top:4px;' }, d.explanation));
+                if (d.userCanEdit) item.appendChild(el('div', { style: 'font-size:11px;color:#475569;margin-top:4px;' }, `You can edit: ${d.userCanEdit}`));
+                panel.appendChild(item);
+            });
+            return panel;
+        }
+
+        function setSummary(summary, isFallback) {
+            body.innerHTML = '';
+            if (isFallback) {
+                body.appendChild(el('div', {
+                    style: 'font-size:12px;color:#92400e;background:#fef3c7;border:1px solid #fcd34d;border-radius:10px;padding:8px 10px;'
+                }, 'AI helper was unavailable, so this summary is generated from your current table values.'));
+            }
+            body.appendChild(el('div', { style: 'font-size:18px;font-weight:900;color:#0f172a;' }, summary.headline || 'Executive Summary'));
+            if (summary.overview) {
+                body.appendChild(el('div', { style: 'font-size:13px;line-height:1.6;color:#334155;background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:12px;' }, summary.overview));
+            }
+            body.appendChild(renderDriverSection('What is driving your costs?', summary.costDrivers, 'cost'));
+            body.appendChild(renderDriverSection('What benefits are you gaining?', summary.benefitDrivers, 'benefit'));
+
+            const listsWrap = el('div', { style: 'display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px;' });
+            const assump = el('div', { style: 'border:1px solid #e2e8f0;border-radius:12px;padding:10px;background:#fff;' });
+            assump.appendChild(el('div', { style: 'font-size:12px;font-weight:800;color:#1e293b;margin-bottom:6px;' }, 'Assumptions to check'));
+            (summary.assumptions || []).forEach(a => assump.appendChild(el('div', { style: 'font-size:12px;color:#334155;margin-top:4px;' }, `• ${a}`)));
+            if (!summary.assumptions || summary.assumptions.length === 0) assump.appendChild(el('div', { style: 'font-size:12px;color:#64748b;' }, 'No assumptions listed.'));
+
+            const next = el('div', { style: 'border:1px solid #d1fae5;border-radius:12px;padding:10px;background:#ecfdf5;' });
+            next.appendChild(el('div', { style: 'font-size:12px;font-weight:800;color:#065f46;margin-bottom:6px;' }, 'Suggested next steps'));
+            (summary.nextSteps || []).forEach(n => next.appendChild(el('div', { style: 'font-size:12px;color:#065f46;margin-top:4px;' }, `• ${n}`)));
+            if (!summary.nextSteps || summary.nextSteps.length === 0) next.appendChild(el('div', { style: 'font-size:12px;color:#64748b;' }, 'No next steps listed.'));
+
+            listsWrap.appendChild(assump);
+            listsWrap.appendChild(next);
+            body.appendChild(listsWrap);
+        }
+
+        return { setLoading, setSummary };
+    }
+
+    async function runExecutiveSummaryHelper(s) {
+        const sym = currencySymbol();
+        const modal = openExecutiveSummaryModal();
+        modal.setLoading('Reading hazard, risk, and table values to build a plain-language guide...');
+        uiState.summaryLoading = true;
+        render();
+
+        try {
+            const ctx = buildExecutiveSummaryContext(s, sym);
+            if (A && typeof A.generateExecutiveSummary === 'function') {
+                const aiSummary = await A.generateExecutiveSummary(ctx, uiState.aiModel);
+                const normalized = cacheExecutiveSummary(aiSummary, false, ctx);
+                modal.setSummary(normalized, false);
+            } else {
+                const fallbackSummary = buildFallbackExecutiveSummary(ctx, sym);
+                const normalized = cacheExecutiveSummary(fallbackSummary, true, ctx);
+                modal.setSummary(normalized, true);
+            }
+        } catch (e) {
+            const fallbackCtx = buildExecutiveSummaryContext(s, sym);
+            const fallbackSummary = buildFallbackExecutiveSummary(fallbackCtx, sym);
+            const normalized = cacheExecutiveSummary(fallbackSummary, true, fallbackCtx);
+            modal.setSummary(normalized, true);
+        } finally {
+            uiState.summaryLoading = false;
+            render();
+        }
+    }
+
+    function openParameterHelpModal(cat, type, sym, periodLabel) {
+        const isCost = type === 'cost';
+        const old = document.getElementById('cba-param-help-overlay');
+        if (old) old.remove();
+
+        const overlay = el('div', {
+            id: 'cba-param-help-overlay',
+            style: 'position:fixed;inset:0;background:rgba(15,23,42,0.72);z-index:10020;display:flex;align-items:center;justify-content:center;padding:14px;backdrop-filter:blur(4px);'
+        });
+        const card = el('div', {
+            style: 'background:#fff;border-radius:16px;width:min(760px,98vw);max-height:88vh;overflow:auto;box-shadow:0 30px 90px rgba(0,0,0,0.28);border:1px solid #e2e8f0;'
+        });
+
+        const header = el('div', {
+            style: 'display:flex;align-items:center;gap:10px;position:sticky;top:0;background:#f8fafc;border-bottom:1px solid #e2e8f0;padding:12px 14px;z-index:1;'
+        });
+        header.appendChild(el('div', { style: 'font-size:15px;font-weight:800;color:#0f172a;flex:1;' }, `How to fill: ${cat.label}`));
+        const closeBtn = el('button', {
+            style: 'border:none;background:#e2e8f0;color:#0f172a;border-radius:8px;padding:6px 10px;font-size:12px;font-weight:700;cursor:pointer;',
+            onClick: () => overlay.remove()
+        }, 'Close');
+        header.appendChild(closeBtn);
+        card.appendChild(header);
+
+        const body = el('div', { style: 'padding:14px;display:flex;flex-direction:column;gap:10px;' });
+        body.appendChild(el('div', {
+            style: 'font-size:13px;line-height:1.55;color:#334155;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:10px;'
+        }, cat.hint || 'Use this line to capture one cost or one benefit for your measure.'));
+
+        const modeText = isCost
+            ? 'This line is a cost. Larger values increase total cost.'
+            : 'This line is a benefit. Larger values increase total benefit.';
+        body.appendChild(el('div', {
+            style: `font-size:12px;color:${isCost ? '#991b1b' : '#065f46'};background:${isCost ? '#fef2f2' : '#ecfdf5'};border:1px solid ${isCost ? '#fecaca' : '#a7f3d0'};border-radius:10px;padding:8px 10px;`
+        }, modeText));
+
+        const list = el('div', {
+            style: 'display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:8px;'
+        });
+
+        const addParam = (name, desc) => {
+            const box = el('div', { style: 'border:1px solid #e2e8f0;border-radius:10px;padding:8px 10px;background:#fff;' });
+            box.appendChild(el('div', { style: 'font-size:12px;font-weight:800;color:#0f172a;' }, name));
+            box.appendChild(el('div', { style: 'font-size:12px;color:#475569;line-height:1.45;margin-top:3px;' }, desc));
+            list.appendChild(box);
+        };
+
+        addParam('Total', `The final value for this line (${sym}). You can type it directly.`);
+        addParam('split', 'Creates editable component rows so you can break one total into smaller parts.');
+        addParam('Component', 'Short name of each part. Example: training time, PPE replacement, inspection labor.');
+        addParam('Qty', 'How many units you have (people, events, hours, items, days, etc.).');
+        addParam('Rate', isCost
+            ? `Cost per one unit (${sym} per unit).`
+            : `Benefit or saving per one unit (${sym} per unit).`);
+        addParam('Subtotal', 'Calculated automatically as Qty x Rate for each component row.');
+        addParam('Sigma total', 'Sum of all component subtotals. This syncs back to the line total.');
+        addParam('Rationale', 'Plain-language reason for your number so reviewers understand your logic.');
+        addParam('Source / evidence', 'Where the number came from (invoice, payroll data, supplier quote, baseline, etc.).');
+        addParam('Quantity notes', 'Short note explaining why the chosen quantity is realistic for your process.');
+        body.appendChild(list);
+
+        const recurringExplain = cat.recurring
+            ? `This line is recurring and currently shown ${periodLabel}. The app converts between monthly and yearly automatically.`
+            : 'This line is one-off (paid once) and is not converted by month/year toggle.';
+        body.appendChild(el('div', {
+            style: 'font-size:12px;color:#334155;background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:8px 10px;'
+        }, recurringExplain));
+
+        body.appendChild(el('div', {
+            style: 'font-size:12px;color:#1e293b;background:#f8fafc;border:1px dashed #cbd5e1;border-radius:10px;padding:8px 10px;font-family:ui-monospace, SFMono-Regular, Menlo, monospace;'
+        }, 'Formula: line total = sum of (Qty x Rate) across component rows'));
+
+        card.appendChild(body);
+        overlay.appendChild(card);
+        overlay.addEventListener('click', (ev) => { if (ev.target === overlay) overlay.remove(); });
+        document.body.appendChild(overlay);
+    }
+
     /* ═══════ Average hourly wage lookup (ILO / BLS rough benchmarks, local currency) ═══════ */
     const AVG_WAGE_TABLE = {
+        'luxembourg': 28,  // STATEC 2024: median €58,126/yr ÷ 2,080 hrs = €27.94/hr ≈ €28/hr
         'united states': 32, 'united kingdom': 20, 'germany': 28, 'france': 26,
         'brazil': 15, 'china': 40, 'india': 200, 'malaysia': 15,
         'thailand': 100, 'indonesia': 35000, 'mexico': 85, 'japan': 2500,
@@ -285,6 +720,50 @@
     function toDisplay(v, rec) { if (!rec) return v || 0; return uiState.recurringPeriod === 'month' ? (v || 0) / 12 : (v || 0); }
     function toAnnual(v, rec) { if (!rec) return parseFloat(v) || 0; return uiState.recurringPeriod === 'month' ? (parseFloat(v) || 0) * 12 : (parseFloat(v) || 0); }
 
+    function isDirectMedicalOverlapRow(row) {
+        const txt = `${(row && row.label) || ''} ${(row && row.qtyReason) || ''} ${(row && row.source) || ''}`.toUpperCase();
+        return /DIRECT MEDICAL|STATUTORY COMPENSATION|TREATMENT COST/.test(txt);
+    }
+
+    function normalizeInjuryMedicalBenefitSeparation(s) {
+        if (!s || !s.benefits || !s.benefits.items) return;
+
+        const items = s.benefits.items;
+        const injuryRaw = Math.max(0, parseFloat(items.injuryCost) || 0);
+        const medicalRaw = Math.max(0, parseFloat(items.medical) || 0);
+        if (!(injuryRaw > 0 && medicalRaw > 0)) return;
+
+        let overlap = 0;
+        const breakdowns = s.benefits.breakdowns || {};
+        const injuryRows = Array.isArray(breakdowns.injuryCost) ? breakdowns.injuryCost : [];
+
+        if (injuryRows.length) {
+            const keptRows = [];
+            injuryRows.forEach((row) => {
+                const subtotal = (parseFloat(row.qty) || 0) * (parseFloat(row.rate) || 0);
+                if (isDirectMedicalOverlapRow(row)) overlap += Math.max(0, subtotal);
+                else keptRows.push(row);
+            });
+            if (overlap > 0) breakdowns.injuryCost = keptRows;
+        }
+
+        if (overlap <= 0) {
+            const injuryRationale = String((s.benefits.rationales || {}).injuryCost || '').toUpperCase();
+            const explicitlyNonMedical = /NON[-\s]?MEDICAL|EXCLUDING DIRECT MEDICAL|EXCLUDES DIRECT MEDICAL|NET OF DIRECT MEDICAL|ALL-IN MINUS DIRECT MEDICAL|MEDICAL HANDLED IN MEDICAL COST SAVINGS|SEPARATE FROM MEDICAL|WITHOUT DIRECT MEDICAL/.test(injuryRationale);
+            if (!explicitlyNonMedical && /ALL-IN|ICEBERG|NOT JUST MEDICAL|MEDICAL\s*\+/.test(injuryRationale)) {
+                overlap = Math.min(injuryRaw, medicalRaw);
+            }
+        }
+
+        if (overlap > 0) {
+            items.injuryCost = Math.max(0, injuryRaw - overlap);
+            s.benefits.rationales = s.benefits.rationales || {};
+            if (!/non-medical/i.test(String(s.benefits.rationales.injuryCost || ''))) {
+                s.benefits.rationales.injuryCost = `${s.benefits.rationales.injuryCost || ''}\nScope adjustment: Injury Cost Avoidance is treated as non-medical impact only (medical handled in Medical Cost Savings).`.trim();
+            }
+        }
+    }
+
     /* ═══════ INJECT CSS ONCE ═══════ */
     (function injectCSS() {
         if (document.getElementById('cba-anim-css')) return;
@@ -296,6 +775,11 @@
             @keyframes cbaPulse  { 0%,100% { r:7 } 50% { r:10 } }
             @keyframes cbaDraw   { from { stroke-dashoffset: 1000 } to { stroke-dashoffset: 0 } }
             @keyframes cbaBarGrow { from { width:0 } to { width: var(--bar-w) } }
+            @keyframes cbaRowSoftIn {
+                0%   { opacity: 0; transform: translateY(10px) scale(0.994); background-color: rgba(99,102,241,0.14); box-shadow: inset 0 0 0 1px rgba(99,102,241,0.22); }
+                60%  { opacity: 1; transform: translateY(0) scale(1.002); background-color: rgba(99,102,241,0.05); box-shadow: inset 0 0 0 1px rgba(99,102,241,0.14); }
+                100% { opacity: 1; transform: translateY(0) scale(1); background-color: transparent; box-shadow: inset 0 0 0 1px rgba(99,102,241,0.00); }
+            }
             .cba-fade { animation: cbaFadeIn .45s ease-out both }
             .cba-fade-d1 { animation-delay: .08s }
             .cba-fade-d2 { animation-delay: .16s }
@@ -339,6 +823,10 @@
                 transition: background .15s;
             }
             .cba-bkdn-toggle:hover { background: rgba(0,0,0,0.05); }
+            .cba-bkdn-toggle.open {
+                background: rgba(59,130,246,0.12);
+                border: 1px solid rgba(59,130,246,0.25);
+            }
             .cba-bkdn-panel {
                 max-height: 0; overflow: hidden; opacity: 0;
                 transition: max-height .4s ease, opacity .25s ease, margin .2s ease;
@@ -350,12 +838,28 @@
             @keyframes cba-spin-svg { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
             .cba-svg-spinner { animation: cba-spin-svg 0.75s linear infinite; flex-shrink: 0; display: inline-block; vertical-align: middle; }
             .cba-bkdn-row {
-                display: grid; grid-template-columns: 1fr 72px 10px 72px 14px 90px;
+                display: grid; grid-template-columns: 1fr 72px 10px 72px 14px 90px 28px;
                 gap: 6px; align-items: center; padding: 6px 0;
                 border-bottom: 1px dashed rgba(0,0,0,0.06);
                 font-size: 13px;
             }
+            .cba-bkdn-row-enter { animation: cbaRowSoftIn .4s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
             .cba-bkdn-row:last-child { border-bottom: none; }
+            .cba-bkdn-del {
+                border: 1px solid #fecaca;
+                background: #fff1f2;
+                color: #be123c;
+                border-radius: 8px;
+                font-size: 11px;
+                font-weight: 800;
+                width: 24px;
+                height: 24px;
+                line-height: 1;
+                cursor: pointer;
+            }
+            .cba-bkdn-del:hover {
+                background: #ffe4e6;
+            }
             .cba-bkdn-inp {
                 width: 100%; text-align: center; font-size: 13px; font-weight: 600;
                 border: 1px solid #e2e8f0; border-radius: 8px; padding: 5px 6px;
@@ -392,6 +896,19 @@
                 box-shadow: 0 0 0 2px rgba(129,140,248,0.15);
             }
             .cba-rationale::placeholder { color: #c4b5c8; font-style: italic; }
+            /* Auto-generated from rows — visually distinct (dimmer, monospace formula look) */
+            .cba-rationale.cba-rationale-auto {
+                font-style: normal; font-family: 'Courier New', Courier, monospace;
+                font-size: 11px; color: #64748b; cursor: default;
+                background: repeating-linear-gradient(
+                    135deg,
+                    transparent,
+                    transparent 4px,
+                    rgba(0,0,0,0.015) 4px,
+                    rgba(0,0,0,0.015) 8px
+                );
+            }
+            .cba-rationale.cba-rationale-auto:focus { outline: none; box-shadow: none; border-color: inherit; background: inherit; }
 
             /* ── Appendix collapsible ── */
             .cba-appendix-body {
@@ -405,11 +922,173 @@
             .cba-term-row:last-child { border-bottom: none; }
             .cba-term-hl { background: #e0e7ff !important; }
             .cba-bkdn-notes {
-                margin-top: 8px; padding: 8px 10px 6px;
-                background: rgba(248,250,252,0.92); border-radius: 6px;
-                border-top: 1px solid rgba(0,0,0,0.07);
-                font-size: 11px; color: #64748b; font-style: italic;
-                display: flex; flex-direction: column; gap: 3px;
+                margin-top: 10px;
+                padding: 12px;
+                background: linear-gradient(180deg, rgba(248,250,252,0.94), rgba(241,245,249,0.9));
+                border-radius: 12px;
+                border: 1px solid #dbeafe;
+                font-size: 12px;
+                color: #475569;
+                font-style: normal;
+                display: flex;
+                flex-direction: column;
+                gap: 10px;
+            }
+            .cba-bkdn-notes-head {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 8px;
+                padding-bottom: 8px;
+                border-bottom: 1px dashed #cbd5e1;
+            }
+            .cba-bkdn-notes-title {
+                font-size: 11px;
+                font-weight: 800;
+                color: #334155;
+                text-transform: uppercase;
+                letter-spacing: .06em;
+            }
+            .cba-bkdn-notes-help {
+                font-size: 11px;
+                color: #64748b;
+            }
+            .cba-note-item {
+                background: #ffffff;
+                border: 1px solid #cbd5e1;
+                border-radius: 12px;
+                padding: 10px;
+                box-shadow: 0 8px 20px rgba(15,23,42,0.05);
+            }
+            .cba-note-head {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 10px;
+                margin-bottom: 10px;
+            }
+            .cba-note-badge {
+                font-size: 11px;
+                font-weight: 800;
+                color: #0f766e;
+                background: #ecfeff;
+                border: 1px solid #99f6e4;
+                border-radius: 999px;
+                padding: 3px 8px;
+                white-space: nowrap;
+            }
+            .cba-note-title {
+                font-size: 12px;
+                font-weight: 800;
+                color: #1e293b;
+                margin-bottom: 0;
+                font-style: normal;
+            }
+            .cba-note-grid {
+                display: grid;
+                grid-template-columns: 1fr;
+                gap: 10px;
+            }
+            .cba-note-field {
+                display: flex;
+                flex-direction: column;
+                gap: 5px;
+            }
+            .cba-note-field-wide {
+                grid-column: 1 / -1;
+            }
+            .cba-note-label {
+                font-size: 11px;
+                font-weight: 700;
+                color: #334155;
+            }
+            .cba-note-inline {
+                display: grid;
+                grid-template-columns: 1fr;
+                gap: 8px;
+            }
+            .cba-note-mini {
+                display: flex;
+                flex-direction: column;
+                gap: 4px;
+            }
+            .cba-note-mini-label {
+                font-size: 10px;
+                font-weight: 700;
+                color: #64748b;
+                text-transform: uppercase;
+                letter-spacing: .03em;
+            }
+            .cba-note-edit {
+                width: 100%;
+                border: 1px solid #bfdbfe;
+                border-radius: 8px;
+                padding: 7px 9px;
+                font-size: 12px;
+                color: #334155;
+                background: #ffffff;
+                resize: vertical;
+                font-family: inherit;
+                transition: border-color .2s, box-shadow .2s, background .2s;
+            }
+            .cba-note-edit:focus {
+                outline: none;
+                border-color: #60a5fa;
+                background: #f8fbff;
+                box-shadow: 0 0 0 3px rgba(59,130,246,0.12);
+            }
+            .cba-note-tools {
+                display: flex;
+                justify-content: flex-end;
+                margin-top: 2px;
+            }
+            .cba-note-sync-btn {
+                font-size: 11px;
+                font-weight: 700;
+                padding: 5px 8px;
+                border-radius: 8px;
+                border: 1px solid #cbd5e1;
+                background: #f8fafc;
+                color: #334155;
+                cursor: pointer;
+                transition: all .2s;
+            }
+            .cba-note-sync-btn:hover {
+                border-color: #93c5fd;
+                background: #eff6ff;
+                color: #1d4ed8;
+            }
+            .cba-note-source-link {
+                font-size: 11px;
+                font-weight: 700;
+                color: #1d4ed8;
+                text-decoration: none;
+                border: 1px solid #bfdbfe;
+                background: #eff6ff;
+                border-radius: 999px;
+                padding: 3px 8px;
+                display: inline-flex;
+                align-items: center;
+            }
+            .cba-note-source-link:hover { background:#dbeafe; border-color:#93c5fd; }
+            .cba-note-context {
+                margin-top: 0;
+                font-size: 11px;
+                color: #0f766e;
+                background: #f0fdfa;
+                border: 1px solid #99f6e4;
+                border-radius: 6px;
+                padding: 6px 8px;
+                line-height: 1.4;
+                font-style: normal;
+            }
+            @media (min-width: 900px) {
+                .cba-note-grid {
+                    grid-template-columns: 1fr 1fr;
+                }
+                .cba-note-inline {
+                    grid-template-columns: 1fr 1fr;
+                }
             }
             .cba-term-link {
                 color: #4f46e5; font-weight: 600;
@@ -421,6 +1100,22 @@
             .cba-revert-btn.cba-revert-same { color:#94a3b8; background:#f8fafc; border-color:#e2e8f0; cursor:default; opacity:0.6; }
             .cba-revert-btn.cba-revert-diff { color:#fff; background:#6366f1; border-color:#4f46e5; box-shadow:0 0 0 2px rgba(99,102,241,.25); }
             .cba-revert-btn.cba-revert-diff:hover { background:#4f46e5; }
+            .cba-param-help-btn {
+                width: 18px; height: 18px;
+                border-radius: 999px;
+                border: 1px solid #cbd5e1;
+                background: #f8fafc;
+                color: #475569;
+                font-size: 11px;
+                font-weight: 800;
+                line-height: 1;
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                cursor: pointer;
+                flex-shrink: 0;
+            }
+            .cba-param-help-btn:hover { background:#eef2ff; border-color:#a5b4fc; color:#4338ca; }
             @keyframes cba-shimmer-slide { 0%{background-position:-400px 0} 100%{background-position:400px 0} }
             @keyframes cba-pulse-border { 0%,100%{box-shadow:0 0 0 0 rgba(99,102,241,.35)} 50%{box-shadow:0 0 0 5px rgba(99,102,241,.0)} }
             .cba-panel-ai-loading {
@@ -469,13 +1164,42 @@
         resultsPanel = null;
         let content;
         switch (step) {
-            case 'landing': content = renderLanding(); break;
-            case 'risk':    content = renderRiskInput(); break;
-            case 'analyze': content = renderAnalyze(); break;
-            case 'compare': content = renderCompare(); break;
-            default:        content = renderLanding();
+            case 'landing':   content = renderLanding(); break;
+            case 'risk':      content = renderRiskInput(); break;
+            case 'analyze':   content = renderAnalyze(); break;
+            case 'compare':   content = renderCompare(); break;
+            case 'baselines': content = renderBaselineEditor(); break;
+            default:          content = renderLanding();
         }
         root.appendChild(content);
+    }
+
+    function renderPreservingView(cardKey, keepPanelOpen) {
+        if (!root) return render();
+
+        const selector = cardKey ? `[data-cba-panel-key="${cardKey}"]` : '';
+        const beforeEl = selector ? root.querySelector(selector) : null;
+        const beforeTop = beforeEl ? beforeEl.getBoundingClientRect().top : null;
+        const beforeScrollY = window.scrollY;
+
+        if (cardKey) {
+            if (keepPanelOpen) uiState.openCalcPanels[cardKey] = true;
+            else delete uiState.openCalcPanels[cardKey];
+        }
+
+        uiState.suppressNextAnalyzeFade = true;
+
+        render();
+
+        requestAnimationFrame(() => {
+            const afterEl = selector ? root.querySelector(selector) : null;
+            if (afterEl && beforeTop != null) {
+                const afterTop = afterEl.getBoundingClientRect().top;
+                window.scrollTo({ top: window.scrollY + (afterTop - beforeTop) });
+            } else {
+                window.scrollTo({ top: beforeScrollY });
+            }
+        });
     }
 
     /* ═══════════════════════════════════════════════════════════════
@@ -490,7 +1214,7 @@
                 'Evaluate whether proposed safety measures are reasonably practicable. The Disproportion Factor scales required benefits by risk severity.')
         ));
         wrap.appendChild(renderLocationBar());
-        const grid = el('div', { className: 'grid md:grid-cols-2 gap-6' });
+        const grid = el('div', { className: 'grid md:grid-cols-3 gap-6' });
         const importCard = el('div', {
             className: 'cursor-pointer group border-2 border-slate-200 hover:border-indigo-400 rounded-2xl p-6 transition-all hover:shadow-lg bg-gradient-to-br from-indigo-50 to-blue-50',
             onClick: () => startImportMode()
@@ -509,6 +1233,28 @@
         freshCard.appendChild(el('p', { className: 'text-sm text-slate-600 mt-2' }, 'Describe a hazard in plain language. AI will identify risks, suggest controls, and estimate costs.'));
         freshCard.appendChild(el('span', { className: 'inline-block mt-4 text-xs font-semibold text-emerald-600 bg-emerald-100 px-3 py-1 rounded-full' }, 'AI-Powered'));
         grid.appendChild(freshCard);
+        // Manual Workflow card
+        const manualWorkCard = el('div', {
+            className: 'cursor-pointer group border-2 border-slate-200 hover:border-violet-400 rounded-2xl p-6 transition-all hover:shadow-lg bg-gradient-to-br from-violet-50 to-purple-50',
+            onClick: () => startManualMode()
+        });
+        manualWorkCard.appendChild(el('div', { className: 'text-3xl mb-3' }, '✏️'));
+        manualWorkCard.appendChild(el('h4', { className: 'text-lg font-bold text-slate-900 group-hover:text-violet-700 transition' }, 'Manual Workflow'));
+        manualWorkCard.appendChild(el('p', { className: 'text-sm text-slate-600 mt-2' },
+            'Describe the hazard, score it yourself, then fill in the cost & benefit table manually. No AI required — use AI as an optional helper at any step.'));
+        manualWorkCard.appendChild(el('span', { className: 'inline-block mt-4 text-xs font-semibold text-violet-700 bg-violet-100 px-3 py-1 rounded-full' }, 'No AI Required'));
+        grid.appendChild(manualWorkCard);
+        // Manual baseline editor card
+        const manualCard = el('div', {
+            className: 'cursor-pointer group border-2 border-slate-200 hover:border-amber-400 rounded-2xl p-6 transition-all hover:shadow-lg bg-gradient-to-br from-amber-50 to-orange-50 md:col-span-3',
+            onClick: () => { uiState.baselineBackStep = 'landing'; step = 'baselines'; render(); }
+        });
+        manualCard.appendChild(el('div', { className: 'text-3xl mb-3' }, '📋'));
+        manualCard.appendChild(el('h4', { className: 'text-lg font-bold text-slate-900 group-hover:text-amber-700 transition' }, 'Edit Baseline Figures Manually'));
+        manualCard.appendChild(el('p', { className: 'text-sm text-slate-600 mt-2' },
+            'View and directly edit the Luxembourg OSH benchmark figures — incident rates, medical costs, AAA Bonus-Malus impact, ITM fines, and more — without using AI.'));
+        manualCard.appendChild(el('span', { className: 'inline-block mt-4 text-xs font-semibold text-amber-700 bg-amber-100 px-3 py-1 rounded-full' }, '🇱🇺 Luxembourg Baselines'));
+        grid.appendChild(manualCard);
         wrap.appendChild(grid);
         /* Save / Load JSON buttons */
         const ioRow = el('div', { className: 'flex flex-wrap gap-3 justify-center' });
@@ -524,6 +1270,7 @@
                 data._recurringPeriod = uiState.recurringPeriod || 'year';
                 data._aiModel = uiState.aiModel || 'anthropic/claude-sonnet-4-6';
                 data._aiSnapshot = uiState.aiSnapshot ? JSON.parse(JSON.stringify(uiState.aiSnapshot)) : null;
+                data._executiveSummary = uiState.executiveSummary ? JSON.parse(JSON.stringify(uiState.executiveSummary)) : null;
                 const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a');
@@ -553,6 +1300,7 @@
                             if (data._aiNotes !== undefined) uiState.aiNotes = data._aiNotes;
                             if (data._recurringPeriod) uiState.recurringPeriod = data._recurringPeriod;
                             if (data._aiModel) uiState.aiModel = data._aiModel;
+                            uiState.executiveSummary = data._executiveSummary || null;
                             if (data._aiSnapshot != null) {
                                 uiState.aiSnapshot = data._aiSnapshot;
                             } else if (data.proposedMeasure && data.proposedMeasure.costItems) {
@@ -565,6 +1313,9 @@
                                 };
                             }
                             E.importData(data);
+                            const sImported = E.getState();
+                            normalizeRiskState(sImported.currentRisk);
+                            normalizeRiskState(sImported.projectedRisk);
                             uiState.locationDetected = !!data.location && !!data.location.country;
                             // Navigate to analysis page if data has a measure, else risk input
                             step = data.proposedMeasure && data.proposedMeasure.description ? 'analyze' : 'risk';
@@ -585,22 +1336,9 @@
         const s = E.getState();
         const bar = el('div', { className: 'flex flex-wrap items-center gap-3 p-4 bg-blue-50 rounded-xl border border-blue-200' });
         bar.appendChild(el('span', { className: 'text-sm font-semibold text-blue-800' },
-            s.location.country ? `📍 ${s.location.region ? s.location.region + ', ' : ''}${s.location.country}` : '📍 Location not set'));
-        const detectBtn = el('button', {
-            className: 'rab-btn rab-c-blue text-xs',
-            onClick: async () => {
-                detectBtn.disabled = true; detectBtn.textContent = 'Detecting…';
-                try {
-                    const loc = await A.detectLocation();
-                    Object.assign(s.location, { lat: loc.lat, lng: loc.lng, country: loc.country, region: loc.region, currency: loc.currency });
-                    uiState.locationDetected = true;
-                    uiState.avgHourlyWage = lookupAvgWage(loc.country, loc.currency);
-                    render();
-                } catch (e) { detectBtn.disabled = false; detectBtn.textContent = 'Detection failed'; setTimeout(() => { detectBtn.textContent = 'Detect Location'; }, 2000); }
-            }
-        }, 'Detect Location');
-        bar.appendChild(detectBtn);
-        bar.appendChild(buildCurrencyDropdown());
+            '🇱🇺 Luxembourg — AAA / MDE / ITM framework (2024–2025)'));
+        bar.appendChild(el('span', { className: 'text-xs text-blue-600 bg-blue-100 px-2 py-1 rounded-lg' },
+            '€ EUR · AAA base rate 0.70% · STATEC median wage €28/hr'));
         return bar;
     }
 
@@ -621,19 +1359,36 @@
     /* ═══════ MODE ENTRY ═══════ */
     function startImportMode() {
         const rows = E.getTableRows();
-        if (rows.length === 0) { alert('No rows in risk table. Use "Fresh Start with AI".'); return; }
+        if (rows.length === 0) { alert('No rows in risk table. Use "Fresh Start with AI" or "Manual Workflow".'); return; }
         uiState.selectedRow = null; step = 'risk'; E.getState().mode = 'import'; render();
     }
-    function startFreshMode() { E.getState().mode = 'fresh'; uiState.freshDescription = ''; step = 'risk'; render(); }
+    function startFreshMode() { E.getState().mode = 'fresh'; uiState.freshDescription = ''; uiState.executiveSummary = null; step = 'risk'; render(); }
+    function startManualMode() {
+        const s = E.getState();
+        s.mode = 'manual';
+        uiState.freshDescription = '';
+        uiState.executiveSummary = null;
+        // Pre-compute default score so the editor is shown immediately
+        if (s.currentRisk.score === null) {
+            s.currentRisk.frequency = RISK_SCALE_OPTIONS.frequency[0].value;
+            s.currentRisk.severity = RISK_SCALE_OPTIONS.severity[0].value;
+            s.currentRisk.likelihood = RISK_SCALE_OPTIONS.likelihood[0].value;
+            normalizeRiskState(s.currentRisk);
+        }
+        step = 'risk'; render();
+    }
 
     /* ═══════════════════════════════════════════════════════════════
        STEP 1: RISK INPUT
        ═══════════════════════════════════════════════════════════════ */
     function renderRiskInput() {
         const s = E.getState();
-        const wrap = el('div', { className: 'space-y-6 cba-fade' });
+        const noFade = !!uiState.suppressNextRiskFade;
+        uiState.suppressNextRiskFade = false;
+        const wrap = el('div', { className: noFade ? 'space-y-6' : 'space-y-6 cba-fade' });
         wrap.appendChild(renderStepHeader('Step 1 — Define the Risk', 'landing'));
-        if (s.mode === 'import') wrap.appendChild(renderImportPicker());
+        if (s.mode === 'import')  wrap.appendChild(renderImportPicker());
+        else if (s.mode === 'manual') wrap.appendChild(renderManualStart());
         else wrap.appendChild(renderFreshStart());
         return wrap;
     }
@@ -688,11 +1443,10 @@
                     const analysis = await A.analyzeRiskDescription(uiState.freshDescription, locStr, uiState.aiModel);
                     s.currentRisk.description = uiState.freshDescription;
                     s.currentRisk.hazards = analysis.hazards || [];
-                    s.currentRisk.frequency = analysis.frequency || 1;
-                    s.currentRisk.severity = analysis.severity || 1;
-                    s.currentRisk.likelihood = analysis.likelihood || 1;
-                    s.currentRisk.score = E.calcRiskScore(s.currentRisk.frequency, s.currentRisk.severity, s.currentRisk.likelihood);
-                    s.currentRisk.category = E.getRiskCategory(s.currentRisk.score);
+                    s.currentRisk.frequency = normalizeScaleValue('frequency', analysis.frequency, s.currentRisk.frequency || 1);
+                    s.currentRisk.severity = normalizeScaleValue('severity', analysis.severity, s.currentRisk.severity || 1);
+                    s.currentRisk.likelihood = normalizeScaleValue('likelihood', analysis.likelihood, s.currentRisk.likelihood || 1);
+                    normalizeRiskState(s.currentRisk);
                     s.currentRisk._suggestedMeasures = analysis.suggestedMeasures || [];
                     uiState.aiLoading = false; render();
                 } catch (e) { uiState.aiLoading = false; uiState.aiError = e.message; render(); }
@@ -736,6 +1490,125 @@
         return container;
     }
 
+    /* ═══════════════════════════════════════════════════════════════
+       MANUAL WORKFLOW — Step 1
+       Description + instant scoring + optional AI assist
+       ═══════════════════════════════════════════════════════════════ */
+    function renderManualStart() {
+        const s = E.getState();
+        const container = el('div', { className: 'space-y-4' });
+
+        // Mode banner
+        const banner = el('div', { className: 'flex items-start gap-3 p-4 bg-violet-50 border border-violet-200 rounded-xl' });
+        banner.appendChild(el('span', { className: 'text-2xl flex-shrink-0' }, '✏️'));
+        const bannerText = el('div', { className: 'text-sm text-violet-800' });
+        bannerText.appendChild(el('b', {}, 'Manual Workflow '));
+        bannerText.appendChild(document.createTextNode(
+            '— No AI required. Type the hazard description, set the three risk scores using the dropdowns, then continue directly to the cost & benefit table. AI is available as an optional helper at any step.'
+        ));
+        banner.appendChild(bannerText);
+        container.appendChild(banner);
+
+        // Description
+        container.appendChild(el('label', { className: 'block text-sm font-semibold text-slate-700' }, 'Hazard description:'));
+        const ta = el('textarea', {
+            className: 'w-full border border-slate-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-violet-400 outline-none resize-none',
+            rows: '3',
+            placeholder: 'e.g., Workers operating counterbalance forklifts in a shared pedestrian walkway in the loading bay…'
+        });
+        ta.value = s.currentRisk.description || uiState.freshDescription || '';
+        ta.addEventListener('input', (e) => {
+            uiState.freshDescription = e.target.value;
+            s.currentRisk.description = e.target.value;
+        });
+        container.appendChild(ta);
+
+        // Risk scoring — always visible in manual mode
+        container.appendChild(renderCurrentRiskSummary());
+        container.appendChild(renderRiskScoreEditor());
+
+        // Optional AI assist — collapsible
+        const aiDetails = el('details', { className: 'bg-slate-50 border border-slate-200 rounded-xl overflow-hidden' });
+        const aiSummary = el('summary', {
+            className: 'cursor-pointer px-4 py-3 text-xs font-semibold text-slate-600 select-none list-none flex items-center gap-2'
+        });
+        aiSummary.appendChild(el('span', {}, '🤖'));
+        aiSummary.appendChild(el('span', {}, 'Optional: Use AI to suggest scores & control measures'));
+        aiSummary.appendChild(el('span', { className: 'ml-auto text-slate-400 text-[10px] font-normal italic' }, '(click to expand)'));
+        aiDetails.appendChild(aiSummary);
+
+        const aiBody = el('div', { className: 'px-4 pb-4 pt-2 space-y-3 border-t border-slate-200' });
+        aiBody.appendChild(renderModelSelector());
+
+        if (uiState.aiError) {
+            aiBody.appendChild(el('div', { className: 'text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg p-3' }, uiState.aiError));
+        }
+
+        const aiAssistBtn = el('button', {
+            className: 'rab-btn rab-c-blue text-sm',
+            disabled: uiState.aiLoading,
+            onClick: async () => {
+                if (!s.currentRisk.description.trim()) { alert('Please describe the hazard first.'); return; }
+                uiState.aiLoading = true; uiState.aiError = null; render();
+                // Re-open the details panel after re-render
+                try {
+                    const locStr = s.location.country
+                        ? `${s.location.region ? s.location.region + ', ' : ''}${s.location.country}` : '';
+                    const analysis = await A.analyzeRiskDescription(s.currentRisk.description, locStr, uiState.aiModel);
+                    s.currentRisk.hazards = analysis.hazards || [];
+                    s.currentRisk.frequency    = normalizeScaleValue('frequency', analysis.frequency, s.currentRisk.frequency);
+                    s.currentRisk.severity     = normalizeScaleValue('severity', analysis.severity, s.currentRisk.severity);
+                    s.currentRisk.likelihood   = normalizeScaleValue('likelihood', analysis.likelihood, s.currentRisk.likelihood);
+                    normalizeRiskState(s.currentRisk);
+                    s.currentRisk._suggestedMeasures = analysis.suggestedMeasures || [];
+                    uiState.aiLoading = false; render();
+                } catch (e) { uiState.aiLoading = false; uiState.aiError = e.message; render(); }
+            }
+        });
+        if (uiState.aiLoading) {
+            aiAssistBtn.appendChild(svgSpinner(16, '#fff'));
+            aiAssistBtn.appendChild(document.createTextNode(' Analyzing…'));
+        } else {
+            aiAssistBtn.appendChild(document.createTextNode('🤖 Get AI Score Suggestions'));
+        }
+        aiBody.appendChild(aiAssistBtn);
+
+        // AI-suggested control measures (shown after AI runs)
+        if (s.currentRisk._suggestedMeasures && s.currentRisk._suggestedMeasures.length > 0) {
+            const sugBox = el('div', { className: 'bg-emerald-50 border border-emerald-200 rounded-xl p-4 space-y-2 mt-2' });
+            sugBox.appendChild(el('h5', { className: 'font-semibold text-emerald-800 text-sm' }, '🤖 AI-Suggested Control Measures (click to pre-fill):'));
+            s.currentRisk._suggestedMeasures.forEach(m => {
+                const item = el('div', {
+                    className: 'flex items-start gap-2 p-2 bg-white rounded-lg border border-emerald-100 cursor-pointer hover:bg-emerald-50 transition',
+                    onClick: () => { s.proposedMeasure.description = m.description; s.proposedMeasure.controlLevel = m.controlLevel; step = 'analyze'; render(); }
+                });
+                item.appendChild(el('span', { className: 'text-xs font-bold bg-emerald-600 text-white px-2 py-0.5 rounded flex-shrink-0' }, `L${m.controlLevel}`));
+                item.appendChild(el('div', {},
+                    el('p', { className: 'text-sm font-medium text-slate-800' }, m.description),
+                    el('p', { className: 'text-xs text-slate-500 mt-0.5' }, m.rationale || '')
+                ));
+                sugBox.appendChild(item);
+            });
+            aiBody.appendChild(sugBox);
+        }
+
+        aiDetails.appendChild(aiBody);
+        container.appendChild(aiDetails);
+
+        // Continue button
+        container.appendChild(el('div', { className: 'flex justify-end pt-2' },
+            el('button', {
+                className: 'rab-btn rab-c-violet',
+                onClick: () => {
+                    if (!s.currentRisk.description.trim()) { alert('Please describe the hazard first.'); return; }
+                    step = 'analyze'; render();
+                }
+            }, 'Continue → Cost & Benefit Table →')
+        ));
+
+        return container;
+    }
+
     function renderModelSelector() {
         const row = el('div', { className: 'flex items-center gap-2' });
         row.appendChild(el('label', { className: 'text-xs font-semibold text-slate-500 whitespace-nowrap' }, 'AI Model:'));
@@ -748,11 +1621,15 @@
     function renderCurrentRiskSummary() {
         const s = E.getState();
         const cat = s.currentRisk.category; const color = E.getRiskColor(cat); const bg = E.getRiskBg(cat); const df = E.getDisproportionFactor(s.currentRisk.score);
+        const fEntry = getScaleEntry('frequency', s.currentRisk.frequency);
+        const sEntry = getScaleEntry('severity', s.currentRisk.severity);
+        const lEntry = getScaleEntry('likelihood', s.currentRisk.likelihood);
+        const scoreText = formatScaleValue(s.currentRisk.score || 0);
         const box = el('div', { className: 'rounded-xl border-2 p-3 cba-fade', style: { borderColor: color, backgroundColor: bg } });
         const header = el('div', { className: 'flex items-center gap-3 flex-wrap' });
-        header.appendChild(el('span', { className: 'text-xl font-black', style: { color } }, String(s.currentRisk.score)));
+        header.appendChild(el('span', { className: 'text-xl font-black', style: { color } }, scoreText));
         header.appendChild(el('span', { className: 'text-xs font-bold text-white px-2 py-0.5 rounded', style: { backgroundColor: color } }, cat));
-        header.appendChild(el('span', { className: 'text-xs text-slate-600' }, `F=${s.currentRisk.frequency} × S=${s.currentRisk.severity} × L=${s.currentRisk.likelihood}`));
+        header.appendChild(el('span', { className: 'text-xs text-slate-600' }, `F=${formatScaleValue(s.currentRisk.frequency)} (${fEntry ? fEntry.label : ''}) × S=${formatScaleValue(s.currentRisk.severity)} (${sEntry ? sEntry.label : ''}) × L=${formatScaleValue(s.currentRisk.likelihood)} (${lEntry ? lEntry.label : ''})`));
         header.appendChild(el('span', { className: 'ml-auto text-xs font-semibold', style: { color } }, `DF: ×${df.factor}`));
         box.appendChild(header);
         if (s.currentRisk.description) box.appendChild(el('p', { className: 'text-xs text-slate-600 mt-2' }, s.currentRisk.description));
@@ -774,12 +1651,36 @@
             grp.appendChild(el('label', { className: 'text-xs font-medium text-slate-600 block mb-1' }, field.charAt(0).toUpperCase() + field.slice(1)));
             const sel = el('select', {
                 className: 'w-full text-sm border border-slate-300 rounded px-2 py-1',
-                onChange: (e) => { s.currentRisk[field] = parseInt(e.target.value); s.currentRisk.score = E.calcRiskScore(s.currentRisk.frequency, s.currentRisk.severity, s.currentRisk.likelihood); s.currentRisk.category = E.getRiskCategory(s.currentRisk.score); render(); }
+                onChange: (e) => {
+                    s.currentRisk[field] = normalizeScaleValue(field, parseFloat(e.target.value), s.currentRisk[field]);
+                    normalizeRiskState(s.currentRisk);
+                    uiState.suppressNextRiskFade = true;
+                    render();
+                }
             });
-            for (let i = 1; i <= 5; i++) { const opt = el('option', { value: String(i) }, String(i)); if (i === s.currentRisk[field]) opt.selected = true; sel.appendChild(opt); }
+            const currentVal = normalizeScaleValue(field, s.currentRisk[field], (RISK_SCALE_OPTIONS[field] || [])[0]?.value || 1);
+            (RISK_SCALE_OPTIONS[field] || []).forEach((optData) => {
+                const opt = el('option', { value: String(optData.value), title: optData.definition }, `${formatScaleValue(optData.value)} — ${optData.label}`);
+                if (currentVal === optData.value) opt.selected = true;
+                sel.appendChild(opt);
+            });
             grp.appendChild(sel); grid.appendChild(grp);
         });
         container.appendChild(grid);
+
+        const defs = el('details', { className: 'bg-white border border-slate-200 rounded-lg p-3' });
+        defs.appendChild(el('summary', { className: 'cursor-pointer text-xs font-semibold text-slate-700' }, 'Show Standard F/S/L Definitions'));
+        const defsWrap = el('div', { className: 'mt-2 space-y-2' });
+        ['frequency', 'severity', 'likelihood'].forEach((field) => {
+            const block = el('div', { className: 'border border-slate-100 rounded-md p-2 bg-slate-50' });
+            block.appendChild(el('div', { className: 'text-[11px] font-bold text-slate-700 mb-1 uppercase tracking-wide' }, field));
+            (RISK_SCALE_OPTIONS[field] || []).forEach((row) => {
+                block.appendChild(el('div', { className: 'text-[11px] text-slate-600 leading-5' }, `${formatScaleValue(row.value)} — ${row.label}: ${row.definition}`));
+            });
+            defsWrap.appendChild(block);
+        });
+        defs.appendChild(defsWrap);
+        container.appendChild(defs);
         return container;
     }
 
@@ -787,12 +1688,28 @@
     function termIdForSource(text) {
         if (!text) return null;
         const u = text.toUpperCase();
+        if (u.includes('AAA')) return 'cba-term-aaa';
+        if (u.includes('MDE') || u.includes('LOHNFORTZAHLUNG')) return 'cba-term-mde';
+        if (u.includes('ITM')) return 'cba-term-itm';
+        if (u.includes('STATEC')) return 'cba-term-statec';
+        if (u.includes('ISSA') || u.includes('ROP')) return 'cba-term-issa-return-on-prevention-rop';
         if (u.includes('BLS') || u.includes('DAFW')) return 'cba-term-bls';
         if (u.includes('OSHA'))                      return 'cba-term-osha';
         if (u.includes('HSE') || u.includes('R2P2')) return 'cba-term-hse';
         if (u.includes('ALARP'))                     return 'cba-term-alarp';
         if (u.includes('LWC') || u.includes('WORKDAY')) return 'cba-term-lost-workday-cases-lwc';
         return null;
+    }
+    function sourceUrlForText(sourceText, explicitUrl) {
+        if (explicitUrl) return explicitUrl;
+        const u = String(sourceText || '').toUpperCase();
+        if (u.includes('BONUS-MALUS') || u.includes('BASE RATE')) return SOURCE_URLS.AAA_BONUS;
+        if (u.includes('AAA')) return SOURCE_URLS.AAA_REPORT;
+        if (u.includes('MDE') || u.includes('LOHNFORTZAHLUNG') || u.includes('CNS')) return SOURCE_URLS.MDE_AFFILIATION;
+        if (u.includes('ITM')) return SOURCE_URLS.ITM_REPORT_PDF;
+        if (u.includes('STATEC')) return SOURCE_URLS.STATEC_PORTAL;
+        if (u.includes('ISSA') || u.includes('ROP')) return SOURCE_URLS.ISSA_ROP;
+        return '';
     }
     function scrollToAppendixTerm(termId) {
         const target = document.getElementById(termId);
@@ -808,22 +1725,359 @@
         setTimeout(() => target.classList.remove('cba-term-hl'), 2500);
     }
 
+    function parseQtyReasonBlocks(reasonText) {
+        const raw = String(reasonText || '').replace(/\s+/g, ' ').trim();
+        const out = { definition: '', basis: '', parameters: '', formula: '' };
+        if (!raw) return out;
+
+        const pKey = 'Parameters used:';
+        const fKey = 'Formula =';
+        const pIdx = raw.indexOf(pKey);
+
+        if (pIdx >= 0) {
+            out.basis = raw.slice(0, pIdx).replace(/^Audit basis:\s*/i, '').trim().replace(/[;\s]+$/, '');
+            const tail = raw.slice(pIdx + pKey.length).trim();
+            const fIdx = tail.indexOf(fKey);
+            if (fIdx >= 0) {
+                out.parameters = tail.slice(0, fIdx).trim().replace(/^[;\s]+|[;\s]+$/g, '');
+                out.formula = tail.slice(fIdx).trim();
+            } else {
+                out.parameters = tail.trim().replace(/^[;\s]+|[;\s]+$/g, '');
+            }
+        } else {
+            const fIdx = raw.indexOf(fKey);
+            if (fIdx >= 0) {
+                out.basis = raw.slice(0, fIdx).replace(/^Audit basis:\s*/i, '').trim().replace(/[;\s]+$/, '');
+                out.formula = raw.slice(fIdx).trim();
+            } else {
+                out.basis = raw.replace(/^Audit basis:\s*/i, '').trim();
+            }
+        }
+
+        if (out.formula && !/^Formula/i.test(out.formula)) out.formula = `Formula = ${out.formula}`;
+        return out;
+    }
+
+    function autoParametersFromRow(row, sym) {
+        const qty = Math.max(0, Number(row && row.qty) || 0);
+        const rate = Math.max(0, Number(row && row.rate) || 0);
+        const unit = String((row && row.unit) || 'unit').trim();
+        return `Qty = ${formatNum(qty)}; Rate = ${(sym || currencySymbol())}${formatNum(rate)} per ${unit}`;
+    }
+
+    function getRowQtyNoteParts(row, sym) {
+        const parsed = parseQtyReasonBlocks(row && row.qtyReason ? row.qtyReason : '');
+        const note = (row && row.noteDetails && typeof row.noteDetails === 'object') ? row.noteDetails : {};
+        const autoParams = note.autoParams !== false;
+        const definition = String(note.definition || (row && row.label) || '').trim();
+        const basis = String(note.basis || parsed.basis || '').trim();
+        const formula = String(note.formula || parsed.formula || '').replace(/^Formula\s*=\s*/i, '').trim() || 'Qty x Rate';
+        let parameters = String(note.parameters || parsed.parameters || '').trim();
+        if (autoParams || !parameters) parameters = autoParametersFromRow(row || {}, sym);
+        return { definition, basis, parameters, formula, autoParams };
+    }
+
+    function syncRowQtyReasonFromNote(row, sym) {
+        if (!row) return;
+        const note = getRowQtyNoteParts(row, sym);
+        row.noteDetails = Object.assign({}, row.noteDetails || {}, note);
+        const parts = [];
+        if (note.basis) parts.push(`Audit basis: ${note.basis}`);
+        if (note.parameters) parts.push(`Parameters used: ${note.parameters}`);
+        if (note.formula) parts.push(`Formula = ${note.formula}`);
+        row.qtyReason = parts.join('; ');
+    }
+
+    function getSourceContextLines(sourceText, reasonText) {
+        const combined = `${sourceText || ''} ${reasonText || ''}`.toUpperCase();
+        const lines = [];
+        if (combined.includes('AAA')) lines.push('AAA = Association d\'Assurance Accident (Luxembourg workplace accident insurer).');
+        if (combined.includes('ITM')) lines.push('ITM = Inspection du Travail et des Mines (Luxembourg labour inspectorate).');
+        if (combined.includes('MDE')) lines.push('MDE = Mutualité des Employeurs (Luxembourg employer salary-continuation mutual).');
+        if (combined.includes('STATEC')) lines.push('STATEC = Luxembourg national statistics institute (wage and labour benchmarks).');
+        return lines;
+    }
+
+    function inferSourceChipLabel(sourceText, sourceUrl, preferredLabel) {
+        const custom = String(preferredLabel || '').trim();
+        if (custom && !/^source$/i.test(custom)) return custom.slice(0, 24);
+
+        const textU = String(sourceText || '').toUpperCase();
+        const urlU = String(sourceUrl || '').toUpperCase();
+        const combined = `${textU} ${urlU}`;
+
+        if (combined.includes('AAA') || combined.includes('AAA.PUBLIC.LU')) return 'AAA';
+        if (combined.includes('ITM') || combined.includes('ITM.PUBLIC.LU')) return 'ITM';
+        if (combined.includes('MDE') || combined.includes('MDE.PUBLIC.LU')) return 'MDE';
+        if (combined.includes('STATEC') || combined.includes('STATISTIQUES.PUBLIC.LU')) return 'STATEC';
+        if (combined.includes('ISSA') || combined.includes('ISSA.INT') || combined.includes('BRITSAFE')) return 'ISSA';
+        if (/\bREPORT\b|\bRAPPORT\b|\bANNUAL\b/.test(combined)) return 'Report';
+        if (combined.includes('BASELINE')) return 'Baseline';
+        return 'Source';
+    }
+
+    function parseNumericTextToValue(rawText) {
+        let t = String(rawText || '')
+            .replace(/\u00a0/g, ' ')
+            .replace(/\s+/g, '')
+            .replace(/[€$£]/g, '')
+            .trim();
+        if (!t) return 0;
+
+        t = t.replace(/[;:,)\]]+$/, '');
+        const hasComma = t.includes(',');
+        const hasDot = t.includes('.');
+
+        if (hasComma && hasDot) {
+            if (t.lastIndexOf(',') > t.lastIndexOf('.')) {
+                // European format: 6.500,00 -> 6500.00
+                t = t.replace(/\./g, '').replace(',', '.');
+            } else {
+                // US/UK format: 6,500.00 -> 6500.00
+                t = t.replace(/,/g, '');
+            }
+        } else if (hasComma && !hasDot) {
+            const fracLen = t.length - t.lastIndexOf(',') - 1;
+            if (fracLen === 3 || fracLen === 0) t = t.replace(/,/g, '');
+            else t = t.replace(',', '.');
+        }
+
+        t = t.replace(/[^0-9.-]/g, '');
+        const n = parseFloat(t);
+        return isFinite(n) && n > 0 ? n : 0;
+    }
+
+    function extractSuggestedDisplayValueFromRationale(rationaleText) {
+        const text = String(rationaleText || '');
+        const patterns = [
+            /(?:^|\n)\s*(?:value|estimated\s+value|valeur|wert)\s*[:=]\s*(?:[A-Z]{3}\s*)?[€$£]?\s*([-+]?[0-9][0-9\s.,]*)/im,
+            /(?:^|\n)\s*(?:non[-\s]?medical[^\n]*?)\s*[:=]\s*(?:[A-Z]{3}\s*)?[€$£]?\s*([-+]?[0-9][0-9\s.,]*)/im
+        ];
+
+        for (const p of patterns) {
+            const m = text.match(p);
+            if (m && m[1]) {
+                const v = parseNumericTextToValue(m[1]);
+                if (v > 0) return v;
+            }
+        }
+        return 0;
+    }
+
+    /* ── Generate a human-readable rationale formula from structured row data ── */
+    function generateRationaleFromRows(rows, sym) {
+        if (!Array.isArray(rows) || rows.length === 0) return '';
+        const parts = rows.map(r => {
+            const qty  = Number(r.qty)  || 0;
+            const rate = Number(r.rate) || 0;
+            // Prefer the full noteDetails.definition over the possibly-abbreviated label
+            const label = String((r.noteDetails && r.noteDetails.definition) || r.label || 'Component').trim();
+            if (qty === 1) {
+                return `${label} (${sym}${Math.round(rate).toLocaleString()})`;
+            }
+            return `${label} (${qty} × ${sym}${Math.round(rate).toLocaleString()})`;
+        });
+        const total = rows.reduce((s, r) => s + (Number(r.qty) || 0) * (Number(r.rate) || 0), 0);
+        let text = parts.join('\n+ ') + `\n= ${sym}${Math.round(total).toLocaleString()}`;
+        const sources = [...new Set(rows.map(r => r.source).filter(Boolean))];
+        if (sources.length) text += `\nSource: ${sources.join('; ')}`;
+        return text;
+    }
+
+    function splitRationaleIntoBreakdownRows(cat, rationaleText, sym) {
+        const text = String(rationaleText || '').trim();
+        if (!text) return [];
+
+        // Search all lines for a compound expression (must contain at least two `+` separated segments each ending with a currency amount)
+        const lines = text.split(/\r?\n/);
+        let expr = '';
+        for (const line of lines) {
+            let candidate = line.split(/\bSource\s*:/i)[0] || '';
+            if (candidate.includes('=')) candidate = candidate.split('=')[0];
+            candidate = candidate.trim();
+            // Must have at least one `+` AND at least two segments that each end with a euro/dollar amount
+            if (!candidate.includes('+')) continue;
+            const segments = candidate.split('+');
+            const withAmount = segments.filter(seg => /[€$£]\s*[0-9][\d\s.,]*\s*$/.test(seg.trim()) || /[0-9][\d\s.,]*\s*$/.test(seg.trim()));
+            if (withAmount.length >= 2) { expr = candidate; break; }
+        }
+        if (!expr) return [];
+
+        const sourceMeta = extractRationaleSourceMeta(text, []);
+        const unit = cat && cat.recurring
+            ? (uiState.recurringPeriod === 'month' ? 'per month' : 'per year')
+            : 'one-off';
+
+        const rows = [];
+        const parts = expr.split('+').map(p => String(p || '').trim()).filter(Boolean);
+        parts.forEach((part, i) => {
+            const amountMatch = part.match(/(?:[A-Z]{3}\s*)?[€$£]?\s*([0-9][0-9\s.,]*)\s*$/i);
+            if (!amountMatch || !amountMatch[1]) return;
+
+            const rate = parseNumericTextToValue(amountMatch[1]);
+            if (!(rate > 0)) return;
+
+            let label = part.slice(0, amountMatch.index).trim();
+            label = label.replace(/[\s,:;\-–—]+$/, '').trim();
+            if (!label) label = `Component ${i + 1}`;
+
+            const row = {
+                label,
+                qty: 1,
+                qtyReason: `Split from rationale line item: ${label}.`,
+                rate,
+                unit,
+                source: sourceMeta.sourceText || 'Manual user split',
+                sourceUrl: sourceMeta.sourceUrl || '',
+                noteDetails: {
+                    definition: label,
+                    basis: `Split automatically from rationale expression so each component can be fine-tuned independently.`,
+                    parameters: '',
+                    formula: 'Qty x Rate',
+                    autoParams: true
+                }
+            };
+            syncRowQtyReasonFromNote(row, sym || currencySymbol());
+            rows.push(row);
+        });
+
+        return rows.length >= 2 ? rows : [];
+    }
+
+    function extractRationaleSourceMeta(rationaleText, fallbackRows) {
+        const lines = String(rationaleText || '').split(/\r?\n/).map(s => String(s || '').trim()).filter(Boolean);
+        const rows = Array.isArray(fallbackRows) ? fallbackRows : [];
+
+        let sourceText = '';
+        let sourceLabel = 'Source';
+        let sourceUrl = '';
+
+        lines.forEach((line) => {
+            const srcMatch = line.match(/^Source:\s*(.+)$/i);
+            if (srcMatch && !sourceText) sourceText = srcMatch[1].trim();
+
+            const linkMatch = line.match(/^Source link:\s*(.+)$/i);
+            if (!linkMatch) return;
+            const raw = String(linkMatch[1] || '').trim();
+            if (!raw) return;
+
+            const md = raw.match(/^\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)$/i);
+            if (md) {
+                sourceLabel = md[1] || 'Source';
+                sourceUrl = md[2] || sourceUrl;
+                return;
+            }
+
+            const bare = raw.match(/^(https?:\/\/\S+)$/i);
+            if (bare) {
+                sourceLabel = 'Source';
+                sourceUrl = bare[1] || sourceUrl;
+                return;
+            }
+
+            sourceLabel = raw || sourceLabel;
+        });
+
+        if (!sourceText) {
+            const rowWithSource = rows.find((r) => r && r.source);
+            if (rowWithSource) sourceText = rowWithSource.source;
+        }
+
+        if (!sourceUrl) {
+            const rowWithUrl = rows.find((r) => r && r.sourceUrl);
+            if (rowWithUrl) sourceUrl = rowWithUrl.sourceUrl;
+        }
+
+        if (!sourceUrl) sourceUrl = sourceUrlForText(sourceText, '');
+
+        return {
+            sourceText: sourceText || '',
+            sourceLabel: inferSourceChipLabel(sourceText, sourceUrl, sourceLabel),
+            sourceUrl: sourceUrl || ''
+        };
+    }
+
     /* ─── Glassmorphic item card with expandable breakdown calculations ─── */
     function buildItemCard(cat, type, s, sym, periodLabel) {
         const isCost = type === 'cost';
+        const panelKey = `${type}:${cat.key}`;
         const items = isCost ? s.proposedMeasure.costItems : s.benefits.items;
         const rationales = isCost ? (s.proposedMeasure.costRationales || {}) : (s.benefits.rationales || {});
         const breakdowns = isCost ? (s.proposedMeasure.costBreakdowns || {}) : (s.benefits.breakdowns || {});
+
+        // ── Auto-upgrade: if only the old generic fallback rows exist, silently replace
+        //    with the rich template rows so users don't need to manually clear + re-calc.
+        if (
+            breakdowns[cat.key] && breakdowns[cat.key].length > 0 &&
+            typeof CBA !== 'undefined' && CBA.buildTemplateRows && 
+            !breakdowns[cat.key][0].autoUpgraded
+        ) {
+            // Check if these appear to be old format rows (looking for old markers like 'Manual user split', 'Unverified source', or simply missing noteDetails struct)
+            const isOldFormat = breakdowns[cat.key].some(r => 
+                !r.noteDetails || !r.noteDetails.definition || r.source === 'Manual user split' || r.source === 'Unverified source'
+            );
+            
+            if (isOldFormat) {
+                const catType = isCost ? 'cost' : 'benefit';
+                const unitLabel = cat.recurring
+                    ? (typeof uiState !== 'undefined' && uiState.recurringPeriod === 'month' ? 'per month' : 'per year')
+                    : 'one-off';
+                const upgraded = CBA.buildTemplateRows(catType, cat.key, unitLabel);
+                if (upgraded.length > 0) {
+                    upgraded[0].autoUpgraded = true; // prevent infinite loop if a template has 1 row
+                    if (isCost) {
+                        if (!s.proposedMeasure.costBreakdowns) s.proposedMeasure.costBreakdowns = {};
+                        s.proposedMeasure.costBreakdowns[cat.key] = upgraded;
+                        breakdowns[cat.key] = upgraded;
+                    } else {
+                        if (!s.benefits.breakdowns) s.benefits.breakdowns = {};
+                        s.benefits.breakdowns[cat.key] = upgraded;
+                        breakdowns[cat.key] = upgraded;
+                    }
+                }
+            }
+        }
+
+        const bkRows = breakdowns[cat.key] || [];
         const cardClass = isCost ? 'cost-card' : 'ben-card';
         const accentColor = isCost ? 'red' : 'emerald';
         const chipClass = isCost ? 'cost-chip' : 'ben-chip';
 
         const card = el('div', { className: `cba-item-card ${cardClass}` });
+        card.dataset.cbaPanelKey = panelKey;
+        let bkPanelRef = null;
+        let bkToggleArrow = null;
+        let bkToggleEl = null;
+        const setBreakdownOpen = (open) => {
+            if (!bkPanelRef || !bkToggleArrow || !bkToggleEl) return;
+            if (open) {
+                bkPanelRef.classList.add('open');
+                bkPanelRef.style.overflow = 'auto';
+                bkToggleArrow.textContent = '▾';
+                bkToggleEl.classList.add('open');
+            } else {
+                bkPanelRef.classList.remove('open');
+                bkPanelRef.style.overflow = 'hidden';
+                bkToggleArrow.textContent = '▸';
+                bkToggleEl.classList.remove('open');
+            }
+        };
 
         /* ── Top row: Label + Total Chip + Expand toggle ── */
         const topRow = el('div', { className: 'flex items-center gap-2' });
         const labelText = cat.recurring ? `${cat.label} ${periodLabel}` : `${cat.label} (once)`;
-        topRow.appendChild(el('span', { className: `text-sm text-${accentColor}-800 font-semibold leading-tight flex-1`, title: cat.hint }, labelText));
+        const labelWrap = el('div', { className: 'flex items-center gap-1.5 flex-1 min-w-0' });
+        labelWrap.appendChild(el('span', { className: `text-sm text-${accentColor}-800 font-semibold leading-tight`, title: cat.hint }, labelText));
+        labelWrap.appendChild(el('button', {
+            className: 'cba-param-help-btn',
+            title: 'Explain these parameters in simple language',
+            onClick: (ev) => {
+                ev.preventDefault();
+                ev.stopPropagation();
+                openParameterHelpModal(cat, type, sym, periodLabel);
+            }
+        }, '?'));
+        topRow.appendChild(labelWrap);
 
         // Editable total chip
         const dv = toDisplay(items[cat.key] || 0, cat.recurring);
@@ -836,13 +2090,20 @@
         });
         totalInp.value = dv > 0 ? String(Math.round(dv)) : '';
         totalInp.addEventListener('input', (e) => {
-            items[cat.key] = toAnnual(parseFloat(e.target.value) || 0, cat.recurring);
+            const typed = parseFloat(e.target.value) || 0;
+            items[cat.key] = toAnnual(typed, cat.recurring);
+            // If this line has a single split row, keep it synchronized with total edits.
+            if (bkRows.length === 1) {
+                bkRows[0].qty = 1;
+                bkRows[0].rate = typed;
+                syncRowQtyReasonFromNote(bkRows[0], sym);
+            }
             refreshResults();
             // Update revert button state based on divergence from AI snapshot
             if (revertBtn) {
                 const snap = uiState.aiSnapshot;
                 const snapVal = snap ? (isCost ? snap.costs[cat.key] : snap.benefits[cat.key]) : undefined;
-                const isDiff = snapVal != null && Math.round(parseFloat(e.target.value) || 0) !== Math.round(toDisplay(snapVal, cat.recurring));
+                const isDiff = snapVal != null && Math.round(typed) !== Math.round(toDisplay(snapVal, cat.recurring));
                 revertBtn.className = 'cba-revert-btn ' + (isDiff ? 'cba-revert-diff' : 'cba-revert-same');
             }
         });
@@ -869,55 +2130,156 @@
         }, `↩ ${sym}${Math.round(toDisplay(snapVal0, cat.recurring)).toLocaleString()}`) : null;
         if (revertBtn) topRow.appendChild(revertBtn);
 
-        // Breakdown toggle button (only show if breakdowns exist)
-        const bkRows = breakdowns[cat.key] || [];
+        // Breakdown toggle or split/calc button
         if (bkRows.length > 0) {
             const toggle = el('span', { className: `cba-bkdn-toggle text-${accentColor}-500` });
+            bkToggleEl = toggle;
             const arrow = el('span', {}, '▸');
+            bkToggleArrow = arrow;
             toggle.appendChild(arrow);
             toggle.appendChild(document.createTextNode('calc'));
             toggle.addEventListener('click', () => {
-                const panel = card.querySelector('.cba-bkdn-panel');
-                const isOpen = panel.classList.toggle('open');
-                arrow.textContent = isOpen ? '▾' : '▸';
-                if (!isOpen) panel.style.overflow = 'hidden';
-                else {
-                    panel.addEventListener('transitionend', () => {
-                        if (panel.classList.contains('open')) panel.style.overflow = 'auto';
-                    }, { once: true });
-                }
+                const nextOpen = !bkPanelRef || !bkPanelRef.classList.contains('open');
+                if (nextOpen) uiState.openCalcPanels[panelKey] = true;
+                else delete uiState.openCalcPanels[panelKey];
+                setBreakdownOpen(nextOpen);
             });
             topRow.appendChild(toggle);
+        } else {
+            const buildManualBreakdownFromTotal = () => {
+                const catType = isCost ? 'cost' : 'benefit';
+                const unitLabel = cat.recurring
+                    ? (uiState.recurringPeriod === 'month' ? 'per month' : 'per year')
+                    : 'one-off';
+
+                // Use rich template rows if available, else fall back to a single seeded row
+                const templateRows = (typeof CBA !== 'undefined' && CBA.buildTemplateRows)
+                    ? CBA.buildTemplateRows(catType, cat.key, unitLabel)
+                    : [];
+                const newRows = templateRows.length
+                    ? templateRows
+                    : seedManualBreakdownRows(
+                        cat,
+                        toDisplay(items[cat.key] || 0, cat.recurring),
+                        'Manual user split', '',
+                        'User-created row. Edit qty and rate to match your site figures.'
+                    );
+
+                // Persist to state directly
+                if (isCost) {
+                    if (!s.proposedMeasure.costBreakdowns) s.proposedMeasure.costBreakdowns = {};
+                    s.proposedMeasure.costBreakdowns[cat.key] = newRows;
+                } else {
+                    if (!s.benefits.breakdowns) s.benefits.breakdowns = {};
+                    s.benefits.breakdowns[cat.key] = newRows;
+                }
+
+                // Pre-fill the rationale with the template paragraph if the user has not
+                // written anything yet for this category
+                if (typeof CBA !== 'undefined' && CBA.getBreakdownParagraph) {
+                    const existing = (rationales[cat.key] || '').trim();
+                    if (!existing) {
+                        const para = CBA.getBreakdownParagraph(catType, cat.key);
+                        if (para) {
+                            // ratInp isn't built yet at this point — update state and let
+                            // renderPreservingView re-render it with the paragraph in place
+                            saveRationaleToState(para);
+                            if (isCost) s.proposedMeasure.costRationales[cat.key] = para;
+                            else s.benefits.rationales[cat.key] = para;
+                        }
+                    }
+                }
+
+                uiState.newBreakdownRow = { panelKey, rowIndex: 0 };
+                uiState.lastAddedRowHint = { panelKey, at: Date.now() };
+                renderPreservingView(panelKey, true);
+            };
+
+            const splitBtn = el('button', {
+                className: `cba-bkdn-toggle text-${accentColor}-500`,
+                title: 'Open calculations by converting this total into editable component rows',
+                onClick: buildManualBreakdownFromTotal
+            }, 'calc');
+            topRow.appendChild(splitBtn);
         }
         card.appendChild(topRow);
 
-        /* ── Rationale row ── */
+        /* ── Rationale row ──
+           Always an editable paragraph. Pre-filled from CBA.BREAKDOWN_TEMPLATES when
+           rows are first created via the "calc" button. After that the user owns it. */
         const ratColorClass = isCost ? 'cost-rationale' : 'ben-rationale';
+        const autoResize = (target) => { target.style.height = 'auto'; target.style.height = Math.max(36, target.scrollHeight) + 'px'; };
+
+        const saveRationaleToState = (text) => {
+            if (isCost) {
+                if (!s.proposedMeasure.costRationales) s.proposedMeasure.costRationales = {};
+                s.proposedMeasure.costRationales[cat.key] = text;
+            } else {
+                if (!s.benefits.rationales) s.benefits.rationales = {};
+                s.benefits.rationales[cat.key] = text;
+            }
+        };
+
         const ratInp = el('textarea', {
             className: `cba-rationale ${ratColorClass}`,
-            placeholder: isCost ? 'Add cost rationale or AI notes…' : 'Add benefit rationale or AI notes…',
+            placeholder: isCost ? 'Notes on why this cost is needed and how the figure was estimated…' : 'Notes on why this benefit is expected and how the figure was estimated…',
             rows: '2'
         });
         ratInp.value = rationales[cat.key] || '';
-        // Auto-resize on load and input
-        const autoResize = (el) => { el.style.height = 'auto'; el.style.height = Math.max(36, el.scrollHeight) + 'px'; };
+
         ratInp.addEventListener('input', (e) => {
             autoResize(e.target);
-            if (isCost) {
-                if (!s.proposedMeasure.costRationales) s.proposedMeasure.costRationales = {};
-                s.proposedMeasure.costRationales[cat.key] = e.target.value;
-            } else {
-                if (!s.benefits.rationales) s.benefits.rationales = {};
-                s.benefits.rationales[cat.key] = e.target.value;
-            }
+            saveRationaleToState(e.target.value);
         });
-        // Resize after appending to DOM
+        ratInp.addEventListener('paste', () => {
+            setTimeout(() => {
+                autoResize(ratInp);
+                // If no value yet, try to auto-fill total from a pasted number
+                const suggested = extractSuggestedDisplayValueFromRationale(ratInp.value);
+                if (suggested > 0 && !(toDisplay(items[cat.key] || 0, cat.recurring) > 0.5)) {
+                    items[cat.key] = toAnnual(suggested, cat.recurring);
+                    totalInp.value = String(Math.round(suggested));
+                    refreshResults();
+                }
+            }, 0);
+        });
+
         setTimeout(() => autoResize(ratInp), 0);
         card.appendChild(ratInp);
+
+        // Small clickable source chip under rationale text (if a source URL is available).
+        const sourceChipRow = el('div', { className: 'mt-1 flex items-center gap-2 flex-wrap' });
+        const refreshSourceChip = (rationaleText) => {
+            const meta = extractRationaleSourceMeta(rationaleText, bkRows);
+            sourceChipRow.innerHTML = '';
+            if (!meta.sourceUrl) return;
+
+            const chip = el('a', {
+                href: meta.sourceUrl,
+                target: '_blank',
+                rel: 'noopener noreferrer',
+                className: `inline-flex items-center gap-1 px-2 py-1 rounded-full border text-[11px] font-semibold ${isCost ? 'border-red-200 text-red-700 bg-red-50 hover:bg-red-100' : 'border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100'}`,
+                title: meta.sourceText || 'Open source'
+            }, meta.sourceLabel || 'Source');
+            sourceChipRow.appendChild(chip);
+
+            if (meta.sourceText) {
+                sourceChipRow.appendChild(el('span', {
+                    className: 'text-[10px] text-slate-500',
+                    style: 'max-width:80%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'
+                }, meta.sourceText));
+            }
+        };
+
+        refreshSourceChip(ratInp.value);
+        ratInp.addEventListener('input', (e) => refreshSourceChip(e.target.value));
+        card.appendChild(sourceChipRow);
 
         /* ── Breakdown panel (expandable) ── */
         if (bkRows.length > 0) {
             const bkPanel = el('div', { className: 'cba-bkdn-panel' });
+            bkPanelRef = bkPanel;
+            setBreakdownOpen(!!uiState.openCalcPanels[panelKey]);
 
             // Header row
             const hdrRow = el('div', { className: 'cba-bkdn-row', style: 'border-bottom:1px solid rgba(0,0,0,0.12);padding-bottom:4px;' });
@@ -927,10 +2289,78 @@
             hdrRow.appendChild(el('span', { className: 'text-[11px] text-slate-500 font-bold text-center uppercase' }, 'Rate'));
             hdrRow.appendChild(el('span', { className: 'text-slate-300 text-sm' }, '='));
             hdrRow.appendChild(el('span', { className: 'text-[11px] text-slate-500 font-bold text-center uppercase' }, 'Subtotal'));
+            hdrRow.appendChild(el('span', { className: 'text-[11px] text-slate-400 font-bold text-center uppercase' }, ''));
             bkPanel.appendChild(hdrRow);
 
+            const toolsRow = el('div', { className: 'flex justify-between mt-2 mb-1' });
+            // Clear & rebuild — wipes the rows for this card so user can start fresh with a clean calc
+            toolsRow.appendChild(el('button', {
+                className: 'text-[10px] font-semibold px-2 py-1 rounded border border-rose-200 bg-rose-50 text-rose-600 hover:bg-rose-100',
+                title: 'Remove all rows and reset to a single editable total for this item',
+                onClick: () => {
+                    if (!confirm('Clear all breakdown rows for this item?')) return;
+                    if (isCost) {
+                        if (s.proposedMeasure.costBreakdowns) delete s.proposedMeasure.costBreakdowns[cat.key];
+                    } else {
+                        if (s.benefits.breakdowns) delete s.benefits.breakdowns[cat.key];
+                    }
+                    renderPreservingView(panelKey, false);
+                }
+            }, '✕ Clear rows'));
+            toolsRow.appendChild(el('button', {
+                className: 'text-[10px] font-semibold px-2 py-1 rounded border border-slate-300 bg-white text-slate-600 hover:bg-slate-50',
+                onClick: () => {
+                    const newRowIndex = bkRows.length;
+                    bkRows.push({
+                        label: `Component ${bkRows.length + 1}`,
+                        qty: 0,
+                        qtyReason: 'User-defined component row.',
+                        rate: 0,
+                        unit: cat.recurring ? (uiState.recurringPeriod === 'month' ? 'per month' : 'per year') : 'one-off',
+                        source: 'Manual user split',
+                        sourceUrl: '',
+                        noteDetails: {
+                            definition: `Component ${bkRows.length + 1}`,
+                            basis: 'User-defined component row.',
+                            parameters: '',
+                            formula: 'Qty x Rate',
+                            autoParams: true
+                        }
+                    });
+                    syncRowQtyReasonFromNote(bkRows[bkRows.length - 1], sym);
+                    uiState.newBreakdownRow = { panelKey, rowIndex: newRowIndex };
+                    uiState.lastAddedRowHint = { panelKey, at: Date.now() };
+                    renderPreservingView(panelKey, true);
+                }
+            }, '+ Add row'));
+            bkPanel.appendChild(toolsRow);
+
+            let sumLabel = null;
+            const parameterEditors = {};
+            const qtyEditors = {};
+            const rateEditors = {};
+            const recalcFns = {};
+            const updateTotalFromBreakdown = () => {
+                const newTotal = bkRows.reduce((sum, br) => sum + ((br.qty || 0) * (br.rate || 0)), 0);
+                items[cat.key] = toAnnual(newTotal, cat.recurring);
+                totalInp.value = newTotal > 0 ? String(Math.round(newTotal)) : '';
+                if (sumLabel) sumLabel.textContent = `Σ ${sym}${Math.round(newTotal).toLocaleString()}`;
+                refreshResults();
+                if (revertBtn) {
+                    const snapV = snap0 ? (isCost ? snap0.costs[cat.key] : snap0.benefits[cat.key]) : undefined;
+                    const diff = snapV != null && Math.round(newTotal) !== Math.round(toDisplay(snapV, cat.recurring));
+                    revertBtn.className = 'cba-revert-btn ' + (diff ? 'cba-revert-diff' : 'cba-revert-same');
+                }
+            };
+
             bkRows.forEach((row, idx) => {
-                const bkRow = el('div', { className: 'cba-bkdn-row' });
+                syncRowQtyReasonFromNote(row, sym);
+                const explicitNew = !!uiState.newBreakdownRow && uiState.newBreakdownRow.panelKey === panelKey && uiState.newBreakdownRow.rowIndex === idx;
+                const hintedNew = !!uiState.lastAddedRowHint && uiState.lastAddedRowHint.panelKey === panelKey && (Date.now() - uiState.lastAddedRowHint.at) < 1500 && idx === (bkRows.length - 1);
+                const isNewlyAdded = explicitNew || hintedNew;
+                if (explicitNew) uiState.newBreakdownRow = null;
+                if (hintedNew) uiState.lastAddedRowHint = null;
+                const bkRow = el('div', { className: isNewlyAdded ? 'cba-bkdn-row cba-bkdn-row-enter' : 'cba-bkdn-row' });
 
                 // Label (editable)
                 const lblInp = el('input', {
@@ -939,16 +2369,32 @@
                     title: row.source || ''
                 });
                 lblInp.value = row.label || '';
-                lblInp.addEventListener('input', (e) => { bkRows[idx].label = e.target.value; });
+                lblInp.addEventListener('input', (e) => {
+                    bkRows[idx].label = e.target.value;
+                });
                 const lblWrap = el('div', { className: 'flex flex-col', style: { minWidth: 0, overflow: 'hidden' } });
                 lblWrap.appendChild(lblInp);
                 if (row.source) {
                     const srcTermId = termIdForSource(row.source);
-                    const srcEl = el('span', {
-                        className: 'cba-bkdn-src truncate' + (srcTermId ? ' cba-term-link' : ''),
-                        title: srcTermId ? 'Click to view definition in appendix' : row.source
-                    }, `📎 ${row.source}`);
-                    if (srcTermId) srcEl.addEventListener('click', (ev) => { ev.stopPropagation(); scrollToAppendixTerm(srcTermId); });
+                    const srcUrl = sourceUrlForText(row.source, row.sourceUrl);
+                    const srcEl = el('div', { className: 'cba-bkdn-src truncate flex items-center gap-2 flex-wrap', title: row.source }, `📎 ${row.source}`);
+                    if (srcUrl) {
+                        srcEl.appendChild(el('a', {
+                            href: srcUrl,
+                            target: '_blank',
+                            rel: 'noopener noreferrer',
+                            className: 'text-[10px] underline text-blue-600 hover:text-blue-700'
+                        }, 'Open source'));
+                    } else {
+                        srcEl.appendChild(el('span', {
+                            className: 'text-[10px] text-amber-700 bg-amber-100 border border-amber-200 rounded px-1.5 py-0.5'
+                        }, 'Unverified source'));
+                    }
+                    if (srcTermId) {
+                        const termLnk = el('span', { className: 'cba-term-link text-[10px]', title: 'View definition in appendix' }, 'Terms');
+                        termLnk.addEventListener('click', (ev) => { ev.stopPropagation(); scrollToAppendixTerm(srcTermId); });
+                        srcEl.appendChild(termLnk);
+                    }
                     lblWrap.appendChild(srcEl);
                 }
                 bkRow.appendChild(lblWrap);
@@ -957,6 +2403,7 @@
                 const qtyWrap = el('div', { className: 'flex flex-col items-center' });
                 const qtyInp = el('input', { type: 'number', className: 'cba-bkdn-inp', min: '0', step: 'any' });
                 qtyInp.value = row.qty || 0;
+                qtyEditors[idx] = qtyInp;
                 qtyWrap.appendChild(qtyInp);
                 bkRow.appendChild(qtyWrap);
 
@@ -965,6 +2412,7 @@
                 // Rate input
                 const rateInp = el('input', { type: 'number', className: 'cba-bkdn-inp', min: '0', step: 'any' });
                 rateInp.value = row.rate || 0;
+                rateEditors[idx] = rateInp;
                 bkRow.appendChild(rateInp);
 
                 bkRow.appendChild(el('span', { className: 'text-slate-400 text-xs font-bold text-center' }, '='));
@@ -978,55 +2426,252 @@
                     const r = parseFloat(rateInp.value) || 0;
                     bkRows[idx].qty = q;
                     bkRows[idx].rate = r;
-                    sub.textContent = `${sym}${Math.round(q * r).toLocaleString()}`;
-                    // Recalc total from all breakdown rows
-                    const newTotal = bkRows.reduce((sum, br) => sum + ((br.qty || 0) * (br.rate || 0)), 0);
-                    items[cat.key] = toAnnual(newTotal, cat.recurring);
-                    totalInp.value = Math.round(newTotal);
-                    sumLabel.textContent = `\u03A3 ${sym}${Math.round(newTotal).toLocaleString()}`;
-                    refreshResults();
-                    // Update revert button state when breakdown values change
-                    if (revertBtn) {
-                        const snapVb = snap0 ? (isCost ? snap0.costs[cat.key] : snap0.benefits[cat.key]) : undefined;
-                        const diff = snapVb != null && Math.round(newTotal) !== Math.round(toDisplay(snapVb, cat.recurring));
-                        revertBtn.className = 'cba-revert-btn ' + (diff ? 'cba-revert-diff' : 'cba-revert-same');
+                    syncRowQtyReasonFromNote(bkRows[idx], sym);
+                    if (parameterEditors[idx] && (bkRows[idx].noteDetails || {}).autoParams !== false) {
+                        parameterEditors[idx].value = getRowQtyNoteParts(bkRows[idx], sym).parameters;
                     }
+                    sub.textContent = `${sym}${Math.round(q * r).toLocaleString()}`;
+                    updateTotalFromBreakdown();
                 };
                 sub.textContent = `${sym}${Math.round((row.qty || 0) * (row.rate || 0)).toLocaleString()}`;
                 qtyInp.addEventListener('input', calcSub);
                 rateInp.addEventListener('input', calcSub);
+                recalcFns[idx] = calcSub;
                 bkRow.appendChild(sub);
+
+                const delBtn = el('button', {
+                    className: 'cba-bkdn-del',
+                    title: 'Remove this component row',
+                    onClick: () => {
+                        bkRows.splice(idx, 1);
+                        const hasRowsAfter = bkRows.length > 0;
+                        if (bkRows.length === 0) {
+                            delete breakdowns[cat.key];
+                            items[cat.key] = 0;
+                        } else {
+                            const remTotal = bkRows.reduce((sum, br) => sum + ((br.qty || 0) * (br.rate || 0)), 0);
+                            items[cat.key] = toAnnual(remTotal, cat.recurring);
+                        }
+                        renderPreservingView(panelKey, hasRowsAfter);
+                    }
+                }, '✕');
+                bkRow.appendChild(delBtn);
 
                 bkPanel.appendChild(bkRow);
             });
 
-            // Unit summary under breakdown
+            // Unit summary + formula under breakdown
             const unitRow = el('div', { className: 'flex justify-between items-center mt-2 pt-2 border-t border-dashed border-slate-200' });
-            const units = bkRows.map(r => r.unit).filter(Boolean).join(', ');
-            if (units) unitRow.appendChild(el('span', { className: 'text-xs text-slate-400' }, `Units: ${units}`));
-            const sumLabel = el('span', { className: `text-xs font-bold ${isCost ? 'text-red-500' : 'text-emerald-500'}` });
+            const units = [...new Set(bkRows.map(r => r.unit).filter(Boolean))].join(' / ');
+            if (units) unitRow.appendChild(el('span', { className: 'text-xs text-slate-400' }, `Unit: ${units}`));
+            sumLabel = el('span', { className: `text-xs font-bold ${isCost ? 'text-red-500' : 'text-emerald-500'}` });
             sumLabel.textContent = `Σ ${sym}${Math.round(bkRows.reduce((s, r) => s + (r.qty || 0) * (r.rate || 0), 0)).toLocaleString()}`;
             unitRow.appendChild(sumLabel);
             bkPanel.appendChild(unitRow);
 
+            // Formula summary — compact expression built from row data
+            const formulaDiv = el('div', {
+                className: 'mt-2 p-2 rounded-lg text-[11px] font-mono text-slate-500 bg-slate-50 border border-slate-100 leading-relaxed',
+                style: 'white-space:pre-wrap;word-break:break-word;'
+            });
+            const refreshFormulaDiv = () => {
+                const expr = bkRows.map(r => {
+                    const qty  = Number(r.qty)  || 0;
+                    const rate = Number(r.rate) || 0;
+                    const lbl  = String((r.noteDetails && r.noteDetails.definition) || r.label || 'Component').trim();
+                    return qty === 1
+                        ? `${lbl}: ${sym}${Math.round(rate).toLocaleString()}`
+                        : `${lbl}: ${qty} × ${sym}${Math.round(rate).toLocaleString()} = ${sym}${Math.round(qty * rate).toLocaleString()}`;
+                }).join('\n');
+                const total = bkRows.reduce((s, r) => s + (Number(r.qty) || 0) * (Number(r.rate) || 0), 0);
+                formulaDiv.textContent = expr + `\n─────────────────\nTotal: ${sym}${Math.round(total).toLocaleString()}`;
+            };
+            refreshFormulaDiv();
+            bkPanel.appendChild(formulaDiv);
+            // Keep formula div in sync when rows change
+            const _origUpdateTotal = updateTotalFromBreakdown;
+            // Patch updateTotalFromBreakdown to also refresh the formula div
+            // We do this by wrapping via a closure-level override
+            Object.defineProperty(bkPanel, '_refreshFormula', { value: refreshFormulaDiv, writable: true });
+            bkPanel.addEventListener('input', () => { refreshFormulaDiv(); });
+
             // Quantity notes footer — shows qtyReason for each row
-            const reasons = bkRows.filter(r => r.qtyReason);
+            const reasons = bkRows
+                .map((row, rowIndex) => ({ row, rowIndex }))
+                .filter(({ row }) => !!(row.qtyReason || row.noteDetails));
             if (reasons.length > 0) {
                 const notesDiv = el('div', { className: 'cba-bkdn-notes' });
-                notesDiv.appendChild(el('span', { className: 'text-[10px] font-semibold text-slate-500 uppercase tracking-wide not-italic' }, 'Quantity notes:'));
-                reasons.forEach(noteRow => {
-                    const line = el('div', { className: 'flex items-start gap-1.5 mt-0.5' });
-                    line.appendChild(el('span', { className: 'not-italic text-slate-400' }, '•'));
-                    const txt = el('span', {});
-                    txt.appendChild(document.createTextNode(`${noteRow.label}: ${noteRow.qtyReason}`));
-                    const noteTermId = termIdForSource(noteRow.source);
-                    if (noteTermId && noteRow.source) {
-                        txt.appendChild(document.createTextNode(' — '));
-                        const lnk = el('span', { className: 'cba-term-link', title: 'View in appendix' }, noteRow.source);
-                        lnk.addEventListener('click', (ev) => { ev.stopPropagation(); scrollToAppendixTerm(noteTermId); });
-                        txt.appendChild(lnk);
+                const notesHead = el('div', { className: 'cba-bkdn-notes-head' });
+                notesHead.appendChild(el('span', { className: 'cba-bkdn-notes-title' }, 'Quantity notes'));
+                notesHead.appendChild(el('span', { className: 'cba-bkdn-notes-help' }, 'Edit each assumption clearly and keep source evidence linked.'));
+                notesDiv.appendChild(notesHead);
+                reasons.forEach(({ row: noteRow, rowIndex }) => {
+                    syncRowQtyReasonFromNote(noteRow, sym);
+                    const note = getRowQtyNoteParts(noteRow, sym);
+                    const line = el('div', { className: 'cba-note-item' });
+                    const head = el('div', { className: 'cba-note-head' });
+                    head.appendChild(el('div', { className: 'cba-note-title' }, noteRow.label || 'Component note'));
+                    const liveSubtotal = Math.round((Number(noteRow.qty) || 0) * (Number(noteRow.rate) || 0));
+                    const subtotalBadge = el('span', { className: 'cba-note-badge' }, `${sym}${liveSubtotal.toLocaleString()}`);
+                    head.appendChild(subtotalBadge);
+                    line.appendChild(head);
+
+                    const fieldGrid = el('div', { className: 'cba-note-grid' });
+
+                    const buildField = (labelText, controlEl, wide) => {
+                        const field = el('div', { className: `cba-note-field${wide ? ' cba-note-field-wide' : ''}` });
+                        field.appendChild(el('label', { className: 'cba-note-label' }, labelText));
+                        field.appendChild(controlEl);
+                        return field;
+                    };
+
+                    const defInp = el('input', {
+                        type: 'text',
+                        className: 'cba-note-edit',
+                        value: note.definition || noteRow.label || ''
+                    });
+                    defInp.addEventListener('input', (e) => {
+                        noteRow.noteDetails = noteRow.noteDetails || {};
+                        noteRow.noteDetails.definition = e.target.value;
+                        syncRowQtyReasonFromNote(noteRow, sym);
+                    });
+                    fieldGrid.appendChild(buildField('Definition', defInp, false));
+
+                    const basisInp = el('textarea', {
+                        className: 'cba-note-edit',
+                        rows: '2'
+                    });
+                    basisInp.value = note.basis || '';
+                    basisInp.addEventListener('input', (e) => {
+                        noteRow.noteDetails = noteRow.noteDetails || {};
+                        noteRow.noteDetails.basis = e.target.value;
+                        syncRowQtyReasonFromNote(noteRow, sym);
+                    });
+                    fieldGrid.appendChild(buildField('Basis', basisInp, true));
+
+                    const figWrap = el('div', { className: 'cba-note-inline' });
+                    const figQtyWrap = el('div', { className: 'cba-note-mini' });
+                    figQtyWrap.appendChild(el('span', { className: 'cba-note-mini-label' }, 'Qty'));
+                    const figQty = el('input', {
+                        type: 'number',
+                        className: 'cba-note-edit',
+                        min: '0',
+                        step: 'any',
+                        placeholder: 'Qty',
+                        value: noteRow.qty || 0
+                    });
+                    figQtyWrap.appendChild(figQty);
+
+                    const figRateWrap = el('div', { className: 'cba-note-mini' });
+                    figRateWrap.appendChild(el('span', { className: 'cba-note-mini-label' }, 'Rate'));
+                    const figRate = el('input', {
+                        type: 'number',
+                        className: 'cba-note-edit',
+                        min: '0',
+                        step: 'any',
+                        placeholder: 'Rate',
+                        value: noteRow.rate || 0
+                    });
+                    figRateWrap.appendChild(figRate);
+                    figQty.addEventListener('input', (e) => {
+                        noteRow.qty = parseFloat(e.target.value) || 0;
+                        if (qtyEditors[rowIndex]) qtyEditors[rowIndex].value = noteRow.qty;
+                        if (rateEditors[rowIndex]) rateEditors[rowIndex].value = noteRow.rate;
+                        if (recalcFns[rowIndex]) recalcFns[rowIndex]();
+                        subtotalBadge.textContent = `${sym}${Math.round((noteRow.qty || 0) * (noteRow.rate || 0)).toLocaleString()}`;
+                    });
+                    figRate.addEventListener('input', (e) => {
+                        noteRow.rate = parseFloat(e.target.value) || 0;
+                        if (qtyEditors[rowIndex]) qtyEditors[rowIndex].value = noteRow.qty;
+                        if (rateEditors[rowIndex]) rateEditors[rowIndex].value = noteRow.rate;
+                        if (recalcFns[rowIndex]) recalcFns[rowIndex]();
+                        subtotalBadge.textContent = `${sym}${Math.round((noteRow.qty || 0) * (noteRow.rate || 0)).toLocaleString()}`;
+                    });
+                    figWrap.appendChild(figQtyWrap);
+                    figWrap.appendChild(figRateWrap);
+                    fieldGrid.appendChild(buildField('Figures', figWrap, true));
+
+                    const pInp = el('textarea', {
+                        className: 'cba-note-edit',
+                        rows: '2'
+                    });
+                    pInp.value = note.parameters || '';
+                    parameterEditors[rowIndex] = pInp;
+                    pInp.addEventListener('input', (e) => {
+                        noteRow.noteDetails = noteRow.noteDetails || {};
+                        noteRow.noteDetails.parameters = e.target.value;
+                        noteRow.noteDetails.autoParams = false;
+                        syncRowQtyReasonFromNote(noteRow, sym);
+                    });
+                    const pWrap = el('div', { className: 'cba-note-field cba-note-field-wide' });
+                    pWrap.appendChild(el('label', { className: 'cba-note-label' }, 'Parameters'));
+                    pWrap.appendChild(pInp);
+                    const pTools = el('div', { className: 'cba-note-tools' });
+                    pTools.appendChild(el('button', {
+                        className: 'cba-note-sync-btn',
+                        onClick: () => {
+                            noteRow.noteDetails = noteRow.noteDetails || {};
+                            noteRow.noteDetails.autoParams = true;
+                            noteRow.noteDetails.parameters = '';
+                            syncRowQtyReasonFromNote(noteRow, sym);
+                            pInp.value = getRowQtyNoteParts(noteRow, sym).parameters;
+                        }
+                    }, 'Sync with Qty x Rate'));
+                    pWrap.appendChild(pTools);
+                    fieldGrid.appendChild(pWrap);
+
+                    const fInp = el('input', {
+                        type: 'text',
+                        className: 'cba-note-edit',
+                        value: note.formula || 'Qty x Rate'
+                    });
+                    fInp.addEventListener('input', (e) => {
+                        noteRow.noteDetails = noteRow.noteDetails || {};
+                        noteRow.noteDetails.formula = e.target.value;
+                        syncRowQtyReasonFromNote(noteRow, sym);
+                    });
+                    fieldGrid.appendChild(buildField('Formula', fInp, false));
+
+                    const srcInp = el('input', {
+                        type: 'text',
+                        className: 'cba-note-edit',
+                        value: noteRow.source || ''
+                    });
+                    srcInp.addEventListener('input', (e) => {
+                        noteRow.source = e.target.value;
+                    });
+                    fieldGrid.appendChild(buildField('Source', srcInp, false));
+
+                    const srcUrlInp = el('input', {
+                        type: 'url',
+                        className: 'cba-note-edit',
+                        value: noteRow.sourceUrl || sourceUrlForText(noteRow.source, noteRow.sourceUrl) || ''
+                    });
+                    srcUrlInp.addEventListener('input', (e) => {
+                        noteRow.sourceUrl = e.target.value;
+                    });
+                    fieldGrid.appendChild(buildField('Source URL', srcUrlInp, false));
+
+                    const noteSrcUrl = sourceUrlForText(noteRow.source, noteRow.sourceUrl);
+                    if (noteSrcUrl) {
+                        const srcLinkRow = el('div', { className: 'cba-note-field cba-note-field-wide' });
+                        srcLinkRow.appendChild(el('a', {
+                            href: noteSrcUrl,
+                            target: '_blank',
+                            rel: 'noopener noreferrer',
+                            className: 'cba-note-source-link'
+                        }, 'Open source'));
+                        fieldGrid.appendChild(srcLinkRow);
                     }
-                    line.appendChild(txt);
+
+                    const ctxLines = getSourceContextLines(noteRow.source, noteRow.qtyReason);
+                    if (ctxLines.length > 0) {
+                        const ctx = el('div', { className: 'cba-note-context cba-note-field-wide' }, `Context: ${ctxLines.join(' ')}`);
+                        fieldGrid.appendChild(ctx);
+                    }
+
+                    line.appendChild(fieldGrid);
+
                     notesDiv.appendChild(line);
                 });
                 bkPanel.appendChild(notesDiv);
@@ -1044,7 +2689,9 @@
     function renderAnalyze() {
         const s = E.getState();
         const sym = currencySymbol();
-        const wrap = el('div', { className: 'space-y-4 cba-fade' });
+        const noFade = !!uiState.suppressNextAnalyzeFade;
+        uiState.suppressNextAnalyzeFade = false;
+        const wrap = el('div', { className: noFade ? 'space-y-4' : 'space-y-4 cba-fade' });
 
         /* Header bar: back + title + currency dropdown */
         const hdr = el('div', { className: 'flex items-center gap-3 flex-wrap' });
@@ -1064,6 +2711,22 @@
         }
 
         wrap.appendChild(renderCurrentRiskSummary());
+
+        /* Manual workflow banner */
+        if (s.mode === 'manual') {
+            const manBanner = el('div', { className: 'flex items-start gap-3 px-4 py-3 bg-violet-50 border border-violet-200 rounded-xl text-sm text-violet-800' });
+            manBanner.appendChild(el('span', { className: 'text-xl flex-shrink-0' }, '✏️'));
+            const manBannerText = el('div', { className: 'flex-1' });
+            manBannerText.appendChild(el('b', {}, 'Manual Workflow — '));
+            manBannerText.appendChild(document.createTextNode(
+                'Enter the control measure below, then type your own cost & benefit figures directly into the table. ' +
+                'All fields are editable. Use the '
+            ));
+            manBannerText.appendChild(el('b', {}, '🤖 AI Estimate'));
+            manBannerText.appendChild(document.createTextNode(' button at any time to have AI fill in suggested values — you can then accept, adjust, or override them freely.'));
+            manBanner.appendChild(manBannerText);
+            wrap.appendChild(manBanner);
+        }
 
         /* Measure description */
         wrap.appendChild(el('div', { className: 'space-y-1' },
@@ -1197,13 +2860,13 @@
             const calloutText = el('div');
             if (bmeta.refreshedAt && !isStale) {
                 calloutText.appendChild(el('b', {}, 'Baselines up to date'));
-                calloutText.appendChild(document.createTextNode(` — calibrated for ${bmeta.location || 'US defaults'}, refreshed ${new Date(bmeta.refreshedAt).toLocaleDateString()}`));
+                calloutText.appendChild(document.createTextNode(` — calibrated for ${bmeta.location || 'Luxembourg defaults'}, refreshed ${new Date(bmeta.refreshedAt).toLocaleDateString()}`));
             } else if (bmeta.refreshedAt && isStale) {
                 calloutText.appendChild(el('b', {}, 'Baselines may be outdated'));
                 calloutText.appendChild(document.createTextNode(` — last refreshed ${new Date(bmeta.refreshedAt).toLocaleDateString()}. Click Refresh to update AI anchors.`));
             } else {
-                calloutText.appendChild(el('b', {}, 'Using factory OSHA/BLS defaults'));
-                calloutText.appendChild(document.createTextNode(' — click Refresh Baselines to calibrate values for your location.'));
+                calloutText.appendChild(el('b', {}, 'Using factory Luxembourg defaults'));
+                calloutText.appendChild(document.createTextNode(' — click Refresh Baselines to update figures from the latest Luxembourg sources.'));
             }
             callout.appendChild(calloutText);
             aiSection.appendChild(callout);
@@ -1215,12 +2878,218 @@
         const refreshBtn = el('button', {
             className: 'rab-btn rab-c-slate text-xs',
             disabled: uiState.baselineRefreshing || uiState.aiLoading,
-            title: 'AI researches current OSHA/BLS/HSE benchmarks for your location and stores them as calibration anchors for cost estimation.',
+            title: 'AI researches current Luxembourg AAA/MDE/ITM/STATEC benchmarks and stores them as calibration anchors for cost estimation.',
             onClick: async () => { await runBaselineRefresh(s, uiState.aiModel); }
         });
         if (uiState.baselineRefreshing) { refreshBtn.appendChild(svgSpinner(14,'#475569')); refreshBtn.appendChild(document.createTextNode(' Refreshing…')); }
-        else { refreshBtn.appendChild(document.createTextNode('🔬 Refresh Baselines')); }
+        else { refreshBtn.appendChild(document.createTextNode('🔬 Refresh Baselines (AI)')); }
         btnRow.appendChild(refreshBtn);
+
+        const manualBaselineBtn = el('button', {
+            className: 'rab-btn rab-c-amber text-xs',
+            disabled: uiState.aiLoading || uiState.baselineRefreshing,
+            title: 'Manually view and edit all Luxembourg baseline figures without AI.',
+            onClick: () => { uiState.baselineBackStep = 'analyze'; step = 'baselines'; render(); }
+        }, '✏️ Edit Manually');
+        btnRow.appendChild(manualBaselineBtn);
+
+        /* ── Apply Baseline to Table button ── */
+        if (B) {
+            const applyBaselineBtn = el('button', {
+                className: 'rab-btn rab-c-violet text-xs',
+                disabled: uiState.aiLoading || uiState.baselineRefreshing,
+                title: 'Pre-fills the benefit table with Luxembourg baseline figures for the current risk severity. You can edit any value afterwards.',
+                onClick: () => {
+                    const sevValue = normalizeScaleValue('severity', s.currentRisk.severity || 1, 1);
+                    const sevBand = toBaselineSeverityLevel(sevValue);
+                    const sev = String(sevBand);
+                    const bundle = B.getSeverityBundle(sev);
+
+                    // Check if any benefit items are already set — ask before overwriting
+                    const hasExisting = Object.values(s.benefits.items).some(v => v && v !== 0);
+                    if (hasExisting && !confirm(
+                        'This will overwrite your current benefit figures with Luxembourg baseline values for Severity S=' + formatScaleValue(sevValue) + ' (mapped to baseline level ' + sevBand + ').\n\nContinue?'
+                    )) return;
+
+                    const inj = bundle.injuryCostPerCase || {};
+                    const med = bundle.medicalCostUSD || {};
+                    const reg = bundle.regulatoryFineUSD || {};
+                    const day = bundle.daysAwayFromWork || {};
+                    const injuryTotal = Math.max(0, inj.value || 0);
+                    const directMedical = Math.max(0, med.value || 0);
+                    const indirectOverhead = Math.max(0, injuryTotal - directMedical);
+
+                    // ── Map baseline metrics → benefit categories ──
+                    // injuryCost  = non-medical impact only (all-in iceberg minus direct medical)
+                    s.benefits.items.injuryCost  = indirectOverhead;
+                    // medical     = direct AAA-covered medical cost per case
+                    s.benefits.items.medical     = directMedical;
+                    // regulatory  = ITM fine risk per violation
+                    s.benefits.items.regulatory  = reg.value || 0;
+                    // manhours    = days away from work × 8 hrs × avg hourly wage
+                    const days = day.value || 0;
+                    const wage = uiState.avgHourlyWage || 28; // STATEC median €28/hr
+                    s.benefits.items.manhours = Math.round(days * 8 * wage);
+                    // insurance   = AAA Bonus-Malus % change is a ratio; set 0 (requires payroll to compute)
+                    // Leave insurance as-is — too payroll-dependent to auto-fill
+                    // Store rationales so user can see where each value came from
+                    s.benefits.rationales = s.benefits.rationales || {};
+                    s.benefits.rationales.injuryCost  =
+                        `Non-medical injury impact benchmark (Severity ${sev})\n` +
+                        `What: Productivity, admin and insurance-effect savings per prevented case, excluding direct medical/statutory compensation.\n` +
+                        `Value: ${sym}${formatNum(indirectOverhead)} per case (= all-in ${sym}${formatNum(injuryTotal)} - direct medical ${sym}${formatNum(directMedical)}).\n` +
+                        `Why this value: Derived from Luxembourg iceberg baseline to avoid double counting with Medical Cost Savings. ${inj.rationaleFormula || inj.notes || 'Luxembourg baseline evidence.'}\n` +
+                        `Source: ${inj.source || 'Luxembourg baseline'}${inj.sourceUrl ? '\nSource link: Source' : ''}`;
+
+                    s.benefits.rationales.medical     =
+                        `Direct medical cost benchmark for (Severity ${sev} case)\n` +
+                        `What: Hospital/treatment and statutory medical compensation for one recognized case.\n` +
+                        `Value: ${sym}${formatNum(med.value || 0)} per case.\n` +
+                        `Why this value: ${med.rationaleFormula || med.notes || 'Luxembourg baseline evidence.'}\n` +
+                        `Context: AAA means Association d'Assurance Accident, Luxembourg's workplace accident insurer.\n` +
+                        `Source: ${med.source || 'Luxembourg baseline'}${med.sourceUrl ? '\nSource link: Source' : ''}`;
+
+                    s.benefits.rationales.regulatory  =
+                        `Regulatory exposure benchmark (Severity ${sev})\n` +
+                        `What: Expected enforcement/fine exposure for a serious violation event.\n` +
+                        `Value: ${sym}${formatNum(reg.value || 0)} per violation.\n` +
+                        `Why this value: ${reg.rationaleFormula || reg.notes || 'Luxembourg baseline evidence.'}\n` +
+                        `Context: ITM means Inspection du Travail et des Mines (Luxembourg labour inspectorate).\n` +
+                        `Source: ${reg.source || 'Luxembourg baseline'}${reg.sourceUrl ? '\nSource link: Source' : ''}`;
+
+                    s.benefits.rationales.manhours    =
+                        `Labour-time recovery benchmark (Severity ${sev})\n` +
+                        `What: Work-hours recovered when this case is avoided.\n` +
+                        `Value: ${days || 0} day(s) x 8 hour/day x ${sym}${formatNum(wage)}/hour = ${sym}${formatNum(Math.round(days * 8 * wage))}.\n` +
+                        `Why this value: Based on severity-level days-away profile and selected wage.\n` +
+                        `Source: ${day.source || 'Luxembourg baseline'}${day.sourceUrl ? '\nSource link: Source' : ''}`;
+
+                    // Pre-build editable split rows so users can immediately tune each component.
+                    const hoursRecovered = Math.max(0, Math.round(days * 8));
+                    const sevLabelForNotes = `Severity S=${formatScaleValue(sevValue)} (baseline level ${sevBand}: ${baselineSeverityName(sevBand)})`;
+                    const inc = bundle.incidentRates || {};
+                    const incRate = Math.max(0, parseFloat(inc.value) || 0);
+                    const hoursPerCase = incRate > 0 ? Math.round((100 * 2080) / incRate) : null;
+                    const incidenceNarrative = incRate > 0
+                        ? `${incRate} case(s) per 100 FTE-year (approximately 1 case per ${formatNum(hoursPerCase)} man-hours worked)`
+                        : 'no validated incident-rate anchor available in the current baseline';
+
+                    s.benefits.breakdowns = s.benefits.breakdowns || {};
+                    
+                    // Medical Cost template injection
+                    try {
+                        const medRows = CBA.buildTemplateRows('benefit', 'medical', 'per year');
+                        if (medRows && medRows.length > 0) {
+                            medRows[0].qty = (med.value || 0) > 0 ? 1 : 0;
+                            medRows[0].rate = med.value || 0;
+                            s.benefits.breakdowns.medical = medRows;
+                        }
+                    } catch(e) {}
+
+                    // Regulatory Cost template injection
+                    try {
+                        const regRows = CBA.buildTemplateRows('benefit', 'regulatory', 'one-off');
+                        if (regRows && regRows.length > 0) {
+                            regRows[0].qty = (reg.value || 0) > 0 ? 1 : 0;
+                            regRows[0].rate = reg.value || 0;
+                            s.benefits.breakdowns.regulatory = regRows;
+                        }
+                    } catch(e) {}
+
+                    // Manhours template injection
+                    try {
+                        const mhRows = CBA.buildTemplateRows('benefit', 'manhours', 'per year');
+                        if (mhRows && mhRows.length > 0) {
+                            mhRows[0].qty = hoursRecovered;
+                            mhRows[0].rate = wage;
+                            s.benefits.breakdowns.manhours = mhRows;
+                        }
+                    } catch(e) {}
+
+                    // Injury Cost template injection
+                    try {
+                        const injRows = CBA.buildTemplateRows('benefit', 'injuryCost', 'per year');
+                        if (injRows && injRows.length > 0) {
+                            const formula = inj.rationaleFormula || '';
+                            let parsedSuccessfully = false;
+                            
+                            if (formula.includes('+') && formula.includes('=')) {
+                                const eqSplit = formula.split('=');
+                                const parts = eqSplit[0].split('+');
+                                let parsedRows = [];
+                                
+                                parts.forEach(part => {
+                                    // Match all currency amounts in the part
+                                    const regex = /[€\\$£]\s*([\d,.]+)/g;
+                                    let match;
+                                    let lastMatch = null;
+                                    while ((match = regex.exec(part)) !== null) {
+                                        lastMatch = match;
+                                    }
+                                    
+                                    if (lastMatch) {
+                                        const lbl = part.substring(0, lastMatch.index).replace(/^Direct\s+/i, '').trim();
+                                        const val = parseFloat(lastMatch[1].replace(/,/g, ''));
+                                        if (val > 0) {
+                                            parsedRows.push({ lbl, val });
+                                        }
+                                    }
+                                });
+                                
+                                if (parsedRows.length > 1) {
+                                    parsedSuccessfully = true;
+                                    // Map parsedRows into injRows
+                                    let targetIdx = 0;
+                                    parsedRows.forEach(pr => {
+                                        if (targetIdx < injRows.length) {
+                                            injRows[targetIdx].label = pr.lbl || injRows[targetIdx].label;
+                                            injRows[targetIdx].qty = 1;
+                                            injRows[targetIdx].rate = pr.val;
+                                            targetIdx++;
+                                        } else {
+                                            const newRow = JSON.parse(JSON.stringify(injRows[injRows.length-1]));
+                                            newRow.label = pr.lbl;
+                                            newRow.qty = 1;
+                                            newRow.rate = pr.val;
+                                            newRow.noteDetails.definition = 'From baseline: ' + pr.lbl;
+                                            injRows.push(newRow);
+                                        }
+                                    });
+                                }
+                            }
+                            
+                            if (!parsedSuccessfully) {
+                                // Fallback if no clean parse
+                                injRows[0].qty = indirectOverhead > 0 ? 1 : 0;
+                                injRows[0].rate = indirectOverhead;
+                            }
+                            
+                            s.benefits.breakdowns.injuryCost = injRows;
+                        }
+                    } catch(e) {}
+
+                    normalizeInjuryMedicalBenefitSeparation(s);
+
+                    uiState.baselineApplied = true;
+                    render();
+                }
+            }, '📊 Apply Baseline to Table');
+            btnRow.appendChild(applyBaselineBtn);
+        }
+
+        // Show a dismissable confirmation strip after baseline was applied
+        if (uiState.baselineApplied) {
+            const strip = el('div', { className: 'flex items-center gap-2 text-xs bg-violet-50 border border-violet-200 text-violet-800 rounded-lg px-3 py-2 mt-1' });
+            strip.appendChild(el('span', { className: 'font-semibold' }, '✅ Baseline figures applied'));
+            const sevValue = normalizeScaleValue('severity', s.currentRisk.severity || 1, 1);
+            const sevBand = toBaselineSeverityLevel(sevValue);
+            strip.appendChild(document.createTextNode(` — Severity S=${formatScaleValue(sevValue)} mapped to baseline level ${sevBand} (${baselineSeverityName(sevBand)}) values pre-filled into Injury Cost, Medical, Regulatory Fine & Man-Hours with editable split rows. Insurance requires your payroll figure. Edit any value freely.`));
+            strip.appendChild(el('button', {
+                className: 'ml-auto text-violet-400 hover:text-violet-700 font-bold',
+                onClick: () => { uiState.baselineApplied = false; render(); }
+            }, '✕'));
+            aiSection.appendChild(strip);
+        }
 
         const aiBtn = el('button', {
             className: 'rab-btn rab-c-blue text-xs', disabled: uiState.aiLoading || uiState.baselineRefreshing,
@@ -1229,7 +3098,8 @@
                 uiState.aiLoading = true; uiState.aiError = null; render();
                 try {
                     const locStr = s.location.country ? `${s.location.region ? s.location.region + ', ' : ''}${s.location.country}` : '';
-                    const baselineCtx = B ? B.buildPromptContext(s.currentRisk.severity, s.location.currency) : '';
+                    const severityBand = toBaselineSeverityLevel(s.currentRisk.severity || 1);
+                    const baselineCtx = B ? B.buildPromptContext(severityBand, s.location.currency) : '';
                     const extraCtx = {
                         processFrequencyPerWeek: uiState.processFrequencyPerWeek || null,
                         processTimeMinutesPerTask: uiState.processTimeMinutesPerTask || null,
@@ -1239,11 +3109,30 @@
                     const est = await A.estimateCosts(s.currentRisk, s.proposedMeasure.description, locStr, s.location.currency, uiState.aiModel, extraCtx);
                     if (est.costs) Object.entries(est.costs).forEach(([k, v]) => { s.proposedMeasure.costItems[k] = v; });
                     if (est.costRationales) s.proposedMeasure.costRationales = est.costRationales;
-                    if (est.costBreakdowns) s.proposedMeasure.costBreakdowns = est.costBreakdowns;
+                    if (est.costBreakdowns) {
+                        Object.keys(est.costBreakdowns).forEach(k => {
+                            est.costBreakdowns[k].forEach(row => {
+                                if(!row.noteDetails) row.noteDetails = { definition: row.label || '', basis: 'AI Estimated', autoParams: true };
+                            });
+                        });
+                        s.proposedMeasure.costBreakdowns = est.costBreakdowns;
+                    }
                     if (est.benefits) { Object.entries(est.benefits).forEach(([k, v]) => { s.benefits.items[k] = v; }); s.benefits.aiEstimates = est; }
                     if (est.benefitRationales) s.benefits.rationales = est.benefitRationales;
-                    if (est.benefitBreakdowns) s.benefits.breakdowns = est.benefitBreakdowns;
-                    if (est.projectedRisk) { s.projectedRisk.frequency = est.projectedRisk.frequency || 1; s.projectedRisk.severity = est.projectedRisk.severity || 1; s.projectedRisk.likelihood = est.projectedRisk.likelihood || 1; }
+                    if (est.benefitBreakdowns) {
+                        Object.keys(est.benefitBreakdowns).forEach(k => {
+                            est.benefitBreakdowns[k].forEach(row => {
+                                if(!row.noteDetails) row.noteDetails = { definition: row.label || '', basis: 'AI Estimated', autoParams: true };
+                            });
+                        });
+                        s.benefits.breakdowns = est.benefitBreakdowns;
+                    }
+                    normalizeInjuryMedicalBenefitSeparation(s);
+                    if (est.projectedRisk) {
+                        s.projectedRisk.frequency = normalizeScaleValue('frequency', est.projectedRisk.frequency, s.projectedRisk.frequency || 1);
+                        s.projectedRisk.severity = normalizeScaleValue('severity', est.projectedRisk.severity, s.projectedRisk.severity || 1);
+                        s.projectedRisk.likelihood = normalizeScaleValue('likelihood', est.projectedRisk.likelihood, s.projectedRisk.likelihood || 1);
+                    }
                     uiState.aiNotes = est.notes || '';
                     // Store AI snapshot for revert
                     uiState.aiSnapshot = {
@@ -1278,6 +3167,21 @@
             }, 1000);
         } else { aiBtn.appendChild(document.createTextNode('🤖 AI Estimate Costs & Benefits')); }
         btnRow.appendChild(aiBtn);
+
+        const helperBtn = el('button', {
+            className: 'rab-btn rab-c-indigo text-xs',
+            disabled: uiState.aiLoading || uiState.baselineRefreshing || uiState.summaryLoading,
+            title: 'Generates a beginner-friendly executive summary using hazard/risk and current table entries.',
+            onClick: async () => { await runExecutiveSummaryHelper(s); }
+        });
+        if (uiState.summaryLoading) {
+            helperBtn.appendChild(svgSpinner(14, '#fff'));
+            helperBtn.appendChild(document.createTextNode(' Building helper...'));
+        } else {
+            helperBtn.appendChild(document.createTextNode('📘 Executive Summary Helper'));
+        }
+        btnRow.appendChild(helperBtn);
+
         aiSection.appendChild(btnRow);
 
         if (uiState.aiError) aiSection.appendChild(el('div', { className: 'text-xs text-red-600 bg-red-50 border border-red-200 rounded p-2 mt-2' }, uiState.aiError));
@@ -1290,7 +3194,7 @@
         const periodLabel = uiState.recurringPeriod === 'month' ? '/mo' : '/yr';
 
         /* LEFT: COSTS (Red theme) */
-        const costPanel = el('div', { className: 'cba-panel cba-cost-panel cba-fade cba-fade-d1' + (uiState.aiLoading ? ' cba-panel-ai-loading' : '') });
+        const costPanel = el('div', { className: 'cba-panel cba-cost-panel' + (noFade ? '' : ' cba-fade cba-fade-d1') + (uiState.aiLoading ? ' cba-panel-ai-loading' : '') });
         const costHdr = el('div', { className: 'flex items-center justify-between mb-3 flex-wrap gap-2' });
         costHdr.appendChild(el('h5', { className: 'text-sm font-bold text-red-700 uppercase tracking-wider' }, '💰 Costs'));
         const costHdrRight = el('div', { className: 'flex items-center gap-2' });
@@ -1311,7 +3215,7 @@
         twoCols.appendChild(costPanel);
 
         /* RIGHT: BENEFITS (Green theme) */
-        const benPanel = el('div', { className: 'cba-panel cba-benefit-panel cba-fade cba-fade-d2' + (uiState.aiLoading ? ' cba-panel-ai-loading' : '') });
+        const benPanel = el('div', { className: 'cba-panel cba-benefit-panel' + (noFade ? '' : ' cba-fade cba-fade-d2') + (uiState.aiLoading ? ' cba-panel-ai-loading' : '') });
         const benHdr = el('div', { className: 'flex items-center justify-between mb-3 flex-wrap gap-2' });
         benHdr.appendChild(el('h5', { className: 'text-sm font-bold text-emerald-700 uppercase tracking-wider' }, '📈 Benefits'));
         const benHdrRight = el('div', { className: 'flex items-center gap-2' });
@@ -1336,7 +3240,7 @@
         wrap.appendChild(renderProjectedRiskSection());
 
         /* Results panel (full width below) */
-        resultsPanel = el('div', { className: 'cba-fade cba-fade-d3' });
+        resultsPanel = el('div', { className: noFade ? '' : 'cba-fade cba-fade-d3' });
         refreshResults();
         wrap.appendChild(resultsPanel);
 
@@ -1347,9 +3251,9 @@
             onClick: () => {
                 E.calculateALARP();
                 const ss = E.getState(); if (!ss.result) return;
-                ss.measures.push({ proposedMeasure: JSON.parse(JSON.stringify(ss.proposedMeasure)), benefits: JSON.parse(JSON.stringify(ss.benefits)), projectedRisk: JSON.parse(JSON.stringify(ss.projectedRisk)), result: JSON.parse(JSON.stringify(ss.result)), currentRisk: JSON.parse(JSON.stringify(ss.currentRisk)), _aiNotes: uiState.aiNotes, _aiSnapshot: uiState.aiSnapshot ? JSON.parse(JSON.stringify(uiState.aiSnapshot)) : null, _recurringPeriod: uiState.recurringPeriod, _savedAt: new Date().toISOString() });
+                ss.measures.push({ proposedMeasure: JSON.parse(JSON.stringify(ss.proposedMeasure)), benefits: JSON.parse(JSON.stringify(ss.benefits)), projectedRisk: JSON.parse(JSON.stringify(ss.projectedRisk)), result: JSON.parse(JSON.stringify(ss.result)), currentRisk: JSON.parse(JSON.stringify(ss.currentRisk)), _aiNotes: uiState.aiNotes, _aiSnapshot: uiState.aiSnapshot ? JSON.parse(JSON.stringify(uiState.aiSnapshot)) : null, _executiveSummary: uiState.executiveSummary ? JSON.parse(JSON.stringify(uiState.executiveSummary)) : null, _recurringPeriod: uiState.recurringPeriod, _savedAt: new Date().toISOString() });
                 ss.proposedMeasure = E.createBlankState().proposedMeasure; ss.benefits = E.createBlankState().benefits; ss.projectedRisk = E.createBlankState().projectedRisk; ss.result = null;
-                uiState.aiNotes = ''; uiState.aiError = null; uiState.viewingMeasureIndex = null; render();
+                uiState.aiNotes = ''; uiState.aiError = null; uiState.executiveSummary = null; uiState.viewingMeasureIndex = null; render();
             }
         }, 'Save Measure'));
 
@@ -1370,7 +3274,7 @@
         dlBtn.innerHTML = 'Download Report';
         saveRow.appendChild(dlBtn);
 
-        saveRow.appendChild(el('button', { className: 'rab-btn rab-c-blue text-xs', onClick: () => { E.resetState(); uiState.aiNotes = ''; uiState.aiError = null; step = 'landing'; render(); } }, 'New Analysis'));
+        saveRow.appendChild(el('button', { className: 'rab-btn rab-c-blue text-xs', onClick: () => { E.resetState(); uiState.aiNotes = ''; uiState.aiError = null; uiState.executiveSummary = null; step = 'landing'; render(); } }, 'New Analysis'));
         if (E.getState().measures.length > 0) saveRow.appendChild(el('button', { className: 'rab-btn rab-c-slate text-xs', onClick: () => { step = 'compare'; render(); } }, 'Compare All'));
         wrap.appendChild(saveRow);
 
@@ -1390,9 +3294,18 @@
             grp.appendChild(el('label', { className: 'text-xs font-medium text-emerald-700 block mb-1' }, field.charAt(0).toUpperCase() + field.slice(1)));
             const sel = el('select', {
                 className: 'w-full text-sm border border-emerald-300 rounded px-2 py-1 bg-white',
-                onChange: (e) => { s.projectedRisk[field] = parseInt(e.target.value); refreshResults(); }
+                onChange: (e) => {
+                    s.projectedRisk[field] = normalizeScaleValue(field, parseFloat(e.target.value), s.projectedRisk[field]);
+                    uiState.suppressNextResultsMotion = true;
+                    refreshResults();
+                }
             });
-            for (let i = 1; i <= 5; i++) { const opt = el('option', { value: String(i) }, String(i)); if (i === (s.projectedRisk[field] || 1)) opt.selected = true; sel.appendChild(opt); }
+            const projectedVal = normalizeScaleValue(field, s.projectedRisk[field], (RISK_SCALE_OPTIONS[field] || [])[0]?.value || 1);
+            (RISK_SCALE_OPTIONS[field] || []).forEach((optData) => {
+                const opt = el('option', { value: String(optData.value), title: optData.definition }, `${formatScaleValue(optData.value)} — ${optData.label}`);
+                if (projectedVal === optData.value) opt.selected = true;
+                sel.appendChild(opt);
+            });
             grp.appendChild(sel); grid.appendChild(grp);
         });
         container.appendChild(grid);
@@ -1405,11 +3318,13 @@
     function refreshResults() {
         if (!resultsPanel) return;
         E.calculateALARP();
+        const noMotion = !!uiState.suppressNextResultsMotion;
+        uiState.suppressNextResultsMotion = false;
         resultsPanel.innerHTML = '';
-        resultsPanel.appendChild(buildResultsPanel());
+        resultsPanel.appendChild(buildResultsPanel(noMotion));
     }
 
-    function buildResultsPanel() {
+    function buildResultsPanel(noMotion) {
         const s = E.getState(); const r = s.result; const sym = currencySymbol();
         const wrap = el('div', { className: 'space-y-4' });
         if (!r || (r.totalCost === 0 && r.totalBenefit === 0)) {
@@ -1437,7 +3352,7 @@
         /* Verdict banner */
         const ratioStr = r.ratio === Infinity ? '∞' : r.ratio.toFixed(2);
         const banner = el('div', {
-            className: 'cba-panel text-center cba-fade',
+            className: 'cba-panel text-center' + (noMotion ? '' : ' cba-fade'),
             style: { background: `linear-gradient(135deg, ${r.verdictColor}12 0%, ${r.verdictColor}08 100%)`, border: `3px solid ${r.verdictColor}` }
         });
         banner.appendChild(el('div', { className: 'text-xl font-black', style: { color: r.verdictColor } }, r.verdict));
@@ -1447,7 +3362,7 @@
         wrap.appendChild(banner);
 
         /* Stats grid */
-        const stats = el('div', { className: 'grid grid-cols-2 lg:grid-cols-4 gap-3 cba-fade cba-fade-d1' });
+        const stats = el('div', { className: 'grid grid-cols-2 lg:grid-cols-4 gap-3' + (noMotion ? '' : ' cba-fade cba-fade-d1') });
         [
             { label: 'Total Cost',   value: `${sym}${formatNum(r.totalCost)}`,       sub: `${r.timeHorizon}-yr lifecycle`, accent: '#ef4444' },
             { label: 'Raw Benefit',  value: `${sym}${formatNum(r.totalBenefit)}`,    sub: `${r.timeHorizon}-yr lifecycle`, accent: '#22c55e' },
@@ -1463,10 +3378,10 @@
         wrap.appendChild(stats);
 
         /* Animated cost-vs-benefit bar chart */
-        wrap.appendChild(buildCostBenefitBars(r, sym));
+        wrap.appendChild(buildCostBenefitBars(r, sym, noMotion));
 
         /* Risk reduction cards */
-        const compRow = el('div', { className: 'grid grid-cols-2 gap-3 cba-fade cba-fade-d2' });
+        const compRow = el('div', { className: 'grid grid-cols-2 gap-3' + (noMotion ? '' : ' cba-fade cba-fade-d2') });
         [{ label: 'Before', score: r.currentScore, cat: r.currentCategory }, { label: 'After', score: r.projectedScore, cat: r.projectedCategory }].forEach(item => {
             const c = E.getRiskColor(item.cat); const b = E.getRiskBg(item.cat);
             const card = el('div', { className: 'rounded-xl border-2 p-3 text-center', style: { borderColor: c, backgroundColor: b } });
@@ -1479,7 +3394,7 @@
         if (r.riskReduction > 0) wrap.appendChild(el('div', { className: 'text-center text-xs font-semibold text-emerald-700 bg-emerald-50 rounded-lg py-2' }, `↓ ${r.riskReduction} pts risk reduction (${Math.round((r.riskReduction / r.currentScore) * 100)}%)`));
 
         /* Two diagrams side by side */
-        const diagrams = el('div', { className: 'grid grid-cols-1 lg:grid-cols-2 gap-4 cba-fade cba-fade-d3' });
+        const diagrams = el('div', { className: 'grid grid-cols-1 lg:grid-cols-2 gap-4' + (noMotion ? '' : ' cba-fade cba-fade-d3') });
         diagrams.appendChild(buildALARPTriangle(r));
         diagrams.appendChild(buildCarrotDiagram(r, s));
         wrap.appendChild(diagrams);
@@ -1488,9 +3403,9 @@
     }
 
     /* ═══════ ANIMATED COST vs BENEFIT BARS ═══════ */
-    function buildCostBenefitBars(r, sym) {
+    function buildCostBenefitBars(r, sym, noMotion) {
         const maxVal = Math.max(r.totalCost, r.adjustedBenefit, 1);
-        const container = el('div', { className: 'bg-white rounded-xl border border-slate-200 p-4 space-y-3 cba-fade cba-fade-d1' });
+        const container = el('div', { className: 'bg-white rounded-xl border border-slate-200 p-4 space-y-3' + (noMotion ? '' : ' cba-fade cba-fade-d1') });
         container.appendChild(el('h6', { className: 'text-xs font-bold text-slate-600 uppercase tracking-wider' }, '📊 Cost vs Adjusted Benefit'));
 
         [{ label: 'Total Cost', value: r.totalCost, color: '#ef4444', bg: '#fecaca' },
@@ -1504,7 +3419,7 @@
             const track = el('div', { className: 'h-5 bg-slate-100 rounded-full overflow-hidden' });
             const pct = Math.min((item.value / maxVal) * 100, 100);
             const bar = el('div', {
-                className: 'h-full rounded-full cba-bar-grow',
+                className: 'h-full rounded-full' + (noMotion ? '' : ' cba-bar-grow'),
                 style: { '--bar-w': pct + '%', width: pct + '%', background: `linear-gradient(90deg, ${item.bg}, ${item.color})` }
             });
             track.appendChild(bar);
@@ -1826,6 +3741,7 @@
                 ss.currentRisk = JSON.parse(JSON.stringify(m.currentRisk));
                 uiState.aiNotes = m._aiNotes || '';
                 uiState.aiSnapshot = m._aiSnapshot || null;
+                uiState.executiveSummary = m._executiveSummary || null;
                 if (m._recurringPeriod) uiState.recurringPeriod = m._recurringPeriod;
                 uiState.viewingMeasureIndex = i;
                 step = 'analyze';
@@ -1870,7 +3786,7 @@
         }
 
         wrap.appendChild(el('div', { className: 'flex gap-3' },
-            el('button', { className: 'rab-btn rab-c-slate', onClick: () => { E.resetState(); uiState = { aiLoading: false, aiError: null, locationDetected: false, freshDescription: '', selectedRow: null, aiNotes: '', recurringPeriod: uiState.recurringPeriod, aiModel: uiState.aiModel }; step = 'landing'; render(); } }, 'New Analysis'),
+            el('button', { className: 'rab-btn rab-c-slate', onClick: () => { E.resetState(); uiState = { aiLoading: false, aiError: null, locationDetected: false, freshDescription: '', selectedRow: null, aiNotes: '', executiveSummary: null, recurringPeriod: uiState.recurringPeriod, aiModel: uiState.aiModel }; step = 'landing'; render(); } }, 'New Analysis'),
             el('button', { className: 'rab-btn rab-c-blue text-xs', onClick: () => { step = 'analyze'; render(); } }, '← Back to Analyze')
         ));
         return wrap;
@@ -1892,6 +3808,7 @@
                 ss.currentRisk = JSON.parse(JSON.stringify(m.currentRisk));
                 uiState.aiNotes = m._aiNotes || '';
                 uiState.aiSnapshot = m._aiSnapshot || null;
+                uiState.executiveSummary = m._executiveSummary || null;
                 if (m._recurringPeriod) uiState.recurringPeriod = m._recurringPeriod;
                 uiState.viewingMeasureIndex = i;
                 step = 'analyze';
@@ -1917,22 +3834,367 @@
     }
 
     /* ═══════════════════════════════════════════════════════════════
+       MANUAL BASELINE EDITOR
+       Allows users to view and edit all Luxembourg OSH baseline
+       figures (6 metrics × 5 severity levels) without AI.
+       ═══════════════════════════════════════════════════════════════ */
+    function renderBaselineEditor() {
+        const B = window.CBA.baseline;
+        if (!B) return el('div', {}, 'Baseline module not loaded.');
+
+        const backTarget = uiState.baselineBackStep || 'landing';
+        const wrap = el('div', { className: 'space-y-6 cba-fade' });
+        wrap.appendChild(renderStepHeader('📋 Edit Luxembourg Baseline Figures', backTarget));
+
+        // Info banner
+        wrap.appendChild(el('div', { className: 'flex items-start gap-3 p-4 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-800' },
+            el('span', { className: 'text-xl flex-shrink-0' }, '🇱🇺'),
+            el('div', {},
+                el('b', {}, 'Luxembourg OSH Baseline Registry '),
+                document.createTextNode('— these values anchor all cost & benefit AI estimates. They reflect AAA (2024), MDE (2025), ITM (2024) and STATEC data from the Luxembourg workplace safety financial analysis. Edit any value below and click Save.')
+            )
+        ));
+
+        // Working copy of current data
+        const currentData = JSON.parse(JSON.stringify(B.getAll()));
+
+        const METRICS = [
+            {
+                key: 'incidentRates',
+                label: 'Incident Rate',
+                unit: 'cases / 100 FTE / yr',
+                description: 'Workplace accident cases per 100 FTE per year — from AAA Annual Report 2024 (13,724 accidents / 501,285 working units).',
+                icon: '📊',
+                color: '#3b82f6',
+                isMonetary: false
+            },
+            {
+                key: 'daysAwayFromWork',
+                label: 'Days Away From Work',
+                unit: 'days',
+                description: 'Median absence days per case. Lohnfortzahlung (salary continuation) applies until end of month of 77th day. MDE reimburses 80%; employer absorbs 20% deadweight.',
+                icon: '📅',
+                color: '#8b5cf6',
+                isMonetary: false
+            },
+            {
+                key: 'medicalCostUSD',
+                label: 'Direct Medical Cost',
+                unit: '€ / case',
+                description: 'Direct AAA-covered costs per case (emergency, hospitalization, treatment). National AAA average 2024 = €4,053 for a standard workplace accident.',
+                icon: '🏥',
+                color: '#ef4444',
+                isMonetary: true
+            },
+            {
+                key: 'injuryCostPerCase',
+                label: 'Total Cost Per Case (Iceberg Model)',
+                unit: '€ / case',
+                description: 'Full direct + indirect cost: unrecovered salary (20% MDE deadweight) + lost productivity + overtime + admin + asset damage + AAA Malus lagging. Verified severity-3 core baseline (Section 8.2) = €27,341.',
+                icon: '🧊',
+                color: '#dc2626',
+                isMonetary: true
+            },
+            {
+                key: 'insurancePremiumChangePct',
+                label: 'AAA Bonus-Malus Premium Change',
+                unit: '% change',
+                description: 'Expected % increase in AAA accident insurance premium after one incident. Base rate 2025 = 0.70%. Multipliers: ×0.85 (bonus) → ×1.00 → ×1.10 → ×1.30 → ×1.50 (max malus).',
+                icon: '📈',
+                color: '#f59e0b',
+                isMonetary: false
+            },
+            {
+                key: 'regulatoryFineUSD',
+                label: 'ITM Regulatory Fine Risk',
+                unit: '€ / violation',
+                description: 'ITM Luxembourg fine exposure per violation. 2024: 1,152 fines totalling €6,370,500 (avg €5,530). Max = €4,000 × number of workers concerned. 116 criminal referrals for fatal accidents.',
+                icon: '⚖️',
+                color: '#7c3aed',
+                isMonetary: true
+            }
+        ];
+
+        const SEV_LABELS = [
+            { sev: '1', label: 'Negligible', sub: 'First-aid, no declaration', color: '#16a34a' },
+            { sev: '2', label: 'Minor',      sub: '<4 days absence, AAA declared', color: '#65a30d' },
+            { sev: '3', label: 'Moderate',   sub: '5–30 days, standard AAA accident', color: '#ca8a04' },
+            { sev: '4', label: 'Major',       sub: '31–77 days, Lohnfortzahlung period', color: '#ea580c' },
+            { sev: '5', label: 'Catastrophic', sub: 'Permanent disability / fatality', color: '#dc2626' }
+        ];
+
+        // Build editable sections
+        METRICS.forEach(metric => {
+            const section = el('div', { className: 'bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm' });
+
+            // Section header
+            const header = el('div', { className: 'flex items-start gap-3 px-5 py-4 border-b border-slate-100', style: { background: '#f8fafc' } });
+            header.appendChild(el('span', { className: 'text-2xl flex-shrink-0 mt-0.5' }, metric.icon));
+            const headerText = el('div', { className: 'flex-1' });
+            headerText.appendChild(el('div', { className: 'font-bold text-slate-900 text-sm' }, metric.label));
+            headerText.appendChild(el('div', { className: 'text-xs text-slate-500 mt-0.5' }, metric.description));
+            header.appendChild(headerText);
+            header.appendChild(el('span', { className: 'text-xs font-mono text-slate-400 flex-shrink-0 mt-1' }, metric.unit));
+            section.appendChild(header);
+
+            // Rows: one per severity
+            SEV_LABELS.forEach(({ sev, label, sub, color }) => {
+                const entry = currentData[metric.key] && currentData[metric.key][sev]
+                    ? currentData[metric.key][sev]
+                    : { value: 0, unit: metric.unit, source: '', year: 2024, notes: '' };
+
+                const row = el('div', { className: 'grid grid-cols-1 gap-2 px-5 py-4 border-b border-slate-50 hover:bg-slate-50 transition-colors' });
+
+                // Severity badge + value input on one line
+                const topRow = el('div', { className: 'flex items-center gap-3 flex-wrap' });
+                const evidenceComplete = !!(entry.sourceUrl || sourceUrlForText(entry.source, entry.sourceUrl)) && !!(entry.figureUsed || entry.value != null) && !!(entry.rationaleFormula || entry.notes);
+                const badge = el('span', {
+                    className: 'text-xs font-bold text-white px-2 py-1 rounded-lg flex-shrink-0 min-w-max',
+                    style: { background: color }
+                }, `S${sev} — ${label}`);
+                topRow.appendChild(badge);
+                topRow.appendChild(el('span', { className: 'text-xs text-slate-500' }, sub));
+                topRow.appendChild(el('span', {
+                    className: `text-[10px] px-2 py-0.5 rounded-full border ${evidenceComplete ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-amber-50 text-amber-700 border-amber-200'}`
+                }, evidenceComplete ? 'Verified evidence' : 'Needs source/evidence'));
+
+                // Value input
+                const valueWrap = el('div', { className: 'ml-auto flex items-center gap-2' });
+                valueWrap.appendChild(el('span', { className: 'text-xs text-slate-400' }, metric.isMonetary ? '€' : ''));
+                const valueInput = el('input', {
+                    type: 'number',
+                    value: entry.value,
+                    step: metric.isMonetary ? '1' : '0.01',
+                    min: '0',
+                    className: 'border border-slate-300 rounded-lg px-3 py-1.5 text-sm font-mono w-32 text-right focus:outline-none focus:ring-2 focus:ring-amber-400',
+                    title: `${metric.label} — Severity ${sev}`,
+                    onInput: (e) => {
+                        if (!currentData[metric.key]) currentData[metric.key] = {};
+                        if (!currentData[metric.key][sev]) currentData[metric.key][sev] = {};
+                        currentData[metric.key][sev].value = parseFloat(e.target.value) || 0;
+                    }
+                });
+                valueWrap.appendChild(valueInput);
+                valueWrap.appendChild(el('span', { className: 'text-xs text-slate-400 min-w-max' }, metric.unit));
+                topRow.appendChild(valueWrap);
+                row.appendChild(topRow);
+
+                // Source + year + notes on second line (collapsed by default)
+                const detailToggle = el('button', {
+                    className: 'text-xs text-slate-400 hover:text-amber-600 text-left transition-colors',
+                    onClick: (e) => {
+                        const detail = e.target.parentElement.querySelector('.bl-detail');
+                        if (detail) detail.style.display = detail.style.display === 'none' ? 'grid' : 'none';
+                        e.target.textContent = detail && detail.style.display === 'none' ? '▸ Show source, links & evidence' : '▾ Hide source, links & evidence';
+                    }
+                }, '▸ Show source, links & evidence');
+                row.appendChild(detailToggle);
+
+                const detail = el('div', { className: 'bl-detail grid grid-cols-1 gap-2 mt-1', style: { display: 'none' } });
+
+                // Source
+                const srcRow = el('div', { className: 'flex items-center gap-2' });
+                srcRow.appendChild(el('label', { className: 'text-xs text-slate-500 w-14 flex-shrink-0' }, 'Source:'));
+                const srcInput = el('input', {
+                    type: 'text',
+                    value: entry.source || '',
+                    placeholder: 'e.g. AAA Annual Report 2024',
+                    className: 'flex-1 border border-slate-200 rounded-lg px-3 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-amber-300',
+                    onInput: (e) => {
+                        if (!currentData[metric.key][sev]) currentData[metric.key][sev] = {};
+                        currentData[metric.key][sev].source = e.target.value;
+                    }
+                });
+                srcRow.appendChild(srcInput);
+
+                // Source URL + open button
+                const srcUrlInput = el('input', {
+                    type: 'url',
+                    value: entry.sourceUrl || sourceUrlForText(entry.source, entry.sourceUrl),
+                    placeholder: 'https://... (direct source URL)',
+                    className: 'flex-1 border border-slate-200 rounded-lg px-3 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-amber-300',
+                    onInput: (e) => {
+                        if (!currentData[metric.key][sev]) currentData[metric.key][sev] = {};
+                        currentData[metric.key][sev].sourceUrl = e.target.value;
+                    }
+                });
+                srcRow.appendChild(srcUrlInput);
+                const openSourceBtn = el('a', {
+                    href: srcUrlInput.value || '#',
+                    target: '_blank',
+                    rel: 'noopener noreferrer',
+                    className: 'rab-btn rab-c-slate text-[10px]',
+                    onClick: (ev) => {
+                        if (!srcUrlInput.value) ev.preventDefault();
+                    }
+                }, 'Open');
+                srcUrlInput.addEventListener('input', () => {
+                    openSourceBtn.setAttribute('href', srcUrlInput.value || '#');
+                });
+                srcRow.appendChild(openSourceBtn);
+
+                // Year
+                const yearInput = el('input', {
+                    type: 'number',
+                    value: entry.year || 2024,
+                    min: '2000',
+                    max: '2099',
+                    className: 'border border-slate-200 rounded-lg px-2 py-1 text-xs w-20 font-mono focus:outline-none focus:ring-2 focus:ring-amber-300',
+                    onInput: (e) => {
+                        if (!currentData[metric.key][sev]) currentData[metric.key][sev] = {};
+                        currentData[metric.key][sev].year = parseInt(e.target.value) || 2024;
+                    }
+                });
+                srcRow.appendChild(yearInput);
+                detail.appendChild(srcRow);
+
+                // Notes
+                const notesRow = el('div', { className: 'flex items-start gap-2' });
+                notesRow.appendChild(el('label', { className: 'text-xs text-slate-500 w-14 flex-shrink-0 mt-1' }, 'Notes:'));
+                const notesInput = el('input', {
+                    type: 'text',
+                    value: entry.notes || '',
+                    placeholder: 'Contextual notes about this value…',
+                    className: 'flex-1 border border-slate-200 rounded-lg px-3 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-amber-300',
+                    onInput: (e) => {
+                        if (!currentData[metric.key][sev]) currentData[metric.key][sev] = {};
+                        currentData[metric.key][sev].notes = e.target.value;
+                    }
+                });
+                notesRow.appendChild(notesInput);
+                detail.appendChild(notesRow);
+
+                // Figure used
+                const figRow = el('div', { className: 'flex items-start gap-2' });
+                figRow.appendChild(el('label', { className: 'text-xs text-slate-500 w-14 flex-shrink-0 mt-1' }, 'Figure:'));
+                const figInput = el('input', {
+                    type: 'text',
+                    value: entry.figureUsed || `${entry.value || 0} ${entry.unit || metric.unit}`,
+                    placeholder: 'Exact figure used (e.g. €6,370,500 / 1,152)',
+                    className: 'flex-1 border border-slate-200 rounded-lg px-3 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-amber-300',
+                    onInput: (e) => {
+                        if (!currentData[metric.key][sev]) currentData[metric.key][sev] = {};
+                        currentData[metric.key][sev].figureUsed = e.target.value;
+                    }
+                });
+                figRow.appendChild(figInput);
+                detail.appendChild(figRow);
+
+                // Rationale formula
+                const formulaRow = el('div', { className: 'flex items-start gap-2' });
+                formulaRow.appendChild(el('label', { className: 'text-xs text-slate-500 w-14 flex-shrink-0 mt-1' }, 'Formula:'));
+                const formulaInput = el('input', {
+                    type: 'text',
+                    value: entry.rationaleFormula || entry.notes || '',
+                    placeholder: 'Rationale formula used for this figure',
+                    className: 'flex-1 border border-slate-200 rounded-lg px-3 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-amber-300',
+                    onInput: (e) => {
+                        if (!currentData[metric.key][sev]) currentData[metric.key][sev] = {};
+                        currentData[metric.key][sev].rationaleFormula = e.target.value;
+                    }
+                });
+                formulaRow.appendChild(formulaInput);
+                detail.appendChild(formulaRow);
+
+                row.appendChild(detail);
+                section.appendChild(row);
+            });
+
+            wrap.appendChild(section);
+        });
+
+        // Luxembourg reference card
+        const refCard = el('div', { className: 'bg-blue-50 border border-blue-200 rounded-xl p-4 text-xs text-blue-800 space-y-1' });
+        refCard.appendChild(el('div', { className: 'font-bold text-blue-900 mb-2' }, '🔑 Key Luxembourg Reference Values (2024–2025)'));
+        const refs = [
+            { text: 'AAA base contribution rate 2025: 0.70% of gross payroll (employer only)', url: SOURCE_URLS.AAA_BONUS },
+            { text: 'AAA Bonus-Malus multipliers: ×0.85 (15% bonus) | ×1.00 (neutral) | ×1.10 | ×1.30 | ×1.50 (50% max malus)', url: SOURCE_URLS.AAA_BONUS },
+            { text: 'MDE reimbursement: 80% of employer cost — employer permanently absorbs 20% deadweight', url: SOURCE_URLS.MDE_AFFILIATION },
+            { text: 'MDE Class 1 premium 2025: 0.07% | Class 2: 0.99% (+0.92% gap = 14× multiplier)', url: SOURCE_URLS.MDE_FINANCING },
+            { text: 'ITM 2024: avg fine €5,530 | max €4,000/worker/violation | 116 criminal referrals for fatal accidents', url: SOURCE_URLS.ITM_REPORT_PDF },
+            { text: 'STATEC 2024: median hourly wage ~€28/hr | daily employer cost ~€257/day', url: SOURCE_URLS.STATEC_PORTAL },
+            { text: 'AAA 2024 national avg direct accident cost: €4,053 | 128 accidents/day nationally', url: SOURCE_URLS.AAA_STATS },
+            { text: 'ISSA Return on Prevention (ROP): 2.2 — every €1 invested in prevention → €2.20 return', url: SOURCE_URLS.ISSA_ROP }
+        ];
+        refs.forEach(r => {
+            const rEl = el('div', { className: 'flex items-baseline gap-1' });
+            rEl.appendChild(el('span', { className: 'flex-shrink-0' }, '•'));
+            rEl.appendChild(document.createTextNode(r.text + ' '));
+            rEl.appendChild(el('a', {
+                href: r.url,
+                target: '_blank',
+                rel: 'noopener noreferrer',
+                className: 'underline text-blue-700'
+            }, 'source'));
+            refCard.appendChild(rEl);
+        });
+        wrap.appendChild(refCard);
+
+        // Action buttons
+        const actRow = el('div', { className: 'flex flex-wrap gap-3 justify-between items-center p-4 bg-slate-50 rounded-xl border border-slate-200' });
+
+        const resetBtn = el('button', {
+            className: 'rab-btn rab-c-slate text-xs',
+            onClick: () => {
+                if (confirm('Reset all baseline figures to Luxembourg factory defaults (AAA/MDE/ITM/STATEC 2024–2025)?')) {
+                    B.reset();
+                    render();
+                }
+            }
+        }, '↺ Reset to Luxembourg Defaults');
+        actRow.appendChild(resetBtn);
+
+        const rightBtns = el('div', { className: 'flex gap-3' });
+        rightBtns.appendChild(el('button', {
+            className: 'rab-btn rab-c-slate text-xs',
+            onClick: () => { step = backTarget; render(); }
+        }, '✕ Cancel'));
+
+        const saveBtn = el('button', {
+            className: 'rab-btn rab-c-emerald',
+            onClick: () => {
+                // Ensure all entries have the correct unit stored
+                METRICS.forEach(metric => {
+                    SEV_LABELS.forEach(({ sev }) => {
+                        if (currentData[metric.key] && currentData[metric.key][sev]) {
+                            currentData[metric.key][sev].unit = metric.unit;
+                        }
+                    });
+                });
+                B.update(currentData, 'Luxembourg', 'EUR', 'manual');
+                step = backTarget;
+                render();
+            }
+        }, '💾 Save Baseline Figures');
+        rightBtns.appendChild(saveBtn);
+        actRow.appendChild(rightBtns);
+        wrap.appendChild(actRow);
+
+        return wrap;
+    }
+
+    /* ═══════════════════════════════════════════════════════════════
        TERMS & DEFINITIONS APPENDIX (collapsible)
        ═══════════════════════════════════════════════════════════════ */
     function renderAppendix() {
         const TERMS = [
+            { term: 'AAA', def: 'Association d\'Assurance Accident (Luxembourg). Mandatory workplace accident insurer for employers. Provides annual accident counts, direct average accident cost, and bonus-malus premium framework.' },
+            { term: 'MDE', def: 'Mutualité des Employeurs (Luxembourg). Employer mutual fund for salary continuation (Lohnfortzahlung), reimbursing 80% of eligible employer salary continuation costs.' },
+            { term: 'ITM', def: 'Inspection du Travail et des Mines (Luxembourg labor inspectorate). Enforces workplace safety and can issue administrative fines and transmit grave cases for criminal proceedings.' },
+            { term: 'STATEC', def: 'Institut national de la statistique et des études économiques du Grand-Duché de Luxembourg. Official source for wage and labor market benchmarks used in this model.' },
             { term: 'ALARP', def: 'As Low As Reasonably Practicable. A legal duty principle (UK HSE, COMAH, OSHA PSM) requiring risk to be reduced until the cost of further reduction is grossly disproportionate to the benefit gained.' },
             { term: 'Benefit-Cost Ratio (BCR)', def: 'Adjusted Benefit divided by Total Cost. BCR > 1.0 means the measure is reasonably practicable. BCR 0.5–1.0 is borderline. BCR < 0.5 indicates costs are grossly disproportionate.' },
             { term: 'Disproportion Factor (DF)', def: 'A multiplier applied to raw benefits to reflect the moral obligation to act when risk is high. HSE R2P2 guidance: LOW risk ×1, MEDIUM ×2, HIGH ×4, CRITICAL ×10.' },
             { term: 'Lifecycle Cost', def: 'Total cost of a measure over the chosen time horizon (e.g. 5 years). One-off costs are counted once; recurring costs are multiplied by the number of years.' },
             { term: 'Adjusted Benefit', def: 'Raw Benefit × Disproportion Factor. Represents the effective benefit weight when compared against cost to justify action.' },
-            { term: 'Risk Score', def: 'Frequency × Severity × Likelihood on a 1–5 scale each. Scores: LOW 1–19, MEDIUM 20–49, HIGH 50–71, CRITICAL 72–125.' },
+            { term: 'Risk Score', def: 'Risk Score = Frequency × Severity × Likelihood using the standard scales in this tool (F: 1/1.25/1.5/1.75/2, S: 1/3/5/7/9/10, L: 1/3/5/8/10). Response bands: LOW 1-19, MEDIUM 20-49, HIGH 50-71, CRITICAL 72-200.' },
             { term: 'Control Measure (CM) Ladder', def: 'Hierarchy from most to least effective: L6 Elimination → L5 Substitution → L4 Engineering Controls → L3 Visual/Warning Controls → L2 Administrative Controls → L1 PPE.' },
-            { term: 'Frequency', def: 'How often the hazardous event can occur: 1=Rare (<1/10yr), 2=Unlikely (1/5yr), 3=Possible (1/yr), 4=Likely (>1/yr), 5=Almost Certain (daily/weekly).' },
-            { term: 'Severity', def: 'Potential consequence of the hazardous event: 1=Minor (first aid), 2=Moderate (medical treatment), 3=Serious (RIDDOR/lost time), 4=Major (permanent injury), 5=Catastrophic (fatality/multiple fatalities).' },
-            { term: 'Likelihood', def: 'Probability the hazard leads to harm given an exposure: 1=Very Unlikely, 2=Unlikely, 3=Possible, 4=Likely, 5=Very Likely.' },
+            { term: 'Frequency', def: 'Standard scale: 1 RARELY (Month <0.5 day, Year 1 day); 1.25 OCCASIONAL (Day <30 min, Week <2 hours, Month <1 day, Year <5 days); 1.5 INTERMEDIATE (Day 30-120 min, Week 2-8 hours, Month 1-4 days, Year 5 days to 2 months); 1.75 FREQUENTLY (Day 2-5 hours, Week 1-3 days, Month 4-15 days, Year 2-5 months); 2 PERMANENT (Day >5 hours, Week >3 days, Month >15 days, Year >5 months).' },
+            { term: 'Severity', def: 'Standard scale: 1 No potential of injury (no treatment); 3 Potential of FIRST AID (non-prescription medication); 5 Potential of MEDICAL TREATMENT (prescription medications); 7 Potential of DART (temporary disability); 9 Potential of SIA (amputation); 10 Potential of Fatality (death).' },
+            { term: 'Likelihood', def: 'Standard scale: 1 Almost impossible; 3 Very unlikely; 5 Possible to happen; 8 Likely to happen; 10 Very likely to happen. Classification is based on machinery reachability (ISO 13857/13849), industrial hygiene class/CML context, and event history over 3-5 years.' },
+            { term: 'Risk Rating & Response', def: 'LOW (1-19): low priority, reduce if feasible. MEDIUM (20-49): reduce over time, prioritize higher risks first. HIGH (50-71): action plan required, lower priority than critical. CRITICAL (72-200): deploy interim protections immediately and prioritize permanent secure controls; clearly communicate exposure risk to associates.' },
             { term: 'Lost Workday Cases (LWC)', def: 'Injuries causing the worker to miss at least one working day. OSHA uses "Days Away from Work" (DAFW) as a standard metric. Avg for severity-3 injuries: ~48 hours.' },
-            { term: 'Injury Cost Avoidance', def: 'The estimated savings from preventing injuries. Includes: direct medical costs, lost wage compensation, productivity loss, investigation time, retraining, and equipment repair.' },
+            { term: 'Injury Cost Avoidance', def: 'The estimated non-medical savings from preventing injuries. Includes lost wage compensation, productivity loss, investigation time, retraining, and equipment repair. Direct medical/statutory compensation is tracked separately under Medical Cost Savings.' },
             { term: 'Regulatory Fine Avoidance', def: 'Expected penalty value = maximum statutory fine × probability of citation. UK HSE can issue unlimited fines per the Health and Safety (Offences) Act 2008. OSHA maximum per wilful violation: $156,259 (2024).' },
             { term: 'Insurance Premium Reduction', def: 'Demonstrating improved safety performance and ALARP compliance typically reduces Employers Liability / General Liability insurance premiums by 5–25% depending on loss history.' },
             { term: 'Man-Hours Saved', def: 'Labour time per year recovered because the process or task is made safer/faster. Calculated as: time saved per occurrence × occurrences per year × hourly labour rate.' },
@@ -2037,6 +4299,108 @@
             if (!tid) return text;
             return `<a class="term-link" href="#${tid}" onclick="(function(){var e=document.getElementById('${tid}');if(!e)return;var d=document.querySelector('details');if(d)d.open=true;e.scrollIntoView({behavior:'smooth',block:'center'});e.classList.add('hl');setTimeout(function(){e.classList.remove('hl')},2500);})();return false;">${text}</a>`;
         }
+        function escapeHtmlText(text) {
+            return String(text || '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+        function renderRationaleHtml(rationaleText) {
+            const lines = String(rationaleText || '').split(/\r?\n/);
+            let sourceText = '';
+            lines.forEach((line) => {
+                const m = String(line || '').trim().match(/^Source:\s*(.+)$/i);
+                if (m && !sourceText) sourceText = m[1].trim();
+            });
+
+            return lines.map((line) => {
+                const trimmed = String(line || '').trim();
+                if (!trimmed) return '';
+
+                const mdMatch = trimmed.match(/^Source link:\s*\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)\s*$/i);
+                const rawMatch = trimmed.match(/^Source link:\s*(https?:\/\/\S+)\s*$/i);
+                const lblMatch = trimmed.match(/^Source link:\s*(.+)\s*$/i);
+
+                let label = 'Source';
+                let url = '';
+
+                if (mdMatch) {
+                    label = mdMatch[1] || 'Source';
+                    url = mdMatch[2] || '';
+                } else if (rawMatch) {
+                    label = 'Source';
+                    url = rawMatch[1] || '';
+                } else if (lblMatch) {
+                    label = lblMatch[1] || 'Source';
+                    url = sourceUrlForText(sourceText, '');
+                }
+
+                if (url && /^https?:\/\//i.test(url)) {
+                    return `Source link: <a href="${escapeHtmlText(url)}" target="_blank" rel="noopener noreferrer">${escapeHtmlText(label)}</a>`;
+                }
+
+                return escapeHtmlText(line);
+            }).join('<br>');
+        }
+        function parseQtyReasonForHtml(reasonText) {
+            const raw = String(reasonText || '').replace(/\s+/g, ' ').trim();
+            const out = { definition: '', basis: '', parameters: '', formula: '' };
+            if (!raw) return out;
+            const pKey = 'Parameters used:';
+            const fKey = 'Formula =';
+            const pIdx = raw.indexOf(pKey);
+            if (pIdx >= 0) {
+                out.basis = raw.slice(0, pIdx).replace(/^Audit basis:\s*/i, '').trim().replace(/[;\s]+$/, '');
+                const tail = raw.slice(pIdx + pKey.length).trim();
+                const fIdx = tail.indexOf(fKey);
+                if (fIdx >= 0) {
+                    out.parameters = tail.slice(0, fIdx).trim().replace(/^[;\s]+|[;\s]+$/g, '');
+                    out.formula = tail.slice(fIdx).trim();
+                } else {
+                    out.parameters = tail.trim().replace(/^[;\s]+|[;\s]+$/g, '');
+                }
+            } else {
+                const fIdx = raw.indexOf(fKey);
+                if (fIdx >= 0) {
+                    out.basis = raw.slice(0, fIdx).replace(/^Audit basis:\s*/i, '').trim().replace(/[;\s]+$/, '');
+                    out.formula = raw.slice(fIdx).trim();
+                } else {
+                    out.basis = raw.replace(/^Audit basis:\s*/i, '').trim();
+                }
+            }
+            return out;
+        }
+        function htmlSourceContext(sourceText, reasonText) {
+            const combined = `${sourceText || ''} ${reasonText || ''}`.toUpperCase();
+            const lines = [];
+            if (combined.includes('AAA')) lines.push('AAA = Association d\'Assurance Accident (Luxembourg workplace accident insurer).');
+            if (combined.includes('ITM')) lines.push('ITM = Inspection du Travail et des Mines (Luxembourg labour inspectorate).');
+            if (combined.includes('MDE')) lines.push('MDE = Mutualité des Employeurs (Luxembourg employer salary-continuation mutual).');
+            if (combined.includes('STATEC')) lines.push('STATEC = Luxembourg national statistics institute (wage and labour benchmarks).');
+            return lines;
+        }
+                function htmlQtyReasonBlock(row) {
+                        if (!row || (!row.qtyReason && !row.noteDetails)) return '';
+                        const parsed = parseQtyReasonForHtml(row.qtyReason || '');
+                        const note = getRowQtyNoteParts(row, sym);
+                        const definition = note.definition || parsed.definition || row.label || '';
+                        const basis = note.basis || parsed.basis || '';
+                        const parameters = note.parameters || parsed.parameters || '';
+                        const formula = note.formula || String(parsed.formula || '').replace(/^Formula\s*=\s*/i, '') || '';
+                        const ctx = htmlSourceContext(row.source, row.qtyReason);
+                        const srcUrl = sourceUrlForText(row.source, row.sourceUrl);
+            return `
+              <div style="margin-top:5px;padding:6px 8px;background:#ffffff;border:1px solid #e2e8f0;border-radius:6px;">
+                                ${definition ? `<div style="font-size:11px;line-height:1.45;color:#475569;"><b style="color:#1e293b;">Definition:</b> ${definition}</div>` : ''}
+                                ${basis ? `<div style="font-size:11px;line-height:1.45;color:#475569;margin-top:2px;"><b style="color:#1e293b;">Basis:</b> ${basis}</div>` : ''}
+                                ${parameters ? `<div style="font-size:11px;line-height:1.45;color:#475569;margin-top:2px;"><b style="color:#1e293b;">Parameters:</b> ${parameters}</div>` : ''}
+                                ${formula ? `<div style="font-size:11px;line-height:1.45;color:#475569;margin-top:2px;"><b style="color:#1e293b;">Formula:</b> ${formula}</div>` : ''}
+                                <div style="font-size:11px;line-height:1.45;color:#475569;margin-top:3px;"><b style="color:#1e293b;">Source:</b> ${row.source ? htmlTermLink(row.source) : 'Not specified'}${srcUrl ? ` <a href="${srcUrl}" target="_blank" rel="noopener noreferrer">[source]</a>` : ''}</div>
+                ${ctx.length ? `<div style="margin-top:4px;font-size:10px;line-height:1.4;color:#0f766e;background:#f0fdfa;border:1px solid #99f6e4;border-radius:5px;padding:4px 6px;"><b>Context:</b> ${ctx.join(' ')}</div>` : ''}
+              </div>`;
+        }
         function costTotal() {
             if (!r) return 0;
             return r.totalCost;
@@ -2050,10 +4414,13 @@
             const rows = (breakdowns || {})[catKey] || [];
             if (!rows.length) return '';
             const rowsHtml = rows.map(bk => {
-                const srcHtml = bk.source ? `📎 ${htmlTermLink(bk.source)}` : '';
-                const qtyNoteHtml = bk.qtyReason ? `
+                                const srcUrl = sourceUrlForText(bk.source, bk.sourceUrl);
+                                const srcHtml = bk.source
+                                        ? `📎 ${htmlTermLink(bk.source)}${srcUrl ? ` <a href="${srcUrl}" target="_blank" rel="noopener noreferrer">[source]</a>` : ''}`
+                                        : '';
+                                const qtyNoteHtml = (bk.qtyReason || bk.noteDetails) ? `
               <tr class="qty-note"><td colspan="8" style="padding:2px 12px 8px 44px;font-size:11px;color:#64748b;font-style:italic;">
-                ↳ ${bk.qtyReason}${bk.source ? ` <span style="font-size:10px;font-style:normal;margin-left:6px;">[${htmlTermLink(bk.source)}]</span>` : ''}
+                                                                ${htmlQtyReasonBlock(bk)}
               </td></tr>` : '';
                 return `
               <tr class="bkdn-row">
@@ -2094,8 +4461,9 @@
 
                 // ── Breakdown table HTML ──
                 const bkRowsHtml = bkRows.map(bk => {
-                    const srcHtml = bk.source ? `<span style="font-size:10px;color:#94a3b8;font-style:italic;">📎 ${htmlTermLink(bk.source)}</span>` : '';
-                    const qtyNoteHtml = bk.qtyReason ? `<tr><td colspan="8" style="padding:3px 10px 7px 36px;font-size:11px;color:#64748b;font-style:italic;background:linear-gradient(to right,#f0f9ff88,#f8fafc44);">↳ ${bk.qtyReason}${bk.source ? ` — ${htmlTermLink(bk.source)}` : ''}</td></tr>` : '';
+                    const srcUrl = sourceUrlForText(bk.source, bk.sourceUrl);
+                    const srcHtml = bk.source ? `<span style="font-size:10px;color:#94a3b8;font-style:italic;">📎 ${htmlTermLink(bk.source)}${srcUrl ? ` <a href="${srcUrl}" target="_blank" rel="noopener noreferrer">[source]</a>` : ''}</span>` : '';
+                                        const qtyNoteHtml = (bk.qtyReason || bk.noteDetails) ? `<tr><td colspan="8" style="padding:3px 10px 7px 36px;font-size:11px;color:#64748b;background:linear-gradient(to right,#f0f9ff88,#f8fafc44);">${htmlQtyReasonBlock(bk)}</td></tr>` : '';
                     return `<tr style="border-bottom:1px solid ${accent.bkAccent}22;">
                       <td style="padding:6px 8px 6px 14px;font-size:12px;color:#475569;">${bk.label || '—'}<br>${srcHtml}</td>
                       <td style="padding:6px 8px;text-align:center;font-weight:600;font-size:13px;">${bk.qty}</td>
@@ -2108,11 +4476,13 @@
                 }).join('');
 
                 // ── Quantity notes footer ──
-                const qtNotes = bkRows.filter(r => r.qtyReason);
+                                const qtNotes = bkRows.filter(r => r.qtyReason || r.noteDetails);
                 const qtNotesHtml = qtNotes.length ? `
                   <div style="margin-top:10px;padding:10px 14px;background:${accent.notesBg};border-top:1px dashed ${accent.bkAccent};border-radius:0 0 8px 8px;font-size:11px;">
                     <div style="font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.06em;font-size:10px;margin-bottom:5px;">Quantity Notes:</div>
-                    ${qtNotes.map(n => `<div style="display:flex;gap:6px;margin-bottom:3px;"><span style="color:${accent.chip};">•</span><span style="color:#475569;font-style:italic;">${n.label}: ${n.qtyReason}${n.source ? ` — ${htmlTermLink(n.source)}` : ''}</span></div>`).join('')}
+                                        ${qtNotes.map(n => {
+                                                                                                return `<div style="margin-bottom:5px;"><div style="font-size:11px;font-weight:700;color:#334155;margin-bottom:3px;">• ${n.label}</div>${htmlQtyReasonBlock(n)}</div>`;
+                                        }).join('')}
                   </div>` : '';
 
                 // ── Unit & sigma row ──
@@ -2153,7 +4523,7 @@
                     <span style="font-size:13px;font-weight:700;color:${accent.hdr};">${cat.label}${cat.recurring ? ' <span style="font-size:10px;font-weight:400;color:'+accent.chip+';">(annual)</span>' : ' <span style="font-size:10px;font-weight:400;color:#94a3b8;">(once)</span>'}</span>
                     <span style="font-size:15px;font-weight:900;color:${accent.chip};white-space:nowrap;padding:4px 14px;background:${accent.chipBg};border-radius:8px;">${sym}${fmtN(rawVal)}</span>
                   </div>
-                  ${rationale ? `<div style="margin-top:8px;padding:8px 12px;background:${accent.ratBg};border-left:3px solid ${accent.ratBorder};border-radius:0 6px 6px 0;font-size:12px;color:#475569;font-style:italic;line-height:1.6;">💡 ${rationale}</div>` : ''}
+                                    ${rationale ? `<div style="margin-top:8px;padding:8px 12px;background:${accent.ratBg};border-left:3px solid ${accent.ratBorder};border-radius:0 6px 6px 0;font-size:12px;color:#475569;font-style:italic;line-height:1.6;">💡 ${renderRationaleHtml(rationale)}</div>` : ''}
                   ${bkHtml}
                 </div>`;
             }).join('');
@@ -2162,6 +4532,10 @@
         const hazardTags = (s.currentRisk.hazards || []).map(h =>
             `<span style="display:inline-block;background:#e2e8f0;color:#334155;font-size:11px;padding:2px 8px;border-radius:99px;margin:2px 2px;">${h.group}: ${h.name}</span>`
         ).join('');
+
+        const reportFEntry = getScaleEntry('frequency', s.currentRisk.frequency);
+        const reportSEntry = getScaleEntry('severity', s.currentRisk.severity);
+        const reportLEntry = getScaleEntry('likelihood', s.currentRisk.likelihood);
 
         const measuresTableHtml = s.measures.length ? `
             <h3 style="color:#1e293b;margin:32px 0 12px;font-size:16px;">📋 All Saved Measures</h3>
@@ -2189,6 +4563,66 @@
                   </tr>`;
               }).join('')}</tbody>
             </table>` : '';
+
+                const savedExecMeta = uiState.executiveSummary && uiState.executiveSummary.summary ? uiState.executiveSummary : null;
+                const savedExecSummary = savedExecMeta ? normalizeExecutiveSummary(savedExecMeta.summary) : null;
+
+                function renderExecDrivers(rows) {
+                        if (!rows || rows.length === 0) {
+                                return '<div style="font-size:12px;color:#64748b;">No driver details captured.</div>';
+                        }
+                        return rows.map((d) => {
+                                const item = escapeHtmlText(d.item || 'Item');
+                                const amount = d.amount ? ` (${escapeHtmlText(d.amount)})` : '';
+                                const explanation = d.explanation ? `<div style="font-size:12px;color:#334155;margin-top:3px;">${escapeHtmlText(d.explanation)}</div>` : '';
+                                const editable = d.userCanEdit ? `<div style="font-size:11px;color:#475569;margin-top:3px;">You can edit: ${escapeHtmlText(d.userCanEdit)}</div>` : '';
+                                return `<div style="border-top:1px dashed #cbd5e1;padding-top:8px;margin-top:8px;"><div style="font-size:12px;font-weight:700;color:#0f172a;">${item}${amount}</div>${explanation}${editable}</div>`;
+                        }).join('');
+                }
+
+                function renderExecBullets(rows, emptyText) {
+                        if (!rows || rows.length === 0) {
+                                return `<div style="font-size:12px;color:#64748b;">${escapeHtmlText(emptyText)}</div>`;
+                        }
+                        return rows.map((x) => `<div style="font-size:12px;color:#334155;margin-top:4px;">• ${escapeHtmlText(String(x || ''))}</div>`).join('');
+                }
+
+                const executiveSummaryHtml = savedExecSummary ? (() => {
+                        const generatedAt = savedExecMeta.generatedAt ? new Date(savedExecMeta.generatedAt).toLocaleString('en-GB') : 'Not recorded';
+                        const method = savedExecMeta.isFallback ? 'Fallback helper' : 'AI helper';
+                        const model = savedExecMeta.model ? escapeHtmlText(savedExecMeta.model) : 'Not recorded';
+                        return `
+    <div class="section">
+        <div class="section-title">📘 Executive Summary Helper Output</div>
+        <div style="font-size:11px;color:#64748b;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:10px 12px;">
+            Generated: ${escapeHtmlText(generatedAt)} &nbsp;|&nbsp; Method: ${escapeHtmlText(method)} &nbsp;|&nbsp; Model: ${model}
+        </div>
+        <div style="margin-top:10px;background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:12px;">
+            <div style="font-size:18px;font-weight:900;color:#0f172a;">${escapeHtmlText(savedExecSummary.headline || 'Executive Summary')}</div>
+            ${savedExecSummary.overview ? `<div style="margin-top:8px;font-size:13px;line-height:1.65;color:#334155;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:10px;">${escapeHtmlText(savedExecSummary.overview)}</div>` : ''}
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px;">
+                <div style="border:1px solid #fecaca;background:#fff7f7;border-radius:10px;padding:10px;">
+                    <div style="font-size:12px;font-weight:800;color:#991b1b;">Cost Drivers</div>
+                    ${renderExecDrivers(savedExecSummary.costDrivers)}
+                </div>
+                <div style="border:1px solid #a7f3d0;background:#f0fdf4;border-radius:10px;padding:10px;">
+                    <div style="font-size:12px;font-weight:800;color:#065f46;">Benefit Drivers</div>
+                    ${renderExecDrivers(savedExecSummary.benefitDrivers)}
+                </div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px;">
+                <div style="border:1px solid #e2e8f0;background:#fff;border-radius:10px;padding:10px;">
+                    <div style="font-size:12px;font-weight:800;color:#1e293b;margin-bottom:4px;">Assumptions</div>
+                    ${renderExecBullets(savedExecSummary.assumptions, 'No assumptions captured.')}
+                </div>
+                <div style="border:1px solid #d1fae5;background:#ecfdf5;border-radius:10px;padding:10px;">
+                    <div style="font-size:12px;font-weight:800;color:#065f46;margin-bottom:4px;">Next Steps</div>
+                    ${renderExecBullets(savedExecSummary.nextSteps, 'No next steps captured.')}
+                </div>
+            </div>
+        </div>
+    </div>`;
+                })() : '';
 
         const html = `<!DOCTYPE html>
 <html lang="en">
@@ -2274,9 +4708,9 @@
             <span class="risk-pill" style="background:${E2.getRiskColor(s.currentRisk.category)};">${s.currentRisk.category || '—'}</span>
           </div>
           <div style="font-size:12px;color:#475569;line-height:2;">
-            <div>Frequency: <b>${s.currentRisk.frequency}/5</b></div>
-            <div>Severity: <b>${s.currentRisk.severity}/5</b></div>
-            <div>Likelihood: <b>${s.currentRisk.likelihood}/5</b></div>
+                        <div>Frequency: <b>${formatScaleValue(s.currentRisk.frequency)}</b>${reportFEntry ? ` (${reportFEntry.label})` : ''}</div>
+                        <div>Severity: <b>${formatScaleValue(s.currentRisk.severity)}</b>${reportSEntry ? ` (${reportSEntry.label})` : ''}</div>
+                        <div>Likelihood: <b>${formatScaleValue(s.currentRisk.likelihood)}</b>${reportLEntry ? ` (${reportLEntry.label})` : ''}</div>
           </div>
         </div>
       </div>
@@ -2379,6 +4813,8 @@
     ${r.riskReduction > 0 ? `<div style="text-align:center;margin-top:12px;font-size:13px;font-weight:600;color:#16a34a;background:#f0fdf4;border-radius:8px;padding:10px;">↓ ${r.riskReduction} point risk reduction (${Math.round((r.riskReduction/r.currentScore)*100)}%)</div>` : ''}
   </div>` : ''}
 
+    ${executiveSummaryHtml}
+
   <!-- AI NOTES -->
   ${uiState.aiNotes ? `
   <div class="section">
@@ -2423,7 +4859,8 @@
           ['Disproportion Factor (DF)','Multiplier reflecting moral obligation to act at higher risk levels. LOW×1, MEDIUM×2, HIGH×4, CRITICAL×10 (HSE R2P2).'],
           ['Lifecycle Cost','Total cost over the chosen time horizon, one-off costs counted once, recurring costs multiplied by years.'],
           ['Adjusted Benefit','Raw Benefit × Disproportion Factor. Effective benefit weight for comparison against cost.'],
-          ['Risk Score','Frequency × Severity × Likelihood (each 1–5). LOW 1–19, MEDIUM 20–49, HIGH 50–71, CRITICAL 72–125.'],
+          ['Risk Score','Frequency × Severity × Likelihood using standard scales: F(1/1.25/1.5/1.75/2), S(1/3/5/7/9/10), L(1/3/5/8/10). LOW 1–19, MEDIUM 20–49, HIGH 50–71, CRITICAL 72–200.'],
+          ['Risk Rating & Response','LOW 1–19: low priority, reduce if feasible. MEDIUM 20–49: reduce over time and prioritize higher risks first. HIGH 50–71: action plan required. CRITICAL 72–200: immediate interim controls + prioritize permanent secure controls and communicate exposure to associates.'],
           ['CM Ladder','L6 Elimination → L5 Substitution → L4 Engineering → L3 Visual → L2 Administrative → L1 PPE.'],
           ['Lost Workday Cases (LWC)','Injuries causing ≥1 missed workday. OSHA DAFW avg for severity-3: ~48 hrs.'],
           ['Broadly Acceptable','Risk so low no ALARP demo needed. Typically <10⁻⁶ annual individual risk of death.'],
@@ -2605,6 +5042,11 @@
                 data._processTimeMinutesPerTask = uiState.processTimeMinutesPerTask || null;
                 data._taskBreakdownMinutes = uiState.taskBreakdownMinutes || 10;
                 data._avgHourlyWage = uiState.avgHourlyWage || null;
+                data._aiNotes = uiState.aiNotes || '';
+                data._recurringPeriod = uiState.recurringPeriod || 'year';
+                data._aiModel = uiState.aiModel || 'anthropic/claude-sonnet-4-6';
+                data._aiSnapshot = uiState.aiSnapshot ? JSON.parse(JSON.stringify(uiState.aiSnapshot)) : null;
+                data._executiveSummary = uiState.executiveSummary ? JSON.parse(JSON.stringify(uiState.executiveSummary)) : null;
                 data._exportedAt = new Date().toISOString();
                 data._version = '3.0';
                 triggerDownload(JSON.stringify(data, null, 2), `CBA_Project_${slug}_${dateTag}.json`, 'application/json');
@@ -2618,22 +5060,22 @@
             root = document.getElementById(targetId || 'cba-app-mount');
             if (!root) { console.error('CBA: mount element not found'); return; }
             step = 'landing';
+            // Luxembourg: pre-set location and wage; no geolocation needed
+            const s = E.getState();
+            s.location = { country: 'Luxembourg', region: '', lat: 49.6117, lng: 6.1319, currency: 'EUR' };
+            uiState.locationDetected = true;
+            uiState.avgHourlyWage = 28; // STATEC 2024 median: €58,126/yr ÷ 2080hrs ≈ €28/hr
             render();
-            // Auto-detect location on first open
-            if (!uiState.locationDetected) {
-                const s = E.getState();
-                A.detectLocation().then(loc => {
-                    Object.assign(s.location, { lat: loc.lat, lng: loc.lng, country: loc.country, region: loc.region, currency: loc.currency });
-                    uiState.locationDetected = true;
-                    // Auto-set average wage from lookup
-                    const cc = (loc.country || '').toLowerCase();
-                    uiState.avgHourlyWage = lookupAvgWage(cc, loc.currency);
-                    render();
-                }).catch(() => { /* silent fail — user can detect manually */ });
-            }
         },
         exportData() { return E.exportData(); },
-        importData(data) { E.importData(data); step = 'landing'; render(); },
+        importData(data) {
+            E.importData(data);
+            const sImported = E.getState();
+            normalizeRiskState(sImported.currentRisk);
+            normalizeRiskState(sImported.projectedRisk);
+            step = 'landing';
+            render();
+        },
         analyzeRow(rowIndex) { if (!root) this.init(); E.importFromTable(rowIndex); uiState.selectedRow = String(rowIndex); step = 'analyze'; render(); if (window.switchTab) window.switchTab('cost-benefit'); }
     };
 

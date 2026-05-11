@@ -26,7 +26,7 @@
     ];
 
     const BENEFIT_CATEGORIES = [
-        { key: 'injuryCost',     label: 'Injury Cost Avoidance',       hint: 'Reduced lost workday cases × cost per case',  recurring: true, aiPrefill: true },
+        { key: 'injuryCost',     label: 'Injury Cost Avoidance',       hint: 'Reduced non-medical injury impact (productivity/admin/insurance)',  recurring: true, aiPrefill: true },
         { key: 'insurance',      label: 'Insurance Premium Reduction', hint: 'Annual savings on premiums',                  recurring: true, aiPrefill: true },
         { key: 'medical',        label: 'Medical Cost Savings',        hint: 'Reduced medical treatment expenses',          recurring: true, aiPrefill: true },
         { key: 'regulatory',     label: 'Regulatory Fine Avoidance',   hint: 'Expected penalty × probability of citation',  recurring: false, aiPrefill: true },
@@ -68,6 +68,30 @@
         { maxScore: Infinity, label: 'CRITICAL', factor: 10 }
     ];
 
+    // Standard risk-assessment scales (aligned to user process standard)
+    const RISK_SCALES = {
+        frequency: [1, 1.25, 1.5, 1.75, 2],
+        severity: [1, 3, 5, 7, 9, 10],
+        likelihood: [1, 3, 5, 8, 10]
+    };
+
+    function normalizeToScaleValue(type, raw, fallback) {
+        const list = RISK_SCALES[type] || [];
+        const fb = fallback != null ? Number(fallback) : (list.length ? list[0] : 1);
+        const n = Number(raw);
+        if (!isFinite(n) || !list.length) return fb;
+        let best = list[0];
+        let bestDiff = Math.abs(n - best);
+        for (let i = 1; i < list.length; i++) {
+            const diff = Math.abs(n - list[i]);
+            if (diff < bestDiff) {
+                best = list[i];
+                bestDiff = diff;
+            }
+        }
+        return best;
+    }
+
     // ═══════════════════════════════════════════════════════════════
     // STATE
     // ═══════════════════════════════════════════════════════════════
@@ -77,13 +101,13 @@
     function createBlankState() {
         return {
             mode: null,           // 'import' | 'fresh'
-            location: { country: '', region: '', lat: null, lng: null, currency: 'USD' },
+            location: { country: 'Luxembourg', region: '', lat: 49.6117, lng: 6.1319, currency: 'EUR' },
             currentRisk: {
                 description: '',
                 hazards: [],      // [{group, name, consequence}]
-                frequency: 1,
-                severity: 1,
-                likelihood: 1,
+                frequency: RISK_SCALES.frequency[0],
+                severity: RISK_SCALES.severity[0],
+                likelihood: RISK_SCALES.likelihood[0],
                 score: null,
                 category: '',
                 imageBase64: null,
@@ -104,9 +128,9 @@
                 aiEstimates: null    // raw AI response for reference
             },
             projectedRisk: {
-                frequency: 1,
-                severity: 1,
-                likelihood: 1,
+                frequency: RISK_SCALES.frequency[0],
+                severity: RISK_SCALES.severity[0],
+                likelihood: RISK_SCALES.likelihood[0],
                 score: null,
                 category: ''
             },
@@ -120,7 +144,7 @@
     // ═══════════════════════════════════════════════════════════════
 
     function calcRiskScore(f, s, l) {
-        return (f || 1) * (s || 1) * (l || 1);
+        return (Number(f) || 1) * (Number(s) || 1) * (Number(l) || 1);
     }
 
     function getRiskCategory(score) {
@@ -171,6 +195,14 @@
 
     function calculateALARP() {
         const s = state;
+        s.currentRisk.frequency = normalizeToScaleValue('frequency', s.currentRisk.frequency, RISK_SCALES.frequency[0]);
+        s.currentRisk.severity = normalizeToScaleValue('severity', s.currentRisk.severity, RISK_SCALES.severity[0]);
+        s.currentRisk.likelihood = normalizeToScaleValue('likelihood', s.currentRisk.likelihood, RISK_SCALES.likelihood[0]);
+
+        s.projectedRisk.frequency = normalizeToScaleValue('frequency', s.projectedRisk.frequency, RISK_SCALES.frequency[0]);
+        s.projectedRisk.severity = normalizeToScaleValue('severity', s.projectedRisk.severity, RISK_SCALES.severity[0]);
+        s.projectedRisk.likelihood = normalizeToScaleValue('likelihood', s.projectedRisk.likelihood, RISK_SCALES.likelihood[0]);
+
         const currentScore = calcRiskScore(s.currentRisk.frequency, s.currentRisk.severity, s.currentRisk.likelihood);
         s.currentRisk.score = currentScore;
         s.currentRisk.category = getRiskCategory(currentScore);
@@ -255,9 +287,9 @@
         const fSelect = cells[6] ? cells[6].querySelector('select') : null;
         const sSelect = cells[7] ? cells[7].querySelector('select') : null;
         const lSelect = cells[8] ? cells[8].querySelector('select') : null;
-        state.currentRisk.frequency = parseInt(fSelect ? fSelect.value : 1) || 1;
-        state.currentRisk.severity = parseInt(sSelect ? sSelect.value : 1) || 1;
-        state.currentRisk.likelihood = parseInt(lSelect ? lSelect.value : 1) || 1;
+        state.currentRisk.frequency = normalizeToScaleValue('frequency', parseFloat(fSelect ? fSelect.value : RISK_SCALES.frequency[0]), RISK_SCALES.frequency[0]);
+        state.currentRisk.severity = normalizeToScaleValue('severity', parseFloat(sSelect ? sSelect.value : RISK_SCALES.severity[0]), RISK_SCALES.severity[0]);
+        state.currentRisk.likelihood = normalizeToScaleValue('likelihood', parseFloat(lSelect ? lSelect.value : RISK_SCALES.likelihood[0]), RISK_SCALES.likelihood[0]);
         state.currentRisk.score = calcRiskScore(state.currentRisk.frequency, state.currentRisk.severity, state.currentRisk.likelihood);
         state.currentRisk.category = getRiskCategory(state.currentRisk.score);
 
@@ -335,6 +367,7 @@
         TIME_HORIZONS,
         CURRENCIES,
         DF_TABLE,
+        RISK_SCALES,
 
         // State
         getState:       () => state,
@@ -343,6 +376,7 @@
 
         // Risk scoring
         calcRiskScore,
+        normalizeToScaleValue,
         getRiskCategory,
         getRiskColor,
         getRiskBg,

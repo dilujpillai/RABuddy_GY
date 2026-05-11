@@ -8,7 +8,7 @@
 
     // ─── STATE ──────────────────────────────────────────────────────────
     const state = {
-        tool: 'blur',           // 'blur' | 'eraser' | 'circle' | 'arrow' | 'select'
+        tool: 'blur',           // 'blur' | 'eraser' | 'circle' | 'arrow' | 'line' | 'stickman' | 'select'
         brushSize: 30,
         brushColor: '#ef4444',  // Red default for annotations
         strokeWidth: 3,
@@ -108,6 +108,8 @@
             const selected = i === state.selectedIdx;
             if (a.type === 'circle') drawCircle(a, selected);
             else if (a.type === 'arrow') drawArrow(a, selected);
+            else if (a.type === 'line') drawLine(a, selected);
+            else if (a.type === 'stickman') drawStickman(a, selected);
         });
 
         // Draw brush cursor when blur or eraser tool active
@@ -174,6 +176,85 @@
         }
     }
 
+    function drawLine(a, selected) {
+        const from = toRendered({ x: a.x1, y: a.y1 });
+        const to = toRendered({ x: a.x2, y: a.y2 });
+        const lw = a.strokeWidth || state.strokeWidth;
+        const color = a.color || state.brushColor;
+
+        ctx.save();
+        ctx.strokeStyle = color;
+        ctx.lineWidth = lw;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(from.x, from.y);
+        ctx.lineTo(to.x, to.y);
+        ctx.stroke();
+        ctx.restore();
+
+        if (selected) {
+            drawHandle(from.x, from.y);
+            drawHandle(to.x, to.y);
+        }
+    }
+
+    function drawStickman(a, selected) {
+        const c = toRendered({ x: a.x, y: a.y });
+        const s = a.size / state.scale;
+        const lw = a.strokeWidth || state.strokeWidth;
+        const color = a.color || state.brushColor;
+
+        ctx.save();
+        ctx.strokeStyle = color;
+        ctx.lineWidth = lw;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+
+        // Head
+        ctx.beginPath();
+        ctx.arc(c.x, c.y - s * 0.65, s * 0.2, 0, Math.PI * 2);
+        ctx.stroke();
+        // Body
+        ctx.beginPath();
+        ctx.moveTo(c.x, c.y - s * 0.45);
+        ctx.lineTo(c.x, c.y + s * 0.05);
+        ctx.stroke();
+        // Left arm
+        ctx.beginPath();
+        ctx.moveTo(c.x, c.y - s * 0.35);
+        ctx.lineTo(c.x - s * 0.4, c.y - s * 0.1);
+        ctx.stroke();
+        // Right arm
+        ctx.beginPath();
+        ctx.moveTo(c.x, c.y - s * 0.35);
+        ctx.lineTo(c.x + s * 0.4, c.y - s * 0.1);
+        ctx.stroke();
+        // Left leg
+        ctx.beginPath();
+        ctx.moveTo(c.x, c.y + s * 0.05);
+        ctx.lineTo(c.x - s * 0.3, c.y + s * 0.65);
+        ctx.stroke();
+        // Right leg
+        ctx.beginPath();
+        ctx.moveTo(c.x, c.y + s * 0.05);
+        ctx.lineTo(c.x + s * 0.3, c.y + s * 0.65);
+        ctx.stroke();
+        ctx.restore();
+
+        if (selected) {
+            // Resize handle at the bottom
+            drawHandle(c.x, c.y + s * 0.65);
+            // Dashed bounding box
+            ctx.save();
+            ctx.strokeStyle = '#3b82f6';
+            ctx.lineWidth = 1;
+            ctx.setLineDash([4, 3]);
+            ctx.strokeRect(c.x - s * 0.45, c.y - s * 0.85, s * 0.9, s * 1.5);
+            ctx.setLineDash([]);
+            ctx.restore();
+        }
+    }
+
     function drawHandle(x, y) {
         ctx.save();
         ctx.fillStyle = '#ffffff';
@@ -236,6 +317,15 @@
             const to = toRendered({ x: a.x2, y: a.y2 });
             if (dist(pt, from) < HANDLE_RADIUS) return 'start';
             if (dist(pt, to) < HANDLE_RADIUS) return 'end';
+        } else if (a.type === 'line') {
+            const from = toRendered({ x: a.x1, y: a.y1 });
+            const to = toRendered({ x: a.x2, y: a.y2 });
+            if (dist(pt, from) < HANDLE_RADIUS) return 'start';
+            if (dist(pt, to) < HANDLE_RADIUS) return 'end';
+        } else if (a.type === 'stickman') {
+            const c = toRendered({ x: a.x, y: a.y });
+            const s = a.size / state.scale;
+            if (dist(pt, { x: c.x, y: c.y + s * 0.65 }) < HANDLE_RADIUS) return 'resize';
         }
         return null;
     }
@@ -254,6 +344,15 @@
             const from = toRendered({ x: a.x1, y: a.y1 });
             const to = toRendered({ x: a.x2, y: a.y2 });
             return distToSegment(pt, from, to) < 10;
+        } else if (a.type === 'line') {
+            const from = toRendered({ x: a.x1, y: a.y1 });
+            const to = toRendered({ x: a.x2, y: a.y2 });
+            return distToSegment(pt, from, to) < 10;
+        } else if (a.type === 'stickman') {
+            const c = toRendered({ x: a.x, y: a.y });
+            const s = a.size / state.scale;
+            return pt.x >= c.x - s * 0.45 && pt.x <= c.x + s * 0.45 &&
+                   pt.y >= c.y - s * 0.85 && pt.y <= c.y + s * 0.65;
         }
         return false;
     }
@@ -436,8 +535,21 @@
             return;
         }
 
-        // Drawing circle or arrow
-        if (state.tool === 'circle' || state.tool === 'arrow') {
+        // Click-to-place: stickman
+        if (state.tool === 'stickman') {
+            const natPt = toNatural(pt);
+            const annots = getAnnotations();
+            ensureBaseImage(window.currentLightboxImageId);
+            const defaultSize = Math.max(state.natural.h * 0.12, 40);
+            annots.push({ type: 'stickman', x: natPt.x, y: natPt.y, size: defaultSize, color: state.brushColor, strokeWidth: state.strokeWidth });
+            setAnnotations(annots);
+            state.selectedIdx = annots.length - 1;
+            setActiveTool('select');
+            return;
+        }
+
+        // Drawing circle, arrow, or line
+        if (state.tool === 'circle' || state.tool === 'arrow' || state.tool === 'line') {
             state.isDrawing = true;
             state.drawStart = pt;
             return;
@@ -494,6 +606,18 @@
                 ctx.stroke();
                 ctx.setLineDash([]);
                 ctx.restore();
+            } else if (state.tool === 'line') {
+                ctx.save();
+                ctx.strokeStyle = state.brushColor;
+                ctx.lineWidth = state.strokeWidth;
+                ctx.lineCap = 'round';
+                ctx.setLineDash([6, 4]);
+                ctx.beginPath();
+                ctx.moveTo(from.x, from.y);
+                ctx.lineTo(pt.x, pt.y);
+                ctx.stroke();
+                ctx.setLineDash([]);
+                ctx.restore();
             }
             return;
         }
@@ -510,6 +634,11 @@
             } else if (a.type === 'arrow') {
                 a.x1 += dxN; a.y1 += dyN;
                 a.x2 += dxN; a.y2 += dyN;
+            } else if (a.type === 'line') {
+                a.x1 += dxN; a.y1 += dyN;
+                a.x2 += dxN; a.y2 += dyN;
+            } else if (a.type === 'stickman') {
+                a.x += dxN; a.y += dyN;
             }
             state.dragStart = pt;
             render();
@@ -535,6 +664,16 @@
                 } else {
                     a.x2 = natPt.x; a.y2 = natPt.y;
                 }
+            } else if (a.type === 'line') {
+                if (state.resizeHandle === 'start') {
+                    a.x1 = natPt.x; a.y1 = natPt.y;
+                } else {
+                    a.x2 = natPt.x; a.y2 = natPt.y;
+                }
+            } else if (a.type === 'stickman') {
+                // Drag the bottom handle to resize the figure
+                const dy = natPt.y - a.y;
+                if (dy > 0) a.size = Math.max(dy / 0.65, 20);
             }
             state.dragStart = pt;
             render();
@@ -572,6 +711,11 @@
             } else if (state.tool === 'arrow') {
                 if (dist(from, pt) > 10) { // Min length
                     annots.push({ type: 'arrow', x1: natFrom.x, y1: natFrom.y, x2: natTo.x, y2: natTo.y, color: state.brushColor, strokeWidth: state.strokeWidth });
+                    state.selectedIdx = annots.length - 1;
+                }
+            } else if (state.tool === 'line') {
+                if (dist(from, pt) > 10) { // Min length
+                    annots.push({ type: 'line', x1: natFrom.x, y1: natFrom.y, x2: natTo.x, y2: natTo.y, color: state.brushColor, strokeWidth: state.strokeWidth });
                     state.selectedIdx = annots.length - 1;
                 }
             }
@@ -647,6 +791,12 @@
                 <button data-tool="arrow" title="Draw Arrow (A)" class="tool-btn p-2 rounded-xl transition-all duration-150" aria-label="Arrow tool">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M5 19L19 5M19 5h-6M19 5v6"/></svg>
                 </button>
+                <button data-tool="line" title="Draw Line — no arrowhead (L)" class="tool-btn p-2 rounded-xl transition-all duration-150" aria-label="Line tool">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="4" y1="20" x2="20" y2="4" stroke-linecap="round"/></svg>
+                </button>
+                <button data-tool="stickman" title="Add Stick Figure (S)" class="tool-btn p-2 rounded-xl transition-all duration-150" aria-label="Stick figure">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="4" r="2"/><line x1="12" y1="6" x2="12" y2="14"/><line x1="8" y1="10" x2="16" y2="10"/><line x1="12" y1="14" x2="9" y2="20"/><line x1="12" y1="14" x2="15" y2="20"/></svg>
+                </button>
             </div>
             <div class="flex items-center gap-1.5 px-2 border-r border-white/10">
                 <label class="text-[10px] text-white/50 uppercase tracking-wider">Color</label>
@@ -682,7 +832,8 @@
         });
         // Update cursor
         if (toolName === 'blur' || toolName === 'eraser') canvas.style.cursor = 'none';
-        else if (toolName === 'circle' || toolName === 'arrow') canvas.style.cursor = 'crosshair';
+        else if (toolName === 'circle' || toolName === 'arrow' || toolName === 'line') canvas.style.cursor = 'crosshair';
+        else if (toolName === 'stickman') canvas.style.cursor = 'copy';
         else canvas.style.cursor = 'default';
         updateDeleteButton();
         render();
@@ -740,6 +891,8 @@
             else if (e.key === 'e' || e.key === 'E') setActiveTool('eraser');
             else if (e.key === 'c' || e.key === 'C') setActiveTool('circle');
             else if (e.key === 'a' || e.key === 'A') setActiveTool('arrow');
+            else if (e.key === 'l' || e.key === 'L') setActiveTool('line');
+            else if (e.key === 's' || e.key === 'S') setActiveTool('stickman');
         });
     }
 
@@ -796,6 +949,28 @@
                         cCtx.lineTo(a.x2 - hl * Math.cos(angle + Math.PI / 6), a.y2 - hl * Math.sin(angle + Math.PI / 6));
                         cCtx.closePath();
                         cCtx.fill();
+                    } else if (a.type === 'line') {
+                        const lw = (a.strokeWidth || 3) * sf;
+                        cCtx.strokeStyle = a.color || '#ef4444';
+                        cCtx.lineWidth = lw;
+                        cCtx.lineCap = 'round';
+                        cCtx.beginPath();
+                        cCtx.moveTo(a.x1, a.y1);
+                        cCtx.lineTo(a.x2, a.y2);
+                        cCtx.stroke();
+                    } else if (a.type === 'stickman') {
+                        const lw = (a.strokeWidth || 3) * sf;
+                        const s = a.size;
+                        cCtx.strokeStyle = a.color || '#ef4444';
+                        cCtx.lineWidth = lw;
+                        cCtx.lineCap = 'round';
+                        cCtx.lineJoin = 'round';
+                        cCtx.beginPath(); cCtx.arc(a.x, a.y - s * 0.65, s * 0.2, 0, Math.PI * 2); cCtx.stroke();
+                        cCtx.beginPath(); cCtx.moveTo(a.x, a.y - s * 0.45); cCtx.lineTo(a.x, a.y + s * 0.05); cCtx.stroke();
+                        cCtx.beginPath(); cCtx.moveTo(a.x, a.y - s * 0.35); cCtx.lineTo(a.x - s * 0.4, a.y - s * 0.1); cCtx.stroke();
+                        cCtx.beginPath(); cCtx.moveTo(a.x, a.y - s * 0.35); cCtx.lineTo(a.x + s * 0.4, a.y - s * 0.1); cCtx.stroke();
+                        cCtx.beginPath(); cCtx.moveTo(a.x, a.y + s * 0.05); cCtx.lineTo(a.x - s * 0.3, a.y + s * 0.65); cCtx.stroke();
+                        cCtx.beginPath(); cCtx.moveTo(a.x, a.y + s * 0.05); cCtx.lineTo(a.x + s * 0.3, a.y + s * 0.65); cCtx.stroke();
                     }
                 });
 
@@ -994,6 +1169,28 @@
                     cCtx.lineTo(a.x2 - hl * Math.cos(angle + Math.PI / 6), a.y2 - hl * Math.sin(angle + Math.PI / 6));
                     cCtx.closePath();
                     cCtx.fill();
+                } else if (a.type === 'line') {
+                    const lw = (a.strokeWidth || 3) * sf;
+                    cCtx.strokeStyle = a.color || '#ef4444';
+                    cCtx.lineWidth = lw;
+                    cCtx.lineCap = 'round';
+                    cCtx.beginPath();
+                    cCtx.moveTo(a.x1, a.y1);
+                    cCtx.lineTo(a.x2, a.y2);
+                    cCtx.stroke();
+                } else if (a.type === 'stickman') {
+                    const lw = (a.strokeWidth || 3) * sf;
+                    const s = a.size;
+                    cCtx.strokeStyle = a.color || '#ef4444';
+                    cCtx.lineWidth = lw;
+                    cCtx.lineCap = 'round';
+                    cCtx.lineJoin = 'round';
+                    cCtx.beginPath(); cCtx.arc(a.x, a.y - s * 0.65, s * 0.2, 0, Math.PI * 2); cCtx.stroke();
+                    cCtx.beginPath(); cCtx.moveTo(a.x, a.y - s * 0.45); cCtx.lineTo(a.x, a.y + s * 0.05); cCtx.stroke();
+                    cCtx.beginPath(); cCtx.moveTo(a.x, a.y - s * 0.35); cCtx.lineTo(a.x - s * 0.4, a.y - s * 0.1); cCtx.stroke();
+                    cCtx.beginPath(); cCtx.moveTo(a.x, a.y - s * 0.35); cCtx.lineTo(a.x + s * 0.4, a.y - s * 0.1); cCtx.stroke();
+                    cCtx.beginPath(); cCtx.moveTo(a.x, a.y + s * 0.05); cCtx.lineTo(a.x - s * 0.3, a.y + s * 0.65); cCtx.stroke();
+                    cCtx.beginPath(); cCtx.moveTo(a.x, a.y + s * 0.05); cCtx.lineTo(a.x + s * 0.3, a.y + s * 0.65); cCtx.stroke();
                 }
             });
 

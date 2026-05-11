@@ -100,23 +100,23 @@
     // ═══════════════════════════════════════════════════════════════
 
     async function analyzeRiskDescription(description, locationStr, model) {
-        const prompt = `You are a senior EHS (Environment, Health & Safety) specialist performing an ALARP cost-benefit analysis.
+        const prompt = `You are a senior EHS (Environment, Health & Safety) specialist performing an ALARP cost-benefit analysis in Luxembourg.
 
 Given this workplace hazard description:
 """
 ${description}
 """
 
-Location: ${locationStr || 'Not specified'}
+Location: Luxembourg (Grand Duchy of Luxembourg) — apply Luxembourg Labour Code, AAA accident insurance framework, and ITM enforcement context.
 
 Analyze the hazard and return a JSON object (no markdown, only valid JSON) with:
 {
   "hazards": [
     { "group": "<hazard group name>", "name": "<specific hazard>", "consequence": "<potential consequence>" }
   ],
-  "frequency": <1-5 rating: 1=rare, 2=unlikely, 3=possible, 4=likely, 5=almost certain>,
-  "severity": <1-5 rating: 1=negligible, 2=minor, 3=moderate, 4=major, 5=catastrophic>,
-  "likelihood": <1-5 rating: 1=very unlikely, 2=unlikely, 3=possible, 4=likely, 5=very likely>,
+  "frequency": <one of 1, 1.25, 1.5, 1.75, 2 using: 1=RARELY, 1.25=OCCASIONAL, 1.5=INTERMEDIATE, 1.75=FREQUENTLY, 2=PERMANENT>,
+  "severity": <one of 1, 3, 5, 7, 9, 10 using: 1=No potential of injury, 3=FIRST AID, 5=MEDICAL TREATMENT, 7=DART, 9=SIA, 10=Fatality>,
+  "likelihood": <one of 1, 3, 5, 8, 10 using: 1=Almost impossible, 3=Very unlikely, 5=Possible, 8=Likely, 10=Very likely>,
   "suggestedMeasures": [
     {
       "description": "<control measure description>",
@@ -143,7 +143,18 @@ Be specific and realistic. Use the industrial workplace context.`;
 
     async function estimateCosts(hazardData, measureDescription, locationStr, currency, model, extraContext) {
         const sym = (window.CBA.engine.CURRENCIES.find(c => c.code === currency) || {}).symbol || '$';
-        const sevDesc = ['Minor','Moderate','Serious','Major','Catastrophic'][((hazardData.severity || 1) - 1)] || 'Moderate';
+      const sevValue = Number(hazardData.severity || 1);
+      const sevDesc = sevValue >= 10
+        ? 'Potential of Fatality'
+        : sevValue >= 9
+          ? 'Potential of SIA'
+          : sevValue >= 7
+            ? 'Potential of DART'
+            : sevValue >= 5
+              ? 'Potential of MEDICAL TREATMENT'
+              : sevValue >= 3
+                ? 'Potential of FIRST AID'
+                : 'No potential of injury';
         // Build process context from either per-task time OR calculated from weekly frequency
         let processCtx = '';
         if (extraContext && extraContext.processTimeMinutesPerTask) {
@@ -152,18 +163,28 @@ Be specific and realistic. Use the industrial workplace context.`;
         const wageCtx = (extraContext && extraContext.avgHourlyWage) ?
             `\nAverage Hourly Wage: ${sym}${extraContext.avgHourlyWage}/hr (local benchmark for this location). Use this rate for all labour-cost calculations.` : '';
         const baselineCtx = (extraContext && extraContext.baselineContext) ? extraContext.baselineContext : '';
-        const prompt = `You are a senior EHS cost estimator specializing in industrial safety investments.
+        const prompt = `You are a senior EHS cost estimator specializing in industrial safety investments in Luxembourg.
 
 Hazard: ${hazardData.description || JSON.stringify(hazardData.hazards)}
 Identified Risks: ${JSON.stringify(hazardData.hazards || [])}
-Risk Score: ${hazardData.score} (${hazardData.category}), Severity: ${hazardData.severity}/5 (${sevDesc})
+Risk Score: ${hazardData.score} (${hazardData.category}), Severity: ${hazardData.severity} (${sevDesc})
 Proposed Control Measure: ${measureDescription}
-Location: ${locationStr || 'Not specified'}
-Currency: ${currency} (${sym})${processCtx}${wageCtx}${baselineCtx}
+Location: Luxembourg (Grand Duchy of Luxembourg)
+Currency: EUR (€)${processCtx}${wageCtx}${baselineCtx}
 
-IMPORTANT: For EVERY cost and benefit line item, provide a "breakdown" array showing the calculation components that multiply together to produce the total. Each breakdown row has: label (what it is), qty (numeric quantity), qtyReason (1-sentence explanation of WHY this specific qty was chosen — e.g. "Based on OSHA incidence rates for severity 4 in manufacturing, ~3 recordable incidents/yr is typical"), rate (unit price/rate), unit (e.g. "hours","people","incidents/yr"), and source (regulation, benchmark, or assumption — e.g. "OSHA avg","Industry benchmark","BLS data").
+LUXEMBOURG REGULATORY & COST FRAMEWORK (mandatory reference):
+- AAA (Association d'Assurance Accident) 2024: avg direct accident cost €4,053; 128 accidents/day nationally
+- AAA Bonus-Malus: base rate 0.70% × multiplier (0.85 bonus → 1.50 max malus); one serious incident can trigger +€7,000–€35,000/yr in premium on a €10M payroll
+- MDE (Mutualité des Employeurs): reimburses 80% of employer cost; employer absorbs 20% deadweight loss; salary continuation (Lohnfortzahlung) until end of month of 77th absence day
+- MDE class rates exist (Class 1: 0.07%, Class 2: 0.99%) but DO NOT assume occupational accidents automatically trigger class migration unless the user provides explicit company absenteeism evidence
+- ITM fines: avg €5,530/fine in 2024 (1,152 fines totalling €6,370,500); max €4,000/worker/violation; 116 criminal referrals for grave/fatal accidents
+- STATEC wage baseline: median €4,844/month gross; total employer cost ~€5,522/month; daily employer cost ~€257; median hourly ~€28
+- ISSA Return on Prevention (ROP) = 2.2 — for every €1 invested in prevention, expected return is €2.20
+- Vision Zero Luxembourg: national strategy promoted by AAA and UEL
 
-The breakdown quantities should be tied to the risk severity level ${hazardData.severity}/5. Higher severity = more lost days, higher medical costs, bigger fines, etc. Use OSHA/HSE/local regulation benchmarks for lost workday estimates, average injury costs, etc.
+IMPORTANT: For EVERY cost and benefit line item, provide a "breakdown" array showing the calculation components that multiply together to produce the total. Each breakdown row has: label (what it is), qty (numeric quantity), qtyReason (1-sentence explanation of WHY this specific qty was chosen), rate (unit price/rate), unit (e.g. "hours","people","incidents/yr"), source (Luxembourg regulation/benchmark title), and sourceUrl (direct URL to the cited source page/document).
+
+The breakdown quantities should be tied to the risk severity level ${hazardData.severity}. Higher severity = more lost days, higher medical costs, bigger AAA/MDE premium hikes, larger ITM fines. Use Luxembourg AAA/ITM/MDE benchmark values for all estimates.
 
 Return a JSON object (no markdown, only valid JSON):
 {
@@ -178,27 +199,20 @@ Return a JSON object (no markdown, only valid JSON):
     "otherRecurring": <annual number>,
     "other": <number>
   },
-  "costBreakdowns": {
-    "capital": [{"label":"<component>","qty":<n>,"qtyReason":"<why this qty>","rate":<n>,"unit":"<unit>","source":"<ref>"}],
-    "installation": [{"label":"...","qty":0,"qtyReason":"...","rate":0,"unit":"...","source":"..."}],
-    "maintenance": [{"label":"...","qty":0,"qtyReason":"...","rate":0,"unit":"...","source":"..."}],
-    "training": [{"label":"...","qty":0,"qtyReason":"...","rate":0,"unit":"...","source":"..."}],
-    "downtime": [{"label":"...","qty":0,"qtyReason":"...","rate":0,"unit":"...","source":"..."}],
-    "consultant": [{"label":"...","qty":0,"qtyReason":"...","rate":0,"unit":"...","source":"..."}],
-    "admin": [{"label":"...","qty":0,"qtyReason":"...","rate":0,"unit":"...","source":"..."}],
-    "otherRecurring": [{"label":"...","qty":0,"qtyReason":"...","rate":0,"unit":"...","source":"..."}],
-    "other": [{"label":"...","qty":0,"qtyReason":"...","rate":0,"unit":"...","source":"..."}]
-  },
   "costRationales": {
     "capital": "<1-sentence justification>",
     "installation": "<1-sentence justification>",
     "maintenance": "<1-sentence justification>",
     "training": "<1-sentence justification>",
-    "downtime": "<1-sentence justification referencing OSHA lost workday avg for severity>",
+    "downtime": "<1-sentence justification referencing Luxembourg lost-workday context for the given severity>",
     "consultant": "<1-sentence justification>",
     "admin": "<1-sentence justification>",
     "otherRecurring": "<1-sentence justification>",
     "other": "<1-sentence justification>"
+  },
+  "costBreakdowns": {
+    "capital": [{"label": "<component name>", "qty": 1, "qtyReason": "<why>", "rate": 100, "unit": "unit", "source": "...", "sourceUrl": "..."}],
+    "downtime": [{"label": "<component name>", "qty": 1, "qtyReason": "<why>", "rate": 100, "unit": "hours", "source": "...", "sourceUrl": "..."}]
   },
   "benefits": {
     "injuryCost": <annual number>,
@@ -212,23 +226,11 @@ Return a JSON object (no markdown, only valid JSON):
     "retention": <annual number>,
     "otherBenefit": <number>
   },
-  "benefitBreakdowns": {
-    "injuryCost": [{"label":"Lost workday cases avoided","qty":<incidents/yr>,"qtyReason":"<why this incident rate — cite OSHA incidence rate for this industry/severity>","rate":<cost per case>,"unit":"incidents/yr","source":"OSHA/BLS avg for severity ${hazardData.severity}"},{{"label":"Avg days away per case","qty":<days>,"qtyReason":"<why this many days — cite BLS DAFW avg for this injury type/severity>","rate":<daily wage>,"unit":"days","source":"BLS DAFW data"}],
-    "insurance": [{"label":"...","qty":0,"qtyReason":"...","rate":0,"unit":"...","source":"..."}],
-    "medical": [{"label":"...","qty":0,"qtyReason":"...","rate":0,"unit":"...","source":"..."}],
-    "regulatory": [{"label":"...","qty":0,"qtyReason":"...","rate":0,"unit":"...","source":"..."}],
-    "production": [{"label":"Downtime avoided","qty":<hours/yr>,"qtyReason":"<why this hours estimate>","rate":<hourly production value>,"unit":"hours/yr","source":"..."}],
-    "material": [{"label":"...","qty":0,"qtyReason":"...","rate":0,"unit":"...","source":"..."}],
-    "ppe": [{"label":"...","qty":0,"qtyReason":"...","rate":0,"unit":"...","source":"..."}],
-    "manhours": [{"label":"Labour hours saved","qty":<hours/yr>,"qtyReason":"<calculation: process time × frequency × weeks/yr>","rate":<hourly wage>,"unit":"hours/yr","source":"Local avg wage"}],
-    "retention": [{"label":"...","qty":0,"qtyReason":"...","rate":0,"unit":"...","source":"..."}],
-    "otherBenefit": [{"label":"...","qty":0,"qtyReason":"...","rate":0,"unit":"...","source":"..."}]
-  },
   "benefitRationales": {
-    "injuryCost": "<refer to specific identified hazard/risk & OSHA lost workday data>",
+    "injuryCost": "<non-medical injury impact only; must exclude direct medical/statutory compensation>",
     "insurance": "<1-sentence justification>",
     "medical": "<refer to injury type & avg treatment cost benchmark>",
-    "regulatory": "<cite applicable regulation & typical fine range>",
+    "regulatory": "<cite ITM Luxembourg — avg fine €5,530 in 2024; max €4,000/worker/violation; 116 criminal referrals for fatal accidents>",
     "production": "<1-sentence justification>",
     "material": "<1-sentence justification>",
     "ppe": "<1-sentence justification>",
@@ -236,22 +238,31 @@ Return a JSON object (no markdown, only valid JSON):
     "retention": "<1-sentence justification>",
     "otherBenefit": "<1-sentence justification>"
   },
+  "benefitBreakdowns": {
+    "injuryCost": [{"label": "<e.g. ITM fines>", "qty": 1, "qtyReason": "<why>", "rate": 60000, "unit": "incidents/yr", "source": "...", "sourceUrl": "..."}, {"label": "<e.g. legal defence>", "qty": 1, "rate": 80000}],
+    "medical": [{"label": "<component name>", "qty": 1, "qtyReason": "<why>", "rate": 100, "unit": "incidents/yr", "source": "...", "sourceUrl": "..."}]
+  },
   "projectedRisk": {
-    "frequency": <1-5>,
-    "severity": <1-5>,
-    "likelihood": <1-5>
+    "frequency": <one of 1, 1.25, 1.5, 1.75, 2>,
+    "severity": <one of 1, 3, 5, 7, 9, 10>,
+    "likelihood": <one of 1, 3, 5, 8, 10>
   },
   "notes": "<brief explanation of assumptions, 2-3 sentences>"
 }
 
 RULES:
 - Each breakdown row qty × rate should equal the portion it contributes. Sum of all breakdown (qty×rate) for a category = that category's total.
-- Use realistic OSHA/HSE/BLS benchmark values scaled to severity level and location/currency.
-- For injuryCost: use OSHA average days away from work for the severity level (e.g. severity 3 → ~48 hrs OSHA avg), multiply by hourly cost.
-- For manhours: if Process Time is provided, calculate annual hours saved = (process time saved per occurrence × estimated occurrences/yr). Multiply by the hourly wage. Break this into clear qty/rate rows.
-- If Average Hourly Wage is provided, use it for ALL labour-cost breakdown rates (manhours, downtime, injury cost, training, etc).
+- Use Luxembourg-specific AAA/MDE/ITM/STATEC benchmark values scaled to severity level.
+- For injuryCost: use the Luxembourg iceberg model as NON-MEDICAL ONLY (all-in minus direct medical). Severity 3 anchor: €27,341 total and €4,053 direct medical, therefore non-medical injuryCost anchor = €23,288.
+- For medical: keep direct treatment/statutory compensation only. Never duplicate direct medical in injuryCost.
+- For insurance: reference AAA Bonus-Malus impact only unless user provides explicit company absenteeism data proving MDE class impact.
+- For regulatory: use ITM 2024 data (avg fine €5,530, max €4,000/worker, 116 criminal referrals for fatal accidents).
+- For manhours: if Process Time is provided, calculate annual hours saved = (process time saved per occurrence × estimated occurrences/yr). Multiply by the Luxembourg median wage (€28/hr or provided wage). Break into clear qty/rate rows.
+- If Average Hourly Wage is provided, use it for ALL labour-cost breakdown rates (manhours, downtime, injury cost, training, etc). Default Luxembourg median: €28/hr.
 - Tag rationales to specific identified hazards where applicable.
-- All amounts in whole numbers in ${currency}.`;
+- All amounts in whole numbers in EUR.
+- No guesswork: every non-zero amount must be traceable to either user input, the supplied baseline context, or a cited Luxembourg source with a direct sourceUrl. If a value cannot be justified, set it to 0 and explain in notes.
+- Mention the ISSA ROP of 2.2 in the notes field when applicable to emphasize Luxembourg prevention economics.`;
 
         const raw = await callAI(prompt, model);
         try {
@@ -300,11 +311,65 @@ Return a JSON object (no markdown, only valid JSON):
     }
 
     // ═══════════════════════════════════════════════════════════════
+    // EXECUTIVE SUMMARY HELPER (plain-language guidance)
+    // ═══════════════════════════════════════════════════════════════
+
+    async function generateExecutiveSummary(context, model) {
+        const safeContext = context || {};
+        const prompt = `You are a safety and business advisor explaining a Luxembourg cost-benefit analysis to a first-time user.
+
+Context JSON:
+${JSON.stringify(safeContext, null, 2)}
+
+Write in plain language for non-experts.
+Do not invent any numbers. Use only values present in the JSON context.
+If a value is missing, say it is user-defined or not yet entered.
+
+Return ONLY valid JSON (no markdown):
+{
+  "headline": "<one short line>",
+  "overview": "<4-6 plain sentences in common language>",
+  "costDrivers": [
+    {
+      "item": "<cost item label>",
+      "amount": "<formatted amount text from provided data>",
+      "explanation": "<what this cost means in simple terms>",
+      "userCanEdit": "<what the user can manually tune>"
+    }
+  ],
+  "benefitDrivers": [
+    {
+      "item": "<benefit item label>",
+      "amount": "<formatted amount text from provided data>",
+      "explanation": "<what this benefit means in simple terms>",
+      "userCanEdit": "<what the user can manually tune>"
+    }
+  ],
+  "assumptions": ["<short bullet>", "<short bullet>"],
+  "nextSteps": ["<short action>", "<short action>"]
+}
+
+Rules:
+- Keep language simple and practical.
+- Tie explanation to hazard, risk score, and control measure from context.
+- Mention Luxembourg framing (AAA, MDE, ITM) only when present in context.
+- Prefer concise outputs over long prose.`;
+
+        const raw = await callAI(prompt, model);
+        try {
+            const cleaned = raw.replace(/```json\s*/gi, '').replace(/```\s*/g, '').trim();
+            return JSON.parse(cleaned);
+        } catch (e) {
+            throw new Error('Failed to parse executive summary: ' + e.message);
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════
     // BASELINE DATA REFRESH (batched AI research call)
     // ═══════════════════════════════════════════════════════════════
 
     /**
-     * Asks the AI to provide current OSHA/BLS/HSE/local benchmark data
+    * Asks the AI to provide current Luxembourg benchmark data
      * for all 5 severity levels, calibrated for the given location.
      * Returns an object shaped exactly like CBA.baseline DEFAULTS so
      * CBA.baseline.update() can merge it directly.
@@ -315,59 +380,96 @@ Return a JSON object (no markdown, only valid JSON):
      * @returns {Promise<object>}   - Structured baseline data
      */
     async function refreshBaselineData(locationStr, currency, model) {
-        const loc = locationStr || 'United States (general)';
-        const cur = currency || 'USD';
+        // Luxembourg-only: ignore locationStr/currency parameters, always use Luxembourg/EUR
+        const loc = 'Luxembourg';
+        const cur = 'EUR';
 
-        const prompt = `You are an occupational health & safety data specialist with expert knowledge of OSHA (US), HSE (UK), EU-OSHA, and equivalent national regulations worldwide.
+        const prompt = `You are an occupational health & safety data specialist with deep expertise in Luxembourg's statutory OSH framework.
 
-Task: Provide the most current available benchmark data for workplace injury cost calculations.
+TASK: Provide the most current and accurate benchmark data for workplace injury cost calculations in Luxembourg.
 
-Location / Region: ${loc}
-Currency: ${cur} — convert ALL monetary values to ${cur} using current exchange rates.
-Reference year: 2023–2024
+Location: Luxembourg (Grand Duchy of Luxembourg)
+Currency: EUR — ALL monetary values must be in EUR.
+Primary Reference Year: 2024–2025
 
-For EACH of the five risk severity levels (1–5), populate ALL six metrics below.
-Definitions:
-  1 = Negligible (first-aid only, no lost time)
-  2 = Minor      (<4 days DAFW, restricted work)
-  3 = Moderate   (5–14 days DAFW, recordable)
-  4 = Major      (15–60 days DAFW, fracture/amputation)
-  5 = Catastrophic (permanent disability or fatality)
+KEY LUXEMBOURG STATUTORY FRAMEWORK YOU MUST USE:
+1. AAA (Association d'Assurance Accident) — compulsory employer-funded accident insurance
+   - 2024 Annual Report: 16,751 total accidents recognized; 13,724 workplace accidents; 2,889 commuting accidents
+   - National average direct cost per accident 2024: €4,053
+   - 501,285 working units; 31,085 enterprises; 128 accident declarations/day nationally
+   - AAA base contribution rate 2025: 0.70% of gross payroll (employers only)
+   - Bonus-Malus multipliers: 0.85 (15% bonus) | 1.00 (neutral) | 1.10 | 1.30 | 1.50 (50% malus – maximum)
+   - Effective rate range: 0.595% (best) → 1.050% (worst) on the 0.70% base rate
+   - Severe case documented: Luxembourg judgment TAL-2021-02459 awarded €29,635 total indemnification
+
+2. MDE (Mutualité des Employeurs) — mandatory employer mutual fund for salary continuation
+   - Lohnfortzahlung: employer must continue full salary until end of month of 77th absence day (rolling 18-month period)
+   - MDE reimburses ONLY 80% of employer cost — employer permanently absorbs 20% deadweight loss
+   - MDE premium 2025: Class 1 (low absenteeism) = 0.07% | Class 2 (high absenteeism) = 0.99% of gross payroll
+  - Do not assume accidents automatically upgrade MDE class; classing depends on employer absenteeism profile and MDE rules
+   - CNS assumes indemnification after 77-day threshold; employment contract ceases at 78 weeks
+
+3. ITM (Inspection du Travail et des Mines) — enforcement authority
+   - 2024: 1,152 administrative fines totalling €6,370,500 (avg €5,530/fine; +€939,000 vs 2023)
+   - Max fine: €4,000 per worker per violation (multiplies per number of workers concerned)
+   - 116 procès-verbaux transmitted to Parquet for grave/fatal accidents in 2024
+   - 12.31% increase in H&S targeted controls in 2024 vs 2023
+
+4. STATEC (Luxembourg National Statistics) — wage baseline 2024
+   - Median gross annual salary: €58,126 (€4,844/month)
+   - Average gross annual salary: €75,919 (€6,327/month)
+   - Total employer cost = gross salary × ~1.14 (employer social charges)
+   - Median daily employer cost: (€4,844 × 1.14) / 21.5 = approx €257/day
+   - Luxembourg median hourly rate: approx €27.94/hr (€58,126 / 2,080 hrs/yr)
+
+5. ISSA Return on Prevention (ROP): verified ROP = 2.2 (€1 prevention → €2.20 return)
+   Source: ISSA/DGUV/BG ETEM multinational study, 337 companies, 19 countries including Luxembourg
+
+SEVERITY DEFINITIONS FOR LUXEMBOURG:
+  1 = Negligible  (first-aid only; no AAA declaration; zero Lohnfortzahlung/MDE impact)
+  2 = Minor       (<4 days absence; declared to AAA; MDE 80% reimbursement; no Malus typically)
+  3 = Moderate    (5–30 days DAFW; standard AAA recognized accident; avg cost = €4,053 direct / €27,341 verified core total)
+  4 = Major       (31–77 days DAFW; within Lohnfortzahlung; AAA Malus 1.30× or 1.50× may be triggered)
+  5 = Catastrophic (permanent disability/fatality; ITM criminal referral to Parquet; contract cessation)
 
 Return ONLY valid JSON — no markdown, no comments, no trailing commas.
 
 {
   "incidentRates": {
-    "1": { "value": <cases per 100 FTE per year>, "unit": "cases/100 FTE/yr", "source": "<citation e.g. OSHA TRIR 2022 mfg>", "year": <int>, "notes": "<1 sentence>" },
+    "1": { "value": <cases per 100 FTE per year>, "unit": "cases/100 FTE/yr", "source": "<cite AAA Annual Report 2024>", "sourceUrl": "<direct source link>", "evidenceKey": "incidentRates.1", "figureUsed": "<exact figure>", "rationaleFormula": "<brief formula/rule>", "year": 2024, "notes": "<1 sentence specific to Luxembourg>"},
     "2": { ... }, "3": { ... }, "4": { ... }, "5": { ... }
   },
   "daysAwayFromWork": {
-    "1": { "value": <median days>, "unit": "days", "source": "<BLS/HSE SOII citation>", "year": <int>, "notes": "<1 sentence>" },
+    "1": { "value": <median days>, "unit": "days", "source": "<AAA/MDE/Luxembourg Social Security Code Art.92>", "year": 2024, "notes": "<mention Lohnfortzahlung context>"},
     "2": { ... }, "3": { ... }, "4": { ... }, "5": { ... }
   },
   "medicalCostUSD": {
-    "1": { "value": <integer in ${cur}>, "unit": "${cur}/case", "source": "<NSC/insurer benchmark>", "year": <int>, "notes": "<1 sentence about injury type/treatment>"},
+    "1": { "value": <integer in EUR>, "unit": "EUR/case", "source": "<AAA Annual Report 2024>", "year": 2024, "notes": "<what AAA covers for this severity; severity 3 anchor = €4,053>"},
     "2": { ... }, "3": { ... }, "4": { ... }, "5": { ... }
   },
   "injuryCostPerCase": {
-    "1": { "value": <integer in ${cur}, total direct+indirect>, "unit": "${cur}/case", "source": "<NSC/Liberty Mutual/HSE total cost study>", "year": <int>, "notes": "direct + indirect incl. lost productivity, admin" },
+    "1": { "value": <integer in EUR, total direct+indirect iceberg>, "unit": "EUR/case", "source": "<Luxembourg iceberg model Sec.8.2 / AAA 2024>", "year": 2024, "notes": "<include 20% MDE deadweight + AAA Malus lagging + productivity loss; severity 3 verified core anchor = €27,341>" },
     "2": { ... }, "3": { ... }, "4": { ... }, "5": { ... }
   },
   "insurancePremiumChangePct": {
-    "1": { "value": <integer % change per incident>, "unit": "%", "source": "<NCCI EMR / WC actuarial study>", "year": <int>, "notes": "<1 sentence>" },
+    "1": { "value": <integer % change in AAA premium>, "unit": "%", "source": "<AAA Bonus-Malus system 2025>", "year": 2025, "notes": "<specify resulting Malus multiplier (1.10/1.30/1.50) and EUR impact example on €10M payroll>" },
     "2": { ... }, "3": { ... }, "4": { ... }, "5": { ... }
   },
   "regulatoryFineUSD": {
-    "1": { "value": <integer in ${cur}>, "unit": "${cur}/violation", "source": "<OSHA 2024 / HSE / local equivalent citation>", "year": <int>, "notes": "<applicable regulation & typical enforcement level>" },
+    "1": { "value": <integer in EUR>, "unit": "EUR/violation", "source": "<ITM Annual Report 2024>", "year": 2024, "notes": "<€4,000/worker max, avg €5,530, 116 criminal referrals for fatal cases>" },
     "2": { ... }, "3": { ... }, "4": { ... }, "5": { ... }
   }
 }
 
-IMPORTANT:
-- All monetary values must be in ${cur}. Apply purchasing-power / location multiplier for ${loc}.
-- Use the most recently published data available (2022–2024 preferred).
-- Each "source" must be a real, citable reference (OSHA table number, BLS publication, NSC chapter, specific regulation number).
-- "notes" must explain WHY that specific value applies at that severity level.`;
+CRITICAL RULES:
+- ALL monetary values in EUR only.
+- Severity 3 medicalCostUSD anchor: €4,053 (AAA 2024 national average).
+- Severity 3 injuryCostPerCase anchor: €27,341 verified core (Luxembourg Sec.8.2 model: unrecovered salary €1,536 + lost productivity €5,760 + overtime €1,920 + admin €1,625 + asset damage €2,500 + AAA Malus €14,000).
+- insurancePremiumChangePct must reference 0.70% × Bonus-Malus factor (0.85/1.00/1.10/1.30/1.50).
+- regulatoryFineUSD must use ITM Luxembourg data (avg €5,530/fine; max €4,000/worker; 116 criminal referrals for fatal accidents).
+- Every severity entry must include sourceUrl, evidenceKey, figureUsed, and rationaleFormula.
+- No speculative assumptions: if a value is not supported by a cited Luxembourg source, keep it conservative and explain in notes.
+- All sources must cite real Luxembourg bodies: AAA, MDE, ITM, STATEC, CCSS, Luxembourg Social Security Code.`;
 
         const raw = await callAI(prompt, model);
         try {
@@ -389,6 +491,7 @@ IMPORTANT:
         analyzeRiskDescription,
         estimateCosts,
         compareMeasures,
+      generateExecutiveSummary,
         refreshBaselineData,
         CBA_MODEL
     };

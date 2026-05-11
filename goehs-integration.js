@@ -1,0 +1,4348 @@
+// ========================================================================
+// GOEHS INTEGRATION - Complete Implementation with CSV Generation
+// ========================================================================
+
+// ========================================================================
+// SECURITY UTILITIES - Safe DOM Manipulation
+// ========================================================================
+
+/**
+ * Sanitize a string for safe display (prevents XSS)
+ * @param {string} str - The string to sanitize
+ * @returns {string} - HTML-escaped string safe for display
+ */
+function sanitizeForDisplay(str) {
+    if (str === null || str === undefined) return '';
+    const div = document.createElement('div');
+    div.textContent = String(str);
+    return div.innerHTML;
+}
+
+/**
+ * Create a safe text element (paragraph, span, etc.)
+ * @param {string} tag - HTML tag name (e.g., 'p', 'span', 'div')
+ * @param {string} text - Text content (will be safely escaped)
+ * @param {string} className - CSS classes to apply
+ * @returns {HTMLElement} - Safe DOM element
+ */
+function createSafeTextElement(tag, text, className = '') {
+    const element = document.createElement(tag);
+    if (className) element.className = className;
+    element.textContent = text;
+    return element;
+}
+
+/**
+ * Validate file upload (type, extension, size)
+ * @param {File} file - The file to validate
+ * @param {object} options - Validation options
+ * @returns {object} - { valid: boolean, error: string|null }
+ */
+function validateFileUpload(file, options = {}) {
+    const {
+        allowedExtensions = ['.xlsx', '.xls'],
+        allowedMimeTypes = [
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'application/vnd.ms-excel',
+            'application/octet-stream'
+        ],
+        maxSizeMB = 10
+    } = options;
+    
+    const fileName = file.name.toLowerCase();
+    const hasValidExtension = allowedExtensions.some(ext => fileName.endsWith(ext));
+    
+    if (!hasValidExtension) {
+        return { valid: false, error: `Invalid file type. Allowed: ${allowedExtensions.join(', ')}` };
+    }
+    
+    const maxSizeBytes = maxSizeMB * 1024 * 1024;
+    if (file.size > maxSizeBytes) {
+        const sizeMB = (file.size / (1024 * 1024)).toFixed(2);
+        return { valid: false, error: `File too large (${sizeMB}MB). Maximum: ${maxSizeMB}MB` };
+    }
+    
+    return { valid: true, error: null };
+}
+
+// ========================================================================
+// DIRECT GOEHS UPLOAD - RA 2025 Template Parser
+// ========================================================================
+
+// Store for direct GOEHS upload data
+let directGoehsData = null;
+
+// Helper to show alerts (works across script scopes)
+function showDirectGoehsAlert(message, type = 'info') {
+    if (window.showCustomAlert) {
+        window.showCustomAlert(message, type);
+    } else {
+        // Fallback - use the GOEHS alert or basic alert
+        const container = document.getElementById('toast-container');
+        if (container) {
+            let bgColor;
+            switch (type) {
+                case 'success': bgColor = 'bg-green-100 border-green-400 text-green-800'; break;
+                case 'error': bgColor = 'bg-red-100 border-red-400 text-red-800'; break;
+                default: bgColor = 'bg-blue-100 border-blue-400 text-blue-800'; break;
+            }
+            const toast = document.createElement('div');
+            toast.className = `flex items-center gap-3 p-4 rounded-lg shadow-lg border ${bgColor} transition-all duration-300`;
+            // Create message div safely using textContent to prevent XSS
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'text-sm font-medium flex-1';
+            messageDiv.textContent = message;
+            // Create close button safely without inline onclick
+            const closeBtn = document.createElement('button');
+            closeBtn.type = 'button';
+            closeBtn.className = 'p-1.5 rounded-full hover:bg-black/10';
+            closeBtn.textContent = '×';
+            closeBtn.onclick = () => { toast.remove(); };
+            toast.appendChild(messageDiv);
+            toast.appendChild(closeBtn);
+            container.appendChild(toast);
+            setTimeout(() => toast.remove(), 5000);
+        } else {
+            alert(message);
+        }
+    }
+}
+
+// Handle Direct GOEHS Excel Upload (RA 2025 Template format)
+// Now with fallback to manual column mapping if auto-detection fails
+async function handleDirectGoehsUpload(event) {
+    console.log('handleDirectGoehsUpload called', event);
+    const file = event.target.files?.[0];
+    if (!file) {
+        console.log('No file selected');
+        return;
+    }
+    
+    console.log('Processing file:', file.name);
+    
+    // SECURITY: Validate file type, extension, and size
+    const validMimeTypes = [
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // .xlsx
+        'application/vnd.ms-excel', // .xls
+        'application/octet-stream' // Some browsers report this for Excel files
+    ];
+    const validExtensions = ['.xlsx', '.xls'];
+    const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB limit
+    
+    const fileName = file.name.toLowerCase();
+    const hasValidExtension = validExtensions.some(ext => fileName.endsWith(ext));
+    
+    if (!hasValidExtension) {
+        showDirectGoehsAlert('❌ Invalid file type. Please upload an Excel file (.xlsx or .xls)', 'error');
+        event.target.value = ''; // Reset input
+        return;
+    }
+    
+    if (file.size > MAX_FILE_SIZE) {
+        const sizeMB = (file.size / (1024 * 1024)).toFixed(2);
+        showDirectGoehsAlert(`❌ File too large (${sizeMB}MB). Maximum allowed size is 10MB.`, 'error');
+        event.target.value = ''; // Reset input
+        return;
+    }
+    
+    // Additional MIME type check (with fallback for browser inconsistencies)
+    if (file.type && !validMimeTypes.includes(file.type)) {
+        console.warn('Unexpected MIME type:', file.type, '- proceeding with extension-based validation');
+    }
+    
+    try {
+        showDirectGoehsAlert('📂 Processing RA 2025 Template (auto-detecting language)...', 'info');
+        
+        // Check for multiple sheets first
+        const sheetList = await getExcelSheetList(file);
+        if (sheetList.length > 1) {
+            // Show sheet picker modal and let user choose
+            showSheetPickerForRA2025(file, sheetList, 'single');
+            return;
+        }
+        
+        // Single sheet — pass the sheet index directly to skip hasRA2025Structure check.
+        // The user explicitly chose this upload path, so we trust it's an RA2025 template.
+        const singleSheetIdx = sheetList.length === 1 ? sheetList[0].index : 1;
+        const data = await parseRA2025Template(file, null, singleSheetIdx);
+        console.log('Parsed data:', data);
+        
+        // Check if we got valid data
+        if (!data.risk_items || data.risk_items.length === 0) {
+            throw new Error('NO_DATA_FOUND');
+        }
+        
+        // Store context for GOEHS modal to use later
+        window.directGoehsContext = data.process_context;
+        
+        // Store the file and raw data for potential remapping
+        window.ra2025LoadedFile = file;
+        window.ra2025RawRiskItems = data.risk_items;
+        window.ra2025SelectedSheetIndex = null; // single-sheet, no specific index
+        
+        // Convert parsed data to the format buildTableFromData expects
+        const tableData = convertRA2025ToTableFormat(data.risk_items);
+        console.log('Converted table data:', tableData);
+        
+        // Populate the main risk assessment table (same as AI does)
+        // Use window.buildTableFromData since it's in a different script scope
+        if (window.buildTableFromData) {
+            window.buildTableFromData(tableData);
+        } else {
+            throw new Error('buildTableFromData not available');
+        }
+        
+        if (window.initializeDashboard) {
+            window.initializeDashboard();
+        }
+        
+        // Show dashboard
+        document.getElementById('dashboard-container').style.display = 'block';
+        
+        // Switch to the Rich Media tab (where the main table lives) and scroll into view
+        if (window.switchTab) window.switchTab('rich-media');
+        
+        // Show the Remap Columns button since we loaded RA2025 data
+        const remapBtn = document.getElementById('remapColumnsBtn');
+        if (remapBtn) remapBtn.classList.remove('rab-hidden');
+        
+        // Scroll to table
+        setTimeout(() => {
+            const table = document.querySelector('#table-container table');
+            if (table) table.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 300);
+        
+        showDirectGoehsAlert(`✅ Loaded ${data.risk_items.length} risk items from "${file.name}". Review the table, then use "Open GOEHS Integration" to upload to GOEHS.`, 'success');
+        
+    } catch (error) {
+        console.error('Direct GOEHS Upload Error:', error);
+        
+        // If auto-detection failed, offer manual column mapping
+        if (error.message === 'NO_DATA_FOUND' || error.message.includes('Could not find RA 2025')) {
+            showDirectGoehsAlert('� ️ Could not auto-detect RA 2025 format. Opening manual column mapper...', 'info');
+            
+            // Store file for manual mapping
+            window.ra2025PendingFile = file;
+            
+            // Open the fallback column mapper modal
+            setTimeout(() => {
+                openRA2025ColumnMapper(file);
+            }, 500);
+        } else {
+            showDirectGoehsAlert('❌ Error parsing Excel: ' + error.message, 'error');
+        }
+    }
+    
+    // Reset input for re-upload
+    event.target.value = '';
+}
+
+// Show the sheet picker modal for multi-tab Excel files
+// mode: 'single' (RA 2025 single file) or 'batch' (batch RA 2025)
+function showSheetPickerForRA2025(file, sheetList, mode, batchFileIndex) {
+    const modal = document.getElementById('sheetPickerModal');
+    const listDiv = document.getElementById('sheetPickerList');
+    const fileNameEl = document.getElementById('sheetPickerFileName');
+    const confirmBtn = document.getElementById('sheetPickerConfirm');
+    const selectAllBtn = document.getElementById('sheetPickerSelectAll');
+
+    fileNameEl.textContent = '📁 ' + file.name + ' — ' + sheetList.length + ' sheets found';
+    listDiv.innerHTML = '';
+
+    sheetList.forEach((sheet, idx) => {
+        const row = document.createElement('label');
+        row.style.cssText = 'display:flex; align-items:center; gap:10px; padding:10px 14px; border-radius:10px; border:1px solid #e2e8f0; background:#f8fafc; cursor:pointer; transition:all 0.15s;';
+        row.onmouseenter = () => { row.style.background = '#eff6ff'; row.style.borderColor = '#93c5fd'; };
+        row.onmouseleave = () => { row.style.background = cb.checked ? '#eff6ff' : '#f8fafc'; row.style.borderColor = cb.checked ? '#93c5fd' : '#e2e8f0'; };
+
+        const cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.value = sheet.index;
+        cb.checked = idx === 0; // Check first by default
+        cb.style.cssText = 'width:18px; height:18px; accent-color:#002c5f; cursor:pointer;';
+        cb.addEventListener('change', () => {
+            row.style.background = cb.checked ? '#eff6ff' : '#f8fafc';
+            row.style.borderColor = cb.checked ? '#93c5fd' : '#e2e8f0';
+        });
+
+        const nameSpan = document.createElement('span');
+        nameSpan.style.cssText = 'font-size:0.95rem; color:#1e293b; font-weight:500; flex:1;';
+        nameSpan.textContent = sheet.name;
+
+        const idxBadge = document.createElement('span');
+        idxBadge.style.cssText = 'font-size:0.75rem; color:#64748b; background:#e2e8f0; padding:2px 8px; border-radius:999px;';
+        idxBadge.textContent = 'Sheet ' + sheet.index;
+
+        row.appendChild(cb);
+        row.appendChild(nameSpan);
+        row.appendChild(idxBadge);
+        listDiv.appendChild(row);
+
+        // Initial highlight for checked
+        if (cb.checked) { row.style.background = '#eff6ff'; row.style.borderColor = '#93c5fd'; }
+    });
+
+    // Select All toggle
+    selectAllBtn.onclick = () => {
+        const cbs = listDiv.querySelectorAll('input[type=checkbox]');
+        const allChecked = Array.from(cbs).every(c => c.checked);
+        cbs.forEach(c => { c.checked = !allChecked; c.dispatchEvent(new Event('change')); });
+        selectAllBtn.textContent = allChecked ? 'Select All' : 'Deselect All';
+    };
+
+    // Confirm handler
+    confirmBtn.onclick = async () => {
+        const selected = Array.from(listDiv.querySelectorAll('input[type=checkbox]:checked')).map(c => parseInt(c.value));
+        if (selected.length === 0) {
+            showCustomAlert('Please select at least one sheet.', 'info');
+            return;
+        }
+        modal.style.display = 'none';
+
+        if (mode === 'single') {
+            await processSelectedSheetsRA2025(file, selected);
+        } else if (mode === 'batch') {
+            await processSelectedSheetsBatchRA2025(file, selected, batchFileIndex);
+        }
+    };
+
+    modal.style.display = 'flex';
+}
+
+// Process selected sheets for RA 2025 single-file workflow
+async function processSelectedSheetsRA2025(file, sheetIndices) {
+    let allRiskItems = [];
+    let lastContext = null;
+    let lastDetectedLang = 'en';
+    let lastDetectedColumns = {};
+    let errors = [];
+
+    showDirectGoehsAlert(`📂 Processing ${sheetIndices.length} sheet(s) from "${file.name}"...`, 'info');
+
+    for (const sheetIdx of sheetIndices) {
+        try {
+            const data = await parseRA2025Template(file, null, sheetIdx);
+            if (data.risk_items && data.risk_items.length > 0) {
+                allRiskItems = allRiskItems.concat(data.risk_items);
+                lastContext = data.process_context;
+                lastDetectedLang = data.detectedLang || lastDetectedLang;
+                lastDetectedColumns = data.detectedColumns || lastDetectedColumns;
+            } else {
+                errors.push(`Sheet ${sheetIdx}: No data rows found`);
+            }
+        } catch (err) {
+            errors.push(`Sheet ${sheetIdx}: ${err.message}`);
+        }
+    }
+
+    if (allRiskItems.length === 0) {
+        showDirectGoehsAlert('� ️ No data found in selected sheets. Opening manual column mapper...', 'info');
+        window.ra2025PendingFile = file;
+        // Pass the first selected sheet index so the mapper shows the correct sheet data
+        const firstSheetIdx = sheetIndices[0] || null;
+        setTimeout(() => { openRA2025ColumnMapper(file, firstSheetIdx); }, 500);
+        return;
+    }
+
+    // Store context
+    window.directGoehsContext = lastContext;
+    window.ra2025LoadedFile = file;
+    window.ra2025RawRiskItems = allRiskItems;
+    window.ra2025SelectedSheetIndex = sheetIndices[0] || null;
+
+    // Convert and build table
+    const tableData = convertRA2025ToTableFormat(allRiskItems);
+    if (window.buildTableFromData) {
+        window.buildTableFromData(tableData);
+    } else {
+        showDirectGoehsAlert('❌ buildTableFromData not available', 'error');
+        return;
+    }
+
+    if (window.initializeDashboard) window.initializeDashboard();
+
+    document.getElementById('dashboard-container').style.display = 'block';
+    if (window.switchTab) window.switchTab('rich-media');
+
+    const remapBtn = document.getElementById('remapColumnsBtn');
+    if (remapBtn) remapBtn.classList.remove('rab-hidden');
+
+    setTimeout(() => {
+        const table = document.querySelector('#table-container table');
+        if (table) table.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 300);
+
+    let msg = `✅ Loaded ${allRiskItems.length} risk items from ${sheetIndices.length} sheet(s) in "${file.name}".`;
+    if (errors.length > 0) msg += ` � ️ ${errors.length} sheet(s) had issues.`;
+    showDirectGoehsAlert(msg, 'success');
+}
+
+// Convert RA 2025 parsed data to buildTableFromData format
+// Note: This function passes raw values - buildTableFromData will handle registry lookups
+function convertRA2025ToTableFormat(riskItems) {
+    // --- AUTO-DETECT LANGUAGE FROM HAZARD GROUPS ---
+    let detectedLang = null;
+    // Get current language from localStorage (since currentLang is in IIFE scope)
+    let appLang = localStorage.getItem('appLanguage') || 'en';
+    
+    if (riskItems.length > 0) {
+        const firstHazardGroup = riskItems[0].hazard_classification?.group || '';
+        detectedLang = window.detectLanguageFromContent ? window.detectLanguageFromContent(firstHazardGroup) : null;
+        
+        if (detectedLang && detectedLang !== appLang) {
+            console.log(`🌐 Auto-detected Excel language: ${detectedLang.toUpperCase()}`);
+            // Auto-switch UI language to match Excel file
+            appLang = detectedLang;
+            localStorage.setItem('appLanguage', appLang);
+            
+            // Update language selector dropdown
+            const langSelect = document.getElementById('langSelect');
+            if (langSelect) langSelect.value = detectedLang;
+            
+            // Trigger language change event to update UI
+            if (langSelect) {
+                langSelect.dispatchEvent(new Event('change'));
+            }
+            
+            showDirectGoehsAlert(`🌐 Detected ${detectedLang === 'fr' ? 'French' : detectedLang === 'de' ? 'German' : detectedLang.toUpperCase()} Excel file - UI switched to match.`, 'info');
+        }
+    }
+    
+    return riskItems.map(item => {
+        // Get hazard info from parsed data
+        const hazardType = item.hazard_classification.type || '';
+        // Normalize hazard group: convert French/German back to English key
+        const rawHazardGroup = item.hazard_classification.group || 'Physical';
+        const hazardGroup = window.reverseTranslate ? window.reverseTranslate(rawHazardGroup) : rawHazardGroup;
+        
+        // Normalize hazard list and consequence: convert French/German back to English key
+        const rawHazardType = item.hazard_classification.type || '';
+        const normalizedHazardType = window.reverseTranslate ? window.reverseTranslate(rawHazardType) : rawHazardType;
+        
+        const rawConsequence = item.risk_scenario.consequence || '';
+        const normalizedConsequence = window.reverseTranslate ? window.reverseTranslate(rawConsequence) : rawConsequence;
+        
+        // Map control hierarchy to Countermeasure Ladder
+        const countermeasureLadder = mapHierarchyToCountermeasureLadder(item.mitigation_plan.control_hierarchy);
+        
+        // Use normalized values - buildTableFromData will validate against registry
+        return {
+            'Steps': item.task_name,
+            'Hazard Group': hazardGroup,
+            'Hazard List': normalizedHazardType || 'Hand tools (cut, impact, puncture, etc.)', // Default fallback
+            'Risk/Consequences': normalizedConsequence || 'Injury',
+            'Hazard Source': item.risk_scenario.source || '',
+            'Current Control': item.mitigation_plan.current_controls || '',
+            'Countermeasure_Ladder': countermeasureLadder,
+            'Routine/Non-Routine/Emergency Situation': 'Routine',
+            'Frequency': item.assessment_pre_control.frequency || 1, // Use extracted frequency, default to 1
+            'Severity': item.assessment_pre_control.severity || 5,
+            'Likelihood': item.assessment_pre_control.likelihood || 3,
+            'Risk Score': item.assessment_pre_control.calculated_score,
+            'imageId': null
+        };
+    });
+}
+
+// Map control hierarchy text to Countermeasure Ladder values
+function mapHierarchyToCountermeasureLadder(hierarchy) {
+    if (!hierarchy) return 'Level 2 - Administrative Controls';
+    
+    const h = hierarchy.toLowerCase();
+    
+    if (h.includes('elimination') || h.includes('eliminate') || h.includes('remove')) {
+        return 'Level 6 - Elimination';
+    }
+    if (h.includes('substitution') || h.includes('substitute') || h.includes('replace')) {
+        return 'Level 5 - Substitution';
+    }
+    if (h.includes('engineering') || h.includes('guard') || h.includes('barrier') || h.includes('interlock') || h.includes('isolation')) {
+        return 'Level 4 - Engineering Controls';
+    }
+    if (h.includes('visual') || h.includes('sign') || h.includes('warning') || h.includes('marking') || h.includes('label')) {
+        return 'Level 3 - Visual Controls';
+    }
+    if (h.includes('administrative') || h.includes('training') || h.includes('procedure') || h.includes('sop') || h.includes('instruction')) {
+        return 'Level 2 - Administrative Controls';
+    }
+    if (h.includes('ppe') || h.includes('individual') || h.includes('personal') || h.includes('glove') || h.includes('goggle') || h.includes('helmet')) {
+        return 'Level 1 - Individual Target';
+    }
+    
+    // Default
+    return 'Level 2 - Administrative Controls';
+}
+
+// Helper: Enumerate all sheets in an Excel file
+async function getExcelSheetList(file) {
+    const zip = await JSZip.loadAsync(file);
+    const parser = new DOMParser();
+    const wbXml = await zip.file("xl/workbook.xml")?.async("text") || "";
+    const wbDoc = parser.parseFromString(wbXml, "text/xml");
+    const wbSheets = wbDoc.getElementsByTagName("sheet");
+    const sheets = [];
+    for (let i = 1; i <= 50; i++) {
+        const path = `xl/worksheets/sheet${i}.xml`;
+        if (zip.file(path)) {
+            const name = (wbSheets[i - 1] && wbSheets[i - 1].getAttribute("name")) || `Sheet ${i}`;
+            sheets.push({ index: i, name: name });
+        }
+    }
+    return sheets;
+}
+
+// Parse RA 2025 Template Excel file
+// sheetIndex: if provided, parse only that specific sheet (1-based)
+async function parseRA2025Template(file, columnOverrides, sheetIndex) {
+    const zip = await JSZip.loadAsync(file);
+    
+    // Get shared strings
+    const strXml = await zip.file("xl/sharedStrings.xml")?.async("text") || "";
+    const strings = parseSharedStringsForRA2025(strXml);
+    
+    // Find the best sheet (look for one with "Plant" in cell A2 area)
+    const parser = new DOMParser();
+    let targetSheet = null;
+    let sheetName = '';
+    
+    if (sheetIndex) {
+        // Parse a specific sheet by index
+        const path = `xl/worksheets/sheet${sheetIndex}.xml`;
+        const sheetFile = zip.file(path);
+        if (sheetFile) {
+            const xml = await sheetFile.async("text");
+            targetSheet = parser.parseFromString(xml, "text/xml");
+            const wbXml = await zip.file("xl/workbook.xml")?.async("text") || "";
+            const wbDoc = parser.parseFromString(wbXml, "text/xml");
+            const sheets = wbDoc.getElementsByTagName("sheet");
+            if (sheets[sheetIndex - 1]) {
+                sheetName = sheets[sheetIndex - 1].getAttribute("name") || `Sheet${sheetIndex}`;
+            }
+        }
+    } else {
+        for (let i = 1; i <= 50; i++) {
+            const path = `xl/worksheets/sheet${i}.xml`;
+            const sheetFile = zip.file(path);
+            if (sheetFile) {
+                const xml = await sheetFile.async("text");
+                const doc = parser.parseFromString(xml, "text/xml");
+                
+                // Check if this sheet has "Plant" indicator in rows 1-5
+                if (hasRA2025Structure(doc, strings)) {
+                    targetSheet = doc;
+                    // Try to get sheet name from workbook.xml
+                    const wbXml = await zip.file("xl/workbook.xml")?.async("text") || "";
+                    const wbDoc = parser.parseFromString(wbXml, "text/xml");
+                    const sheets = wbDoc.getElementsByTagName("sheet");
+                    if (sheets[i-1]) {
+                        sheetName = sheets[i-1].getAttribute("name") || `Sheet${i}`;
+                    }
+                    break;
+                }
+            }
+        }
+    }
+    
+    if (!targetSheet) {
+        throw new Error('Could not find RA 2025 formatted sheet. Looking for "Plant" label in header area.');
+    }
+    
+    // Parse Zone A: Header Metadata (Rows 1-13)
+    const context = parseZoneA(targetSheet, strings);
+    
+    // Extract raw preview rows (first 25 rows) for column mapper UI
+    const previewRows = extractSheetPreview(targetSheet, strings, 25);
+    
+    // Detect columns (also detects language)
+    const detectionResult = detectRA2025Columns(targetSheet, strings);
+    const detectedLang = detectionResult.detectedLang || 'en';
+    
+    // Parse Zone B: Risk Items (Row 15+) — pass column overrides if provided
+    const riskItems = parseZoneB(targetSheet, strings, columnOverrides);
+    
+    // Build a clean detectedColumns map (field → column letter) for the mapper UI
+    const detectedColumns = {};
+    const _dcFields = ['taskId','taskDesc','hazardGroup','hazardDetail','consequence','source','currentControl','frequency','severity','likelihood','riskScore','newControl','hierarchy'];
+    _dcFields.forEach(f => { if (detectionResult[f]) detectedColumns[f] = detectionResult[f]; });
+    if (detectionResult.headerRow) detectedColumns.headerRow = detectionResult.headerRow;
+    
+    return {
+        file_source: file.name,
+        sheet_name: sheetName,
+        process_context: context,
+        risk_items: riskItems,
+        previewRows: previewRows,
+        detectedLang: detectedLang,
+        detectedColumns: detectedColumns
+    };
+}
+
+// Extract first N rows from a sheet for preview display
+function extractSheetPreview(doc, strings, maxRows) {
+    const rows = doc.getElementsByTagName("row");
+    const preview = [];
+    let maxCol = 0; // track widest row
+    
+    for (let i = 0; i < rows.length && preview.length < maxRows; i++) {
+        const row = rows[i];
+        const rowNum = parseInt(row.getAttribute("r"));
+        const cells = row.getElementsByTagName("c");
+        const rowData = { _rowNum: rowNum };
+        
+        for (let cell of cells) {
+            const ref = cell.getAttribute("r") || '';
+            const colMatch = ref.match(/^([A-Z]+)/);
+            if (colMatch) {
+                const colLetter = colMatch[1];
+                const colIdx = colLetterToIndex(colLetter);
+                if (colIdx > maxCol) maxCol = colIdx;
+                rowData[colLetter] = getCellTextRA2025(cell, strings);
+            }
+        }
+        preview.push(rowData);
+    }
+    
+    // Build column letters array up to the widest column found
+    const columns = [];
+    for (let i = 0; i <= Math.min(maxCol, 25); i++) { // Cap at Z
+        columns.push(indexToColLetter(i));
+    }
+    
+    return { rows: preview, columns: columns };
+}
+
+// Convert column letter (A, B, ..., Z, AA, AB...) to 0-based index
+function colLetterToIndex(col) {
+    let idx = 0;
+    for (let i = 0; i < col.length; i++) {
+        idx = idx * 26 + (col.charCodeAt(i) - 64);
+    }
+    return idx - 1;
+}
+
+// Convert 0-based index to column letter
+function indexToColLetter(idx) {
+    let s = '';
+    idx++;
+    while (idx > 0) {
+        idx--;
+        s = String.fromCharCode(65 + (idx % 26)) + s;
+        idx = Math.floor(idx / 26);
+    }
+    return s;
+}
+
+// Parse shared strings XML for RA 2025
+function parseSharedStringsForRA2025(xml) {
+    const strings = [];
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(xml, "text/xml");
+    const siNodes = doc.getElementsByTagName("si");
+    
+    for (let si of siNodes) {
+        let text = '';
+        const tNodes = si.getElementsByTagName("t");
+        for (let t of tNodes) {
+            text += t.textContent || '';
+        }
+        strings.push(text);
+    }
+    return strings;
+}
+
+// Multi-language keywords for RA 2025 template detection
+const RA2025_KEYWORDS = {
+    // Header area keywords (Zone A)
+    headerKeywords: {
+        plant: ['plant', 'usine', 'werk', 'fabrika', 'planta', 'stabilimento'],
+        department: ['department', 'département', 'abteilung', 'bölüm', 'departamento', 'dipartimento'],
+        area: ['area', 'zone', 'bereich', 'alan', 'área', 'area'],
+        workstation: ['workstation', 'poste de travail', 'arbeitsplatz', 'iş istasyonu', 'estación de trabajo', 'postazione'],
+        raReference: ['ra reference', 'référence ra', 'ra-referenz', 'ra referansı', 'referencia ra']
+    },
+    // Data row header keywords (Zone B - Row 14)
+    columnKeywords: {
+        taskId: ['task id', 'id tâche', 'aufgaben-id', 'görev id', 'no', 'nr', '#', 'id'],
+        taskDesc: ['task description', 'job step', 'description', 'beschreibung', 'açıklama', 'description de la tâche', 'tâche', 'aufgabe', 'görev'],
+        hazardGroup: ['hazard group', 'groupe de risque', 'gefahrengruppe', 'tehlike grubu', 'categoria', 'catégorie', 'hazard category', 'groupe de danger'],
+        hazardDetail: ['hazard detail', 'hazard list', 'détail du risque', 'gefahrendetail', 'tehlike detayı', 'tipo', 'type de danger', 'liste des dangers'],
+        consequence: ['consequence', 'conséquence', 'konsequenz', 'sonuç', 'injury', 'blessure', 'verletzung', 'illness', 'maladie', 'risk/consequence', 'risque/conséquence', 'injury/illness', 'blessure/maladie', 'verletzung/krankheit'],
+        source: ['source', 'quelle', 'kaynak', 'origen', 'hazard source', 'source du danger'],
+        currentControl: ['current control', 'contrôle actuel', 'aktuelle kontrolle', 'mevcut kontrol', 'control actual', 'counter measure', 'countermeasure', 'maßnahme', 'mesure existante'],
+        frequency: ['frequency', 'fréquence', 'häufigkeit', 'sıklık', 'frecuencia', 'freq'],
+        severity: ['severity', 'gravité', 'schweregrad', 'şiddet', 'severidad', 'sev'],
+        likelihood: ['likelihood', 'probabilité', 'wahrscheinlichkeit', 'olasılık', 'probabilidad', 'like', 'vraisemblance'],
+        riskScore: ['risk score', 'score de risque', 'risikobewertung', 'risk skoru', 'puntuación', 'note de risque', 'score', 'initial risk'],
+        newControl: ['new control', 'nouveau contrôle', 'neue kontrolle', 'yeni kontrol', 'proposed', 'mesure proposée', 'action'],
+        hierarchy: ['hierarchy', 'hiérarchie', 'hierarchie', 'hiyerarşi', 'level', 'niveau', 'ladder', 'échelle']
+    }
+};
+
+// Check if sheet has RA 2025 structure (multi-language support)
+function hasRA2025Structure(doc, strings) {
+    const rows = doc.getElementsByTagName("row");
+    let matchCount = 0;
+    
+    // Check up to 25 rows (wider scan covers templates with larger header zones)
+    for (let r = 0; r < Math.min(rows.length, 25); r++) {
+        const cells = rows[r].getElementsByTagName("c");
+        for (let c of cells) {
+            const text = getCellTextRA2025(c, strings).toLowerCase().trim();
+            if (!text) continue;
+            
+            // Check against all header keywords in all languages
+            for (const category of Object.values(RA2025_KEYWORDS.headerKeywords)) {
+                if (category.some(kw => text.includes(kw))) {
+                    matchCount++;
+                    if (matchCount >= 2) return true; // Need at least 2 matches for confidence
+                }
+            }
+            
+            // Also check column headers
+            for (const category of Object.values(RA2025_KEYWORDS.columnKeywords)) {
+                if (category.some(kw => text.includes(kw))) {
+                    matchCount++;
+                    if (matchCount >= 3) return true;
+                }
+            }
+        }
+    }
+    return matchCount >= 2;
+}
+
+// Get cell text helper for RA 2025 parser
+function getCellTextRA2025(cell, strings) {
+    const type = cell.getAttribute("t");
+    const vNode = cell.getElementsByTagName("v")[0];
+
+    // Inline string (type="inlineStr") — value is in <is><t>...</t></is>
+    if (type === "inlineStr") {
+        const isNode = cell.getElementsByTagName("is")[0];
+        if (!isNode) return '';
+        let text = '';
+        const tNodes = isNode.getElementsByTagName("t");
+        for (let t of tNodes) text += t.textContent || '';
+        return text;
+    }
+
+    if (!vNode) return '';
+
+    if (type === "s") {
+        const idx = parseInt(vNode.textContent, 10);
+        return strings[idx] || '';
+    }
+    return vNode.textContent || '';
+}
+
+// Get cell value by column letter and row number
+function getCellByRef(doc, colLetter, rowNum, strings) {
+    const ref = colLetter + rowNum;
+    const rows = doc.getElementsByTagName("row");
+    
+    for (let row of rows) {
+        const r = row.getAttribute("r");
+        if (parseInt(r) === rowNum) {
+            const cells = row.getElementsByTagName("c");
+            for (let cell of cells) {
+                if (cell.getAttribute("r") === ref) {
+                    return getCellTextRA2025(cell, strings);
+                }
+            }
+        }
+    }
+    return '';
+}
+
+// Parse Zone A: Header Metadata (Context)
+function parseZoneA(doc, strings) {
+    // Based on template structure:
+    // B2 = Plant, B3 = RA Reference, B4 = Department, B5 = Area/HPU, B6 = Work Station
+    // Creation date around C11-C16 area
+    
+    const plant = getCellByRef(doc, 'B', 2, strings) || '';
+    const raReference = getCellByRef(doc, 'B', 3, strings) || '';
+    const department = getCellByRef(doc, 'B', 4, strings) || '';
+    const area = getCellByRef(doc, 'B', 5, strings) || '';
+    const workstation = getCellByRef(doc, 'B', 6, strings) || '';
+    
+    // Try to find creation date (search C column rows 10-16)
+    let creationDate = '';
+    for (let r = 10; r <= 16; r++) {
+        const val = getCellByRef(doc, 'C', r, strings);
+        if (val && (val.includes('-') || val.includes('/'))) {
+            creationDate = val;
+            break;
+        }
+    }
+    
+    // Format date if found
+    if (!creationDate) {
+        creationDate = new Date().toISOString().split('T')[0];
+    }
+    
+    return {
+        plant_id: plant,
+        ra_reference: raReference,
+        department_id: department,
+        area_hpu: area,
+        workstation_id: workstation,
+        assessment_date: creationDate
+    };
+}
+
+// Parse Zone B: Risk Line Items (Row 14 = headers, Row 15+ = data)
+function parseZoneB(doc, strings, columnOverrides) {
+    const riskItems = [];
+    const rows = doc.getElementsByTagName("row");
+    
+    // First, detect column mapping from header row (typically row 14)
+    const columnMap = detectRA2025Columns(doc, strings);
+    console.log('Detected column mapping:', columnMap);
+    
+    // Merge manual overrides on top of auto-detected columns
+    if (columnOverrides) {
+        console.log('🗺️ Applying column overrides:', columnOverrides);
+        for (const [key, val] of Object.entries(columnOverrides)) {
+            if (key !== 'headerRow' && key !== 'dataStartRow' && val) {
+                columnMap[key] = val;
+            }
+        }
+        if (columnOverrides.headerRow) columnMap.headerRow = columnOverrides.headerRow;
+    }
+    
+    // If we couldn't detect columns, use fallback defaults
+    const cols = {
+        taskId: columnMap.taskId || 'A',
+        taskDesc: columnMap.taskDesc || 'B',
+        hazardGroup: columnMap.hazardGroup || 'C',
+        hazardDetail: columnMap.hazardDetail || 'D',
+        consequence: columnMap.consequence || 'E',
+        source: columnMap.source || 'G',
+        currentControl: columnMap.currentControl || 'H',
+        frequency: columnMap.frequency || 'I',
+        severity: columnMap.severity || 'K',
+        likelihood: columnMap.likelihood || 'L',
+        riskScore: columnMap.riskScore || 'M',
+        newControl: columnMap.newControl || 'N',
+        hierarchy: columnMap.hierarchy || 'O'
+    };
+    
+    // Find data start row (row after header) — use override if provided
+    const dataStartRow = (columnOverrides && columnOverrides.dataStartRow) ? columnOverrides.dataStartRow : (columnMap.headerRow || 14) + 1;
+    
+    for (let row of rows) {
+        const rowNum = parseInt(row.getAttribute("r"));
+        
+        // Skip header rows
+        if (rowNum < dataStartRow) continue;
+        
+        // Get cell values for this row
+        const cells = row.getElementsByTagName("c");
+        const rowData = {};
+        
+        for (let cell of cells) {
+            const ref = cell.getAttribute("r") || '';
+            const colMatch = ref.match(/^([A-Z]+)/);
+            if (colMatch) {
+                rowData[colMatch[1]] = getCellTextRA2025(cell, strings);
+            }
+        }
+        
+        // Stop condition: Column A contains "Total" or "Insert rows" (end of data section)
+        const colA = (rowData[cols.taskId] || '').toLowerCase().trim();
+        if (colA.includes('total') || colA.includes('insert row') || colA.includes('somme') || colA.includes('gesamt') || colA.includes('toplam')) {
+            break;
+        }
+        
+        // Extract risk item data using detected columns
+        const taskDesc = rowData[cols.taskDesc] || '';
+        const hazardGroup = rowData[cols.hazardGroup] || '';
+        const hazardDetail = rowData[cols.hazardDetail] || '';
+        
+        // Skip truly empty rows (no task description AND no hazard info)
+        if (!taskDesc && !hazardGroup && !hazardDetail) continue;
+        
+        const consequence = rowData[cols.consequence] || '';
+        const source = rowData[cols.source] || '';
+        const currentControls = rowData[cols.currentControl] || '';
+        // Parse frequency as float (keys are 1, 1.25, 1.5, 1.75, 2) — extract number from text if needed
+        let rawFreq = rowData[cols.frequency] || '';
+        let frequency = parseFloat(rawFreq);
+        if (isNaN(frequency)) { const m = String(rawFreq).match(/[\d.]+/); frequency = m ? parseFloat(m[0]) : 1; }
+        const severity = parseInt(rowData[cols.severity]) || 5;
+        const likelihood = parseInt(rowData[cols.likelihood]) || 3;
+        const riskScore = parseFloat(rowData[cols.riskScore]) || (frequency * severity * likelihood);
+        const newControl = rowData[cols.newControl] || '';
+        const hierarchyLevel = rowData[cols.hierarchy] || '';
+        
+        // Determine risk level
+        let riskLevel = 'LOW';
+        if (riskScore >= 50) riskLevel = 'HIGH';
+        else if (riskScore >= 20) riskLevel = 'MEDIUM';
+        
+        riskItems.push({
+            row_index: rowNum,
+            task_name: taskDesc,
+            hazard_classification: {
+                group: hazardGroup,
+                type: hazardDetail
+            },
+            risk_scenario: {
+                source: source,
+                consequence: consequence
+            },
+            assessment_pre_control: {
+                frequency: frequency,
+                severity: severity,
+                likelihood: likelihood,
+                calculated_score: riskScore,
+                risk_level: riskLevel
+            },
+            mitigation_plan: {
+                current_controls: currentControls,
+                proposed_controls: newControl,
+                control_hierarchy: hierarchyLevel
+            }
+        });
+    }
+    
+    return riskItems;
+}
+
+// Detect column letters from header row (multi-language)
+function detectRA2025Columns(doc, strings) {
+    const rows = doc.getElementsByTagName("row");
+    const mapping = {};
+    let headerRow = 14; // Default
+    
+    // Language-specific keyword sets for detection scoring
+    const LANG_KEYWORDS = {
+        fr: ['tâche', 'description de la tâche', 'groupe de danger', 'groupe de risque', 'détail du risque', 'liste des dangers', 'conséquence', 'contrôle actuel', 'fréquence', 'gravité', 'probabilité', 'score de risque', 'hiérarchie', 'mesure', 'risque', 'blessure', 'étape', 'département', 'usine', 'poste de travail'],
+        de: ['beschreibung', 'aufgabe', 'gefahrengruppe', 'gefahrendetail', 'gefahrenliste', 'konsequenz', 'kontrolle', 'häufigkeit', 'schweregrad', 'wahrscheinlichkeit', 'risikobewertung', 'hierarchie', 'maßnahme', 'verletzung', 'arbeitsschritt', 'abteilung', 'werk', 'arbeitsplatz'],
+        en: ['task description', 'hazard group', 'hazard detail', 'consequence', 'current control', 'frequency', 'severity', 'likelihood', 'risk score', 'hierarchy', 'injury', 'department', 'plant', 'workstation']
+    };
+    let langScores = { en: 0, fr: 0, de: 0 };
+    
+    // Search rows 5-40 for header row (wider range handles varied template layouts)
+    for (let row of rows) {
+        const rowNum = parseInt(row.getAttribute("r"));
+        if (rowNum < 5 || rowNum > 40) continue;
+        
+        const cells = row.getElementsByTagName("c");
+        let matchesInRow = 0;
+        const tempMap = {};
+        
+        for (let cell of cells) {
+            const ref = cell.getAttribute("r") || '';
+            const colMatch = ref.match(/^([A-Z]+)/);
+            if (!colMatch) continue;
+            
+            const colLetter = colMatch[1];
+            const text = getCellTextRA2025(cell, strings).toLowerCase().trim();
+            if (!text) continue;
+            
+            // Score language matches for auto-detection
+            for (const [lang, kws] of Object.entries(LANG_KEYWORDS)) {
+                for (const kw of kws) {
+                    if (text.includes(kw)) langScores[lang]++;
+                }
+            }
+            
+            // Check each keyword category - prioritize more specific matches
+            const orderedFields = ['riskScore', 'taskId', 'taskDesc', 'hazardGroup', 'hazardDetail', 'consequence', 'source', 'currentControl', 'frequency', 'severity', 'likelihood', 'newControl', 'hierarchy'];
+            
+            let matched = false;
+            for (const field of orderedFields) {
+                if (matched) break;
+                const keywords = RA2025_KEYWORDS.columnKeywords[field];
+                if (keywords && keywords.some(kw => text.includes(kw))) {
+                    if (!tempMap[field]) {
+                        tempMap[field] = colLetter;
+                        matchesInRow++;
+                        matched = true;
+                    }
+                }
+            }
+        }
+        
+        // If we found 2+ matches in this row, it's likely the header row
+        if (matchesInRow >= 2) {
+            Object.assign(mapping, tempMap);
+            mapping.headerRow = rowNum;
+            headerRow = rowNum;
+            console.log(`📊 RA2025 Column Detection - Row ${rowNum}:`, tempMap);
+            break;
+        }
+    }
+    
+    // Also scan header area (rows 1-10) for language clues
+    for (let row of rows) {
+        const rowNum = parseInt(row.getAttribute("r"));
+        if (rowNum > 10) break;
+        const cells = row.getElementsByTagName("c");
+        for (let cell of cells) {
+            const text = getCellTextRA2025(cell, strings).toLowerCase().trim();
+            if (!text) continue;
+            for (const [lang, kws] of Object.entries(LANG_KEYWORDS)) {
+                for (const kw of kws) {
+                    if (text.includes(kw)) langScores[lang]++;
+                }
+            }
+        }
+    }
+    
+    // Determine detected language (only FR/DE if clearly dominant, otherwise EN)
+    const maxLang = Object.entries(langScores).sort((a, b) => b[1] - a[1])[0];
+    if (maxLang[1] > 0 && maxLang[0] !== 'en' && maxLang[1] >= langScores.en + 2) {
+        mapping.detectedLang = maxLang[0];
+    } else if (maxLang[0] === 'en' || langScores.en >= langScores.fr && langScores.en >= langScores.de) {
+        mapping.detectedLang = 'en';
+    } else {
+        mapping.detectedLang = maxLang[0];
+    }
+    console.log(`🌐 Language detection scores:`, langScores, `→ ${mapping.detectedLang}`);
+    
+    return mapping;
+}
+
+// Setup drag and drop for Direct GOEHS upload
+document.addEventListener('DOMContentLoaded', function() {
+    const dropZone = document.getElementById('directGoehsDropZone');
+    if (dropZone) {
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, preventDefaults, false);
+        });
+        
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+        
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropZone.addEventListener(eventName, () => {
+                dropZone.classList.add('border-orange-500', 'bg-orange-100');
+            }, false);
+        });
+        
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, () => {
+                dropZone.classList.remove('border-orange-500', 'bg-orange-100');
+            }, false);
+        });
+        
+        dropZone.addEventListener('drop', (e) => {
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                const file = files[0];
+                if (file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) {
+                    handleDirectGoehsUpload({ target: { files: [file] } });
+                } else {
+                    showDirectGoehsAlert('❌ Please drop an Excel file (.xlsx or .xls)', 'error');
+                }
+            }
+        }, false);
+    }
+});
+
+// ============ DATA STRUCTURES ============
+
+// Organization > Location > Department/Workstation hierarchy
+const GOEHS_LOCATION_DATA = {
+    'Mfg - EMEA': {
+        name: 'Mfg - EMEA',
+        locations: {
+            'Adapazari': {
+                name: 'Adapazari',
+                departments: ['Production', 'Maintenance', 'Quality', 'Logistics'],
+                workstations: ['Line 1', 'Line 2', 'Maintenance', 'Quality Testing']
+            },
+            'Amiens': {
+                name: 'Amiens',
+                departments: ['Production', 'Maintenance', 'Quality'],
+                workstations: ['Production Line', 'Maintenance', 'Quality']
+            },
+            'Dębica': {
+                name: 'Dębica',
+                departments: ['Production', 'Maintenance', 'Quality'],
+                workstations: ['Production', 'Maintenance', 'Quality']
+            },
+            'Fulda': {
+                name: 'Fulda',
+                departments: ['Production', 'Maintenance', 'Quality'],
+                workstations: ['Production', 'Maintenance', 'Quality']
+            },
+            'Furstenwalde': {
+                name: 'Furstenwalde',
+                departments: ['Production', 'Maintenance', 'Quality'],
+                workstations: ['Production', 'Maintenance', 'Quality']
+            },
+            'Goodyear Mounting Solutions': {
+                name: 'Goodyear Mounting Solutions',
+                departments: ['Production', 'Maintenance', 'Quality'],
+                workstations: ['Mounting', 'Assembly', 'QA']
+            },
+            'Hanau': {
+                name: 'Hanau',
+                departments: ['Production', 'Maintenance', 'Quality'],
+                workstations: ['Production', 'Maintenance', 'Quality']
+            },
+            'Izmit': {
+                name: 'Izmit',
+                departments: ['Production', 'Maintenance', 'Quality'],
+                workstations: ['Production', 'Maintenance', 'Quality']
+            },
+            'Kranj': {
+                name: 'Kranj',
+                departments: ['Production', 'Maintenance', 'Quality'],
+                workstations: ['Production', 'Maintenance', 'Quality']
+            },
+            'Kruševac': {
+                name: 'Kruševac',
+                departments: ['Production', 'Maintenance', 'Quality'],
+                workstations: ['Production', 'Maintenance', 'Quality']
+            },
+            'Luxembourg Tire Plant': {
+                name: 'Luxembourg Tire Plant',
+                departments: ['Production', 'Maintenance', 'Quality', 'Engineering'],
+                workstations: ['Building', 'Curing', 'Finishing', 'Quality Testing']
+            },
+            'Lux-Mold Plant RCCE': {
+                name: 'Lux-Mold Plant RCCE',
+                departments: ['Production', 'Maintenance', 'Quality', 'Logistics', 'Engineering', 'Warehouse'],
+                workstations: ['Assembly Line A', 'Assembly Line B', 'Tire Curing', 'Quality Testing', 'Extrusion', 'Mixing']
+            },
+            'Mercury Dudelange': {
+                name: 'Mercury Dudelange',
+                departments: ['Production', 'Maintenance', 'Quality'],
+                workstations: ['Production', 'Maintenance', 'Quality']
+            },
+            'Montlucon': {
+                name: 'Montlucon',
+                departments: ['Production', 'Maintenance', 'Quality'],
+                workstations: ['Production', 'Maintenance', 'Quality']
+            },
+            'Riesa': {
+                name: 'Riesa',
+                departments: ['Production', 'Maintenance', 'Quality'],
+                workstations: ['Production', 'Maintenance', 'Quality']
+            },
+            'Riom': {
+                name: 'Riom',
+                departments: ['Production', 'Maintenance', 'Quality'],
+                workstations: ['Production', 'Maintenance', 'Quality']
+            },
+            'Tilburg': {
+                name: 'Tilburg',
+                departments: ['Production', 'Maintenance', 'Quality'],
+                workstations: ['Production', 'Maintenance', 'Quality']
+            },
+            'Uitenhage': {
+                name: 'Uitenhage',
+                departments: ['Production', 'Maintenance', 'Quality'],
+                workstations: ['Production', 'Maintenance', 'Quality']
+            },
+            'Wittlich': {
+                name: 'Wittlich',
+                departments: ['Production', 'Maintenance', 'Quality'],
+                workstations: ['Production', 'Maintenance', 'Quality']
+            }
+        }
+    },
+    'Mfg - NA': {
+        name: 'Mfg - NA',
+        locations: {
+            'Akron Plant': {
+                name: 'Akron Plant',
+                departments: ['Production', 'Maintenance', 'R&D', 'Logistics'],
+                workstations: ['Test Lab', 'Development', 'Prototype Assembly']
+            },
+            'Fayetteville Plant': {
+                name: 'Fayetteville Plant',
+                departments: ['Production', 'Maintenance', 'Warehouse'],
+                workstations: ['Extrusion', 'Building', 'Curing', 'Finishing']
+            }
+        }
+    },
+    'Mfg - APAC': {
+        name: 'Mfg - APAC',
+        locations: {
+            'Shanghai Plant': {
+                name: 'Shanghai Plant',
+                departments: ['Production', 'Logistics'],
+                workstations: ['Main Production', 'Distribution']
+            }
+        }
+    }
+};
+
+// Global API Endpoint for GOEHS AI Assist (accessible outside IIFE)
+const GOEHS_GLOBAL_API_ENDPOINT = 'https://risk-assessment-api-nine.vercel.app/api/ai';
+
+// Condition Mode options
+const CONDITION_MODES = ['Routine', 'Non-Routine', 'Emergency Situation'];
+
+// Core Activity options (74 activities)
+const CORE_ACTIVITIES = [
+    'Acting/Performing', 'Asbestos Removal', 'Assembly Operations', 'Bladder Building', 'Blasting',
+    'Blending', 'Brazing', 'Business Meetings/Event/Travel', 'Cafeteria Operations', 'Calendering',
+    'Chemical Production Operations', 'Cleaning Operations', 'Component Prep', 'Compounding',
+    'Confined Space Operations', 'Construction', 'Customer Assistance', 'Cutting Operations',
+    'Demolition', 'Disassembly Operations', 'Engraving', 'Equipment De-installation',
+    'Equipment Installation', 'Equipment Operation', 'Extrusion', 'Finishing', 'Flight Operations',
+    'Forming', 'Foundry', 'Groundskeeping', 'Housekeeping', 'Inspecting', 'Laboratory Operations',
+    'Lifting', 'Loading/Unloading', 'Machining', 'Maintenance', 'Material Handling', 'Mixing',
+    'Modeling', 'Non-Specific Site Activity', 'Office Work', 'Open Road Testing', 'Packaging',
+    'Plating', 'Press Operations', 'Repair', 'Resident Assistance', 'Roadside Fitment',
+    'Security/Emergency Response Operations', 'Shipping/Receiving', 'Studio Operations',
+    'Stunt Operation', 'Surface Cleaning', 'Surface Coating', 'Testing', 'Training',
+    'Vehicle Operations', 'Waste Management', 'Welding', 'Woodworking'
+].sort();
+
+// Job Titles (72 titles)
+const JOB_TITLES = [
+    'Apprentice', 'Assembler', 'Bladder Builder', 'Broadcast Technician', 'Buyer',
+    'Calender Operator', 'Chemical Process Operator', 'Compounder', 'Contractor',
+    'Co-op or intern', 'Coordinator', 'Crane operator', 'Cribkeeper', 'Curing Technician',
+    'Cutter Technician', 'Dispatcher', 'Doctor', 'Electrician', 'Emergency spill responder',
+    'Engineer', 'Extruder Technician', 'Fabric Machine Operator', 'Fabricator', 'Facilities',
+    'Final Finish Technician', 'Firefighter', 'Fork truck operator', 'Founder', 'Ground Crew',
+    'Groundskeeper', 'Group Leader', 'Guard', 'Inspector', 'Janitor', 'Lab Technician',
+    'Labor Trainer', 'Machinist', 'Maintenance', 'Manager', 'Material handler', 'Mechanic',
+    'Mill Operator', 'Mixer Operator', 'Nurse', 'Office worker-other', 'Operator',
+    'Pigment Weighing Operator', 'Pilot', 'Pipefitter', 'Plumber', 'Press operator',
+    'Quality Technician', 'Repairman', 'Replacement Operator', 'Research Scientist',
+    'Retread Technician', 'Sales person', 'Security', 'Service Tech', 'Shipping & Receiving',
+    'Storeroom Clerk', 'Support Technician', 'Team Leader', 'Technician', 'Test Driver',
+    'Tester', 'Tire Builder', 'Tire Fitment', 'Tool & die maker', 'Truck driver', 'Welder',
+    'Wire Drawer'
+].sort();
+
+// ── Registry aliases ─────────────────────────────────────────────────────────
+// All data now lives in ra-registry.js (loaded before this script).
+// ra-registry.js declares these as top-level const AND exposes them on window.*
+// Do NOT redeclare with const here — that causes SyntaxError: already declared.
+// They are directly accessible by name from the global lexical environment.
+
+// Returns the translated display label for a GOEHS dropdown value.
+// value attribute stays English; only visible text is translated.
+function goehsUiLabel(val) {
+    if (!val) return val;
+    const lang = localStorage.getItem('appLanguage') || 'en';
+    if (lang === 'en') return val;
+    if (GOEHS_LADDER_TRANSLATIONS[lang]?.[val]) return GOEHS_LADDER_TRANSLATIONS[lang][val];
+    return window.TRANSLATIONS?.[lang]?.[val] || val;
+}
+// State Management
+let goehsTasks = [];
+let goehsHazards = [];
+let taskIdCounter = 0;
+let hazardIdCounter = 0;
+
+// ============ RISK TABLE EXTRACTION FUNCTIONS ============
+
+// Extract data from the main risk assessment table
+function extractRiskTableData() {
+    const tableData = {
+        tasks: [],      // Unique tasks/steps
+        hazards: [],    // All hazard rows with full details
+        projectName: document.getElementById('projectNameInput')?.value || 'Risk Assessment'
+    };
+    
+    // Try both possible selectors for compatibility
+    let tableRows = document.querySelectorAll('#table-container tbody tr:not(.deleted-row)');
+    if (tableRows.length === 0) {
+        tableRows = document.querySelectorAll('#table-container table tbody tr:not(.deleted-row)');
+    }
+    
+    const uniqueTasks = new Map(); // Use Map to track unique tasks by step name
+    
+    console.log(`📊 Found ${tableRows.length} table rows to process`);
+    
+    tableRows.forEach((row, index) => {
+        const cells = row.querySelectorAll('td');
+        // Lower the minimum cell requirement to catch more rows
+        if (cells.length < 10) {
+            console.log(`� ️ Skipping row ${index} - only ${cells.length} cells`);
+            return;
+        }
+        
+        // Column mapping based on table headers:
+        // 0: Picture, 1: AI, 2: Steps, 3: Hazard Group, 4: Hazard List, 5: Risk/Consequences,
+        // 6: Frequency, 7: Severity, 8: Likelihood, 9: Risk Score, 10: Risk Category,
+        // 11: Hazard Source, 12: Current Control, 13: Routine/Non-Routine, 14: Actions, 15: Delete
+        
+        const stepName = cells[2]?.textContent?.trim() || `Step ${index + 1}`;
+        const hazardGroup = cells[3]?.querySelector('select')?.value || cells[3]?.textContent?.trim() || '';
+        const hazardList = cells[4]?.querySelector('select')?.value || cells[4]?.textContent?.trim() || '';
+        const consequence = cells[5]?.querySelector('select')?.value || cells[5]?.textContent?.trim() || '';
+        
+        // Get dropdown values for F/S/L
+        const frequencySelect = cells[6]?.querySelector('select');
+        const severitySelect = cells[7]?.querySelector('select');
+        const likelihoodSelect = cells[8]?.querySelector('select');
+        
+        const frequency = frequencySelect?.value || cells[6]?.textContent?.trim() || '1';
+        const severity = severitySelect?.value || cells[7]?.textContent?.trim() || '1';
+        const likelihood = likelihoodSelect?.value || cells[8]?.textContent?.trim() || '1';
+        const riskScore = cells[9]?.textContent?.trim() || '';
+        const riskCategory = cells[10]?.textContent?.trim() || '';
+        const hazardSource = cells[11]?.querySelector('input')?.value || cells[11]?.textContent?.trim() || '';
+        const currentControl = cells[12]?.querySelector('input')?.value || cells[12]?.textContent?.trim() || '';
+        const routineType = cells[13]?.querySelector('input')?.value || cells[13]?.textContent?.trim() || '';
+        
+        // Try to get Countermeasure_Ladder from stored data (if AI generated it)
+        const rowData = row.dataset?.countermeasureLadder || '';
+        
+        console.log(`📝 Row ${index}: Step="${stepName}", Hazard="${hazardGroup}/${hazardList}"`);
+        
+        // Track unique tasks
+        if (!uniqueTasks.has(stepName)) {
+            uniqueTasks.set(stepName, {
+                name: stepName,
+                description: '', // Task description should be empty - not pulled from outcome/consequence
+                rowIndices: [index]
+            });
+        } else {
+            uniqueTasks.get(stepName).rowIndices.push(index);
+        }
+        
+        // Add to hazards list - include countermeasure ladder from AI if available
+        tableData.hazards.push({
+            rowIndex: index,
+            stepName: stepName,
+            hazardGroup: hazardGroup,
+            hazardList: hazardList,
+            consequence: consequence,
+            frequency: frequency,
+            severity: severity,
+            likelihood: likelihood,
+            riskScore: riskScore,
+            riskCategory: riskCategory,
+            hazardSource: hazardSource,
+            currentControl: currentControl,
+            routineType: routineType,
+            countermeasureLadder: rowData // Pass AI-tagged countermeasure ladder to GOEHS
+        });
+    });
+    
+    // Convert unique tasks to array
+    uniqueTasks.forEach((value, key) => {
+        tableData.tasks.push({
+            name: key,
+            description: value.description,
+            hazardCount: value.rowIndices.length
+        });
+    });
+    
+    console.log('📊 Extracted Risk Table Data:', tableData);
+    return tableData;
+}
+
+// Map app hazard group to GOEHS hazard category
+function mapHazardGroupToGOEHS(hazardGroup) {
+    const mapping = {
+        'Physical': 'Physical',
+        'Chemical': 'Chemical',
+        'Biological': 'Biological',
+        'Ergonomic': 'Ergonomic',
+        'Psychosocial': 'Psychosocial',
+        'Electrical': 'Physical', // Map to Physical
+        'Mechanical': 'Physical', // Map to Physical
+        'Fire': 'Physical', // Map to Physical
+        'Environmental': 'Environmental',
+        'Safety': 'Safety'
+    };
+    
+    // Try exact match first
+    if (mapping[hazardGroup]) return mapping[hazardGroup];
+    
+    // Try partial match
+    for (const [key, value] of Object.entries(mapping)) {
+        if (hazardGroup?.toLowerCase().includes(key.toLowerCase())) {
+            return value;
+        }
+    }
+    
+    return 'Physical'; // Default fallback
+}
+
+// Case-insensitive matching for hazard category (GOEHS supersedes)
+function findMatchingGoehsCategory(parentCategory) {
+    if (!parentCategory) return '';
+    
+    // First, try to reverse-translate if it's in French/German
+    const normalizedCategory = window.reverseTranslate ? window.reverseTranslate(parentCategory) : parentCategory;
+    const parentLower = normalizedCategory.toLowerCase().trim();
+    
+    // Find matching GOEHS category (case-insensitive)
+    for (const goehsCat of Object.keys(HAZARD_CATEGORIES)) {
+        if (goehsCat.toLowerCase() === parentLower) {
+            return goehsCat; // Return GOEHS version with correct casing
+        }
+    }
+    
+    // Partial match fallback
+    for (const goehsCat of Object.keys(HAZARD_CATEGORIES)) {
+        const goehsLower = goehsCat.toLowerCase();
+        // Check if main words match (e.g., "mechanical" in both)
+        const parentWords = parentLower.split(/[\s\/]+/);
+        const goehsWords = goehsLower.split(/[\s\/]+/);
+        
+        // If any significant word matches (excluding common words)
+        const significantMatch = parentWords.some(pw => 
+            pw.length > 3 && goehsWords.some(gw => gw.includes(pw) || pw.includes(gw))
+        );
+        if (significantMatch) {
+            return goehsCat;
+        }
+    }
+    
+    return ''; // No match found
+}
+
+// Case-insensitive matching for sub-hazard (GOEHS supersedes)
+function findMatchingGoehsSubHazard(goehsCategory, parentSubHazard) {
+    if (!goehsCategory || !parentSubHazard) return '';
+    
+    // First, try to reverse-translate if it's in French/German
+    const normalizedSubHazard = window.reverseTranslate ? window.reverseTranslate(parentSubHazard) : parentSubHazard;
+    
+    const subHazards = HAZARD_CATEGORIES[goehsCategory] || [];
+    const parentLower = normalizedSubHazard.toLowerCase().trim();
+    
+    // Exact match (case-insensitive)
+    for (const sub of subHazards) {
+        if (sub.toLowerCase() === parentLower) {
+            return sub; // Return GOEHS version with correct casing
+        }
+    }
+    
+    // Normalize special characters for comparison
+    const normalizeForComparison = (str) => {
+        return str.toLowerCase()
+            .replace(/[≥≤<>]/g, '')
+            .replace(/\s*\/\s*/g, ' ')
+            .replace(/\s+/g, ' ')
+            .replace(/[()]/g, '')
+            .trim();
+    };
+    
+    const parentNorm = normalizeForComparison(parentSubHazard);
+    
+    // Partial match - key phrase matching
+    for (const sub of subHazards) {
+        const subNorm = normalizeForComparison(sub);
+        
+        // Check if main descriptive words match
+        if (subNorm.includes(parentNorm) || parentNorm.includes(subNorm)) {
+            return sub;
+        }
+        
+        // Special handling for "work at height" variants
+        if (parentLower.includes('work at height') && sub.toLowerCase().includes('work at height')) {
+            // Match based on height threshold
+            if ((parentLower.includes('≥') || parentLower.includes('1.2m') || parentLower.includes('4 feet or more')) 
+                && sub.includes('1.2m / 4 feet or more')) {
+                return sub;
+            }
+            if ((parentLower.includes('<') || parentLower.includes('less than')) 
+                && sub.includes('less than 1.2m')) {
+                return sub;
+            }
+        }
+    }
+    
+    // Word-based partial match
+    const parentWords = parentLower.split(/[\s\/]+/).filter(w => w.length > 3);
+    for (const sub of subHazards) {
+        const subWords = sub.toLowerCase().split(/[\s\/]+/);
+        const matchCount = parentWords.filter(pw => subWords.some(sw => sw.includes(pw) || pw.includes(sw))).length;
+        if (matchCount >= 2 || (parentWords.length === 1 && matchCount === 1)) {
+            return sub;
+        }
+    }
+    
+    return ''; // No match found
+}
+
+// Map app hazard list to GOEHS sub-hazard
+function mapHazardListToSubHazard(hazardGroup, hazardList) {
+    const goehsCategory = mapHazardGroupToGOEHS(hazardGroup);
+    const subHazards = HAZARD_CATEGORIES[goehsCategory] || [];
+    
+    // Try exact match
+    if (subHazards.includes(hazardList)) return hazardList;
+    
+    // Try partial match
+    const lowerHazard = hazardList?.toLowerCase() || '';
+    for (const sub of subHazards) {
+        if (lowerHazard.includes(sub.toLowerCase()) || sub.toLowerCase().includes(lowerHazard)) {
+            return sub;
+        }
+    }
+    
+    // Return first sub-hazard if no match
+    return subHazards[0] || '';
+}
+
+// Convert app frequency (1, 1.25, 1.5, 1.75, 2) to GOEHS format (must be exact)
+function mapFrequencyToGOEHS(freq) {
+    const validFreqs = ['1', '1.25', '1.5', '1.75', '2'];
+    const numFreq = parseFloat(freq);
+    
+    // Find closest valid frequency
+    if (numFreq <= 1) return '1';
+    if (numFreq <= 1.125) return '1';
+    if (numFreq <= 1.375) return '1.25';
+    if (numFreq <= 1.625) return '1.5';
+    if (numFreq <= 1.875) return '1.75';
+    return '2';
+}
+
+// Convert app severity to GOEHS format
+function mapSeverityToGOEHS(sev) {
+    const validSevs = ['1', '3', '5', '7', '9', '10'];
+    const numSev = parseFloat(sev);
+    
+    // Find closest valid severity
+    if (numSev <= 2) return '1';
+    if (numSev <= 4) return '3';
+    if (numSev <= 6) return '5';
+    if (numSev <= 8) return '7';
+    if (numSev <= 9.5) return '9';
+    return '10';
+}
+
+// Convert app likelihood to GOEHS format
+function mapLikelihoodToGOEHS(like) {
+    const validLikes = ['1', '3', '5', '8', '10'];
+    const numLike = parseFloat(like);
+    
+    // Find closest valid likelihood
+    if (numLike <= 2) return '1';
+    if (numLike <= 4) return '3';
+    if (numLike <= 6.5) return '5';
+    if (numLike <= 9) return '8';
+    return '10';
+}
+
+// Intelligent Core Activity suggestion based on task name
+function suggestCoreActivity(taskName) {
+    const task = (taskName || '').toLowerCase();
+    
+    // Keyword to Core Activity mapping - expanded for better coverage
+    const activityMap = {
+        // Vehicle & Transport operations
+        'drive': 'Vehicle Operations', 'driving': 'Vehicle Operations', 'drives': 'Vehicle Operations',
+        'vehicle': 'Vehicle Operations', 'truck': 'Vehicle Operations', 'car': 'Vehicle Operations',
+        'forklift': 'Material Handling', 'fork lift': 'Material Handling', 'pallet': 'Material Handling',
+        'transport': 'Material Handling', 'transfer': 'Material Handling', 'move': 'Material Handling',
+        'maneuver': 'Vehicle Operations', 'maneuvering': 'Vehicle Operations',
+        'yard': 'Vehicle Operations', 'corner': 'Vehicle Operations',
+        'reach': 'Material Handling', 'reaching': 'Material Handling',
+        // Production operations
+        'mix': 'Mixing', 'mixing': 'Mixing', 'blend': 'Blending', 'compound': 'Compounding',
+        'extrusion': 'Extrusion', 'extrud': 'Extrusion', 'extruder': 'Extrusion',
+        'cure': 'Equipment Operation', 'curing': 'Equipment Operation',
+        'build': 'Assembly Operations', 'building': 'Assembly Operations', 'assembly': 'Assembly Operations',
+        'finish': 'Finishing', 'final': 'Finishing',
+        'inspect': 'Inspecting', 'inspection': 'Inspecting', 'check': 'Inspecting', 'quality': 'Inspecting',
+        'test': 'Testing', 'testing': 'Testing',
+        'clean': 'Cleaning Operations', 'cleaning': 'Cleaning Operations',
+        'maintain': 'Maintenance', 'maintenance': 'Maintenance', 'repair': 'Repair',
+        'load': 'Loading/Unloading', 'unload': 'Loading/Unloading', 'loading': 'Loading/Unloading',
+        'lift': 'Lifting', 'lifting': 'Lifting',
+        'handle': 'Material Handling', 'handling': 'Material Handling', 'material': 'Material Handling',
+        'cut': 'Cutting Operations', 'cutting': 'Cutting Operations',
+        'weld': 'Welding', 'welding': 'Welding',
+        'machine': 'Machining', 'machining': 'Machining',
+        'pack': 'Packaging', 'packaging': 'Packaging',
+        'ship': 'Shipping/Receiving', 'receiving': 'Shipping/Receiving',
+        'warehouse': 'Material Handling', 'storage': 'Material Handling',
+        'calender': 'Calendering', 'press': 'Press Operations',
+        'office': 'Office Work', 'admin': 'Office Work',
+        'train': 'Training', 'training': 'Training',
+        'bladder': 'Bladder Building', 'tire': 'Assembly Operations',
+        'associate': 'Equipment Operation', 'operator': 'Equipment Operation', 'operate': 'Equipment Operation',
+        // Additional keywords for better coverage
+        'rubber': 'Compounding', 'stock': 'Material Handling', 'store': 'Material Handling',
+        'grind': 'Machining', 'grinding': 'Machining', 'buff': 'Finishing', 'buffing': 'Finishing',
+        'coat': 'Surface Coating', 'coating': 'Surface Coating', 'spray': 'Surface Coating', 'paint': 'Surface Coating',
+        'form': 'Forming', 'forming': 'Forming', 'mold': 'Press Operations', 'molding': 'Press Operations',
+        'setup': 'Equipment Installation', 'set up': 'Equipment Installation', 'install': 'Equipment Installation',
+        'remove': 'Equipment De-installation', 'dismantle': 'Disassembly Operations',
+        'lab': 'Laboratory Operations', 'laboratory': 'Laboratory Operations', 'sample': 'Laboratory Operations',
+        'weigh': 'Chemical Production Operations', 'weighing': 'Chemical Production Operations',
+        'chemical': 'Chemical Production Operations', 'hazmat': 'Chemical Production Operations',
+        'confined': 'Confined Space Operations', 'tank': 'Confined Space Operations',
+        'construct': 'Construction', 'demolish': 'Demolition',
+        'security': 'Security/Emergency Response Operations', 'emergency': 'Security/Emergency Response Operations',
+        'waste': 'Waste Management', 'dispose': 'Waste Management', 'disposal': 'Waste Management',
+        'fabric': 'Component Prep', 'textile': 'Component Prep', 'cord': 'Component Prep',
+        'housekeep': 'Housekeeping', 'ground': 'Groundskeeping', 'landscape': 'Groundskeeping',
+        'engrav': 'Engraving', 'braze': 'Brazing', 'solder': 'Brazing',
+        'foundry': 'Foundry', 'cast': 'Foundry', 'melt': 'Foundry',
+        'wood': 'Woodworking', 'carpenter': 'Woodworking',
+        'plate': 'Plating', 'plating': 'Plating',
+        'disassembl': 'Disassembly Operations', 'takedown': 'Disassembly Operations'
+    };
+    
+    for (const [keyword, activity] of Object.entries(activityMap)) {
+        if (task.includes(keyword)) {
+            return activity;
+        }
+    }
+    
+    return ''; // No match found
+}
+
+// Intelligent Job Title suggestion based on task name
+function suggestJobTitle(taskName) {
+    const task = (taskName || '').toLowerCase();
+    
+    // Keyword to Job Title mapping - expanded for better coverage
+    const jobMap = {
+        // Vehicle & Transport
+        'drive': 'Fork truck operator', 'driving': 'Fork truck operator', 'drives': 'Fork truck operator',
+        'forklift': 'Fork truck operator', 'fork lift': 'Fork truck operator',
+        'truck': 'Fork truck operator', 'vehicle': 'Fork truck operator',
+        'pallet': 'Material handler', 'transfer': 'Material handler', 'transport': 'Material handler',
+        'maneuver': 'Fork truck operator', 'yard': 'Fork truck operator',
+        'associate': 'Operator', 'operator': 'Operator',
+        // Production
+        'mix': 'Mixer Operator', 'mixing': 'Mixer Operator',
+        'extrusion': 'Extruder Technician', 'extrud': 'Extruder Technician',
+        'cure': 'Curing Technician', 'curing': 'Curing Technician',
+        'build': 'Tire Builder', 'building': 'Tire Builder', 'assembly': 'Assembler',
+        'finish': 'Final Finish Technician', 'final': 'Final Finish Technician',
+        'inspect': 'Inspector', 'inspection': 'Inspector', 'quality': 'Quality Technician',
+        'test': 'Tester', 'testing': 'Tester', 'lab': 'Lab Technician',
+        'maintain': 'Maintenance', 'maintenance': 'Maintenance', 'repair': 'Repairman',
+        'load': 'Material handler', 'unload': 'Material handler',
+        'handle': 'Material handler', 'material': 'Material handler', 'handling': 'Material handler',
+        'cut': 'Cutter Technician', 'cutting': 'Cutter Technician',
+        'weld': 'Welder', 'welding': 'Welder',
+        'machine': 'Machinist', 'machining': 'Machinist',
+        'ship': 'Shipping & Receiving', 'receiving': 'Shipping & Receiving',
+        'calender': 'Calender Operator', 'press': 'Press operator',
+        'electric': 'Electrician', 'electrical': 'Electrician',
+        'compound': 'Compounder', 'bladder': 'Bladder Builder',
+        'office': 'Office worker-other', 'admin': 'Office worker-other',
+        'supervise': 'Team Leader', 'leader': 'Team Leader', 'manage': 'Manager',
+        // Additional keywords for better coverage
+        'rubber': 'Compounder', 'stock': 'Material handler', 'store': 'Storeroom Clerk',
+        'grind': 'Machinist', 'grinding': 'Machinist', 'buff': 'Final Finish Technician',
+        'mill': 'Mill Operator', 'crane': 'Crane operator', 'hoist': 'Crane operator',
+        'fabric': 'Fabric Machine Operator', 'textile': 'Fabric Machine Operator',
+        'security': 'Security', 'guard': 'Guard', 'safety': 'Coordinator',
+        'engineer': 'Engineer', 'design': 'Engineer',
+        'research': 'Research Scientist', 'scientist': 'Research Scientist',
+        'janitor': 'Janitor', 'custodian': 'Janitor', 'housekeep': 'Janitor',
+        'plumb': 'Plumber', 'pipe': 'Pipefitter',
+        'mechanic': 'Mechanic', 'tool': 'Tool & die maker', 'die': 'Tool & die maker',
+        'wire': 'Wire Drawer', 'draw': 'Wire Drawer',
+        'retread': 'Retread Technician', 'chemical': 'Chemical Process Operator',
+        'pigment': 'Pigment Weighing Operator', 'weigh': 'Pigment Weighing Operator',
+        'dispatch': 'Dispatcher', 'coordinator': 'Coordinator',
+        'train': 'Labor Trainer', 'trainer': 'Labor Trainer',
+        'ground': 'Groundskeeper', 'landscape': 'Groundskeeper'
+    };
+    
+    for (const [keyword, job] of Object.entries(jobMap)) {
+        if (task.includes(keyword)) {
+            return job;
+        }
+    }
+    
+    return ''; // No match found
+}
+
+// Auto-populate GOEHS tasks from risk table
+function populateGoehsTasksFromTable(tableData) {
+    // Clear existing tasks
+    goehsTasks = [];
+    taskIdCounter = 0;
+    const container = document.getElementById('taskRowsContainer');
+    if (container) container.innerHTML = '';
+    
+    if (tableData.tasks.length === 0) {
+        addTaskRow(); // Add empty row if no tasks
+        return;
+    }
+    
+    // Add a row for each unique task
+    tableData.tasks.forEach((task, index) => {
+        taskIdCounter++;
+        const taskId = `task-${taskIdCounter}`;
+        goehsTasks.push({ id: taskId, data: task });
+        
+        const row = document.createElement('div');
+        row.id = taskId;
+        row.className = 'task-row grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 p-4 bg-slate-50 border border-slate-200 rounded-lg';
+        
+        // Intelligently suggest Core Activity and Job Title based on task name
+        const suggestedActivity = suggestCoreActivity(task.name);
+        const suggestedJob = suggestJobTitle(task.name);
+        
+        // Don't apply AI class to default values - only apply when AI actually fills empty fields
+        const activityClass = 'goehs-empty-required';
+        const jobClass = 'goehs-empty-required';
+        
+        // Generate Core Activity options with intelligent pre-selection
+        const coreActivityOptions = CORE_ACTIVITIES.map(ca => 
+            `<option value="${ca}" ${ca === suggestedActivity ? 'selected' : ''}>${ca}</option>`
+        ).join('');
+        
+        // Generate Job Title options with intelligent pre-selection
+        const jobTitleOptions = JOB_TITLES.map(jt => 
+            `<option value="${jt}" ${jt === suggestedJob ? 'selected' : ''}>${jt}</option>`
+        ).join('');
+        
+        row.innerHTML = `
+            <div>
+                <label class="block text-xs font-medium text-slate-600 mb-1">Task Name <span class="text-red-500">*</span></label>
+                <input type="text" class="task-name w-full px-3 py-2 border border-slate-300 rounded-lg text-sm" value="${escapeHtml(task.name)}" placeholder="Task name">
+                <span class="text-xs text-slate-500">${task.hazardCount} hazard(s)</span>
+            </div>
+            <div>
+                <label class="block text-xs font-medium text-slate-600 mb-1">Task Description</label>
+                <input type="text" class="task-description w-full px-3 py-2 border border-slate-300 rounded-lg text-sm" value="${escapeHtml(task.name)}" placeholder="Description">
+            </div>
+            <div>
+                <label class="block text-xs font-medium text-slate-600 mb-1">Condition Mode <span class="text-red-500">*</span></label>
+                <select class="task-condition w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white">
+                    <option value="">-- Select --</option>
+                    <option value="Routine" selected>Routine</option>
+                    <option value="Non-Routine">Non-Routine</option>
+                    <option value="Emergency Situation">Emergency Situation</option>
+                </select>
+            </div>
+            <div class="goehs-field-wrapper">
+                <label class="block text-xs font-medium text-slate-600 mb-1">Core Activity <span class="text-red-500">*</span></label>
+                <select class="task-activity w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white ${activityClass}" onchange="this.classList.remove('goehs-empty-required', 'goehs-ai-prefilled')">
+                    <option value="">-- Select --</option>
+                    ${coreActivityOptions}
+                </select>
+            </div>
+            <div class="goehs-field-wrapper">
+                <label class="block text-xs font-medium text-slate-600 mb-1">Job Title <span class="text-red-500">*</span></label>
+                <div class="flex gap-2">
+                    <select class="task-jobtitle flex-1 px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white ${jobClass}" onchange="this.classList.remove('goehs-empty-required', 'goehs-ai-prefilled')">
+                        <option value="">-- Select --</option>
+                        ${jobTitleOptions}
+                    </select>
+                    <button type="button" onclick="removeTaskRow('${taskId}')" class="px-2 py-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded flex-shrink-0">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                    </button>
+                </div>
+            </div>
+        `;
+        
+        container.appendChild(row);
+    });
+    
+    console.log(`✅ Populated ${tableData.tasks.length} tasks from risk table`);
+}
+
+// Auto-populate GOEHS hazards from risk table - TABLE FORMAT
+function populateGoehsHazardsFromTable(tableData) {
+    // Clear existing hazards
+    goehsHazards = [];
+    hazardIdCounter = 0;
+    const tbody = document.getElementById('hazardTableBody');
+    if (tbody) tbody.innerHTML = '';
+    
+    // Update count display
+    const countDisplay = document.getElementById('hazardCountDisplay');
+    if (countDisplay) countDisplay.textContent = tableData.hazards.length;
+    
+    if (tableData.hazards.length === 0) {
+        addHazardTableRow(); // Add empty row if no hazards
+        return;
+    }
+    
+    // Add a table row for each hazard
+    tableData.hazards.forEach((hazard, index) => {
+        hazardIdCounter++;
+        const hazardId = `hazard-${hazardIdCounter}`;
+        goehsHazards.push({ id: hazardId, data: hazard });
+        
+        // Map to GOEHS format with case-insensitive matching (GOEHS casing supersedes)
+        const goehsCategory = findMatchingGoehsCategory(hazard.hazardGroup) || '';
+        const goehsSubHazard = goehsCategory ? findMatchingGoehsSubHazard(goehsCategory, hazard.hazardList) : '';
+        const goehsFreq = mapFrequencyToGOEHS(hazard.frequency);
+        const goehsSev = mapSeverityToGOEHS(hazard.severity);
+        const goehsLike = mapLikelihoodToGOEHS(hazard.likelihood);
+        
+        // Calculate initial risk score
+        const initScore = (parseFloat(goehsFreq) * parseFloat(goehsSev) * parseFloat(goehsLike)).toFixed(2);
+        const initRating = getRiskRating(parseFloat(initScore));
+        
+        // Get task names for dropdown
+        const taskOptions = tableData.tasks.length > 0 
+            ? tableData.tasks.map(t => `<option value="${escapeHtml(t.name)}" ${t.name === hazard.stepName ? 'selected' : ''}>${escapeHtml(t.name)}</option>`).join('')
+            : `<option value="${escapeHtml(hazard.stepName)}" selected>${escapeHtml(hazard.stepName)}</option>`;
+        
+        // Generate hazard category options - with case-insensitive selection
+        const categoryOptions = Object.keys(HAZARD_CATEGORIES).map(cat => 
+            `<option value="${cat}" ${cat === goehsCategory ? 'selected' : ''}>${goehsUiLabel(cat)}</option>`
+        ).join('');
+        
+        // Generate sub-hazard options for selected category with proper matching
+        const subHazards = HAZARD_CATEGORIES[goehsCategory] || [];
+        const subHazardOptions = subHazards.map(sub => 
+            `<option value="${sub}" ${sub === goehsSubHazard ? 'selected' : ''}>${goehsUiLabel(sub)}</option>`
+        ).join('');
+        
+        // Generate frequency/severity/likelihood options
+        const freqOpts = (vals, selected) => vals.map(v => `<option value="${v}" ${v === selected ? 'selected' : ''}>${v}</option>`).join('');
+        const freqValues = ['1', '1.25', '1.5', '1.75', '2'];
+        const sevValues = ['1', '3', '5', '7', '9', '10'];
+        const likeValues = ['1', '3', '5', '8', '10'];
+        
+        // Countermeasure ladder options - with preselection from parent table data
+        // Parse pre-tagged ladder levels from parent table (can be comma-separated string or array)
+        const preTaggedLadder = hazard.countermeasureLadder || '';
+        const preSelectedLadders = Array.isArray(preTaggedLadder) 
+            ? preTaggedLadder 
+            : preTaggedLadder.split(',').map(s => s.trim()).filter(s => s);
+        
+        const ladderOptions = COUNTERMEASURE_LADDER.map(l => {
+            const isSelected = preSelectedLadders.some(
+                presel => presel.toLowerCase() === l.toLowerCase()
+            );
+            return `<option value="${l}" ${isSelected ? 'selected' : ''}>${goehsUiLabel(l)}</option>`;
+        }).join('');
+        
+        const row = document.createElement('tr');
+        row.id = hazardId;
+        row.className = 'hazard-table-row border-b border-slate-200 hover:bg-slate-50';
+        row.dataset.hazardIndex = index;
+        
+        row.innerHTML = `
+            <td class="p-1 border-r border-slate-200 text-center font-medium text-slate-600">${index + 1}</td>
+            <td class="p-1 border-r border-slate-200">
+                <select class="hazard-task w-full p-1 border border-slate-300 rounded text-xs bg-white">
+                    <option value="">--</option>
+                    ${taskOptions}
+                </select>
+            </td>
+            <td class="p-1 border-r border-slate-200 bg-orange-50">
+                <select class="hazard-category w-full p-1 border border-slate-300 rounded text-xs bg-white" onchange="updateTableSubHazards(this, '${hazardId}')">
+                    <option value="">--</option>
+                    ${categoryOptions}
+                </select>
+            </td>
+            <td class="p-1 border-r border-slate-200 bg-orange-50">
+                <select class="hazard-sub w-full p-1 border border-slate-300 rounded text-xs bg-white">
+                    <option value="">--</option>
+                    ${subHazardOptions}
+                </select>
+            </td>
+            <td class="p-1 border-r border-slate-200">
+                <input type="text" class="hazard-outcome w-full p-1 border border-slate-300 rounded text-xs" value="${escapeHtml(goehsUiLabel(hazard.consequence))}" placeholder="Outcome">
+            </td>
+            <td class="p-1 border-r border-slate-200">
+                <input type="text" class="hazard-desc w-full p-1 border border-slate-300 rounded text-xs" value="${escapeHtml(goehsUiLabel(hazard.hazardSource || hazard.hazardList))}" placeholder="Description">
+            </td>
+            <td class="p-1 border-r border-slate-200 bg-amber-50">
+                <select class="hazard-init-freq w-full p-1 border border-slate-300 rounded text-xs bg-white text-center" onchange="calcTableInitRisk('${hazardId}')">
+                    ${freqOpts(freqValues, goehsFreq)}
+                </select>
+            </td>
+            <td class="p-1 border-r border-slate-200 bg-amber-50">
+                <select class="hazard-init-sev w-full p-1 border border-slate-300 rounded text-xs bg-white text-center" onchange="calcTableInitRisk('${hazardId}')">
+                    ${freqOpts(sevValues, goehsSev)}
+                </select>
+            </td>
+            <td class="p-1 border-r border-slate-200 bg-amber-50">
+                <select class="hazard-init-like w-full p-1 border border-slate-300 rounded text-xs bg-white text-center" onchange="calcTableInitRisk('${hazardId}')">
+                    ${freqOpts(likeValues, goehsLike)}
+                </select>
+            </td>
+            <td class="p-1 border-r border-slate-200 bg-amber-50">
+                <input type="text" class="hazard-init-score w-full p-1 border border-slate-300 rounded text-xs bg-slate-100 text-center font-semibold" value="${initScore}" readonly>
+            </td>
+            <td class="p-1 border-r border-slate-200 bg-amber-50">
+                <input type="text" class="hazard-init-rating w-full p-1 border border-slate-300 rounded text-xs bg-slate-100 text-center font-semibold" value="${initRating}" readonly>
+            </td>
+            <td class="p-1 border-r border-slate-200 bg-blue-50">
+                <input type="text" class="hazard-counter-desc w-full p-1 border border-slate-300 rounded text-xs" value="${escapeHtml(hazard.currentControl)}" placeholder="Controls">
+            </td>
+            <td class="p-1 border-r border-slate-200 bg-blue-50">
+                <select class="hazard-counter-ladder w-full p-1 border border-slate-300 rounded text-xs bg-white" multiple size="4" style="min-height: 70px;" title="Hold Ctrl/Cmd to select multiple">
+                    ${ladderOptions}
+                </select>
+            </td>
+            <td class="p-1 border-r border-slate-200 bg-blue-50">
+                <select class="hazard-res-freq w-full p-1 border border-slate-300 rounded text-xs bg-white text-center" onchange="calcTableResRisk('${hazardId}')">
+                    ${freqOpts(freqValues, goehsFreq)}
+                </select>
+            </td>
+            <td class="p-1 border-r border-slate-200 bg-blue-50">
+                <select class="hazard-res-sev w-full p-1 border border-slate-300 rounded text-xs bg-white text-center" onchange="calcTableResRisk('${hazardId}')">
+                    ${freqOpts(sevValues, goehsSev)}
+                </select>
+            </td>
+            <td class="p-1 border-r border-slate-200 bg-blue-50">
+                <select class="hazard-res-like w-full p-1 border border-slate-300 rounded text-xs bg-white text-center" onchange="calcTableResRisk('${hazardId}')">
+                    ${freqOpts(likeValues, goehsLike)}
+                </select>
+            </td>
+            <td class="p-1 border-r border-slate-200 bg-blue-50">
+                <input type="text" class="hazard-res-score w-full p-1 border border-slate-300 rounded text-xs bg-slate-100 text-center" value="${initScore}" readonly>
+            </td>
+            <td class="p-1 border-r border-slate-200 bg-blue-50">
+                <input type="text" class="hazard-res-rating w-full p-1 border border-slate-300 rounded text-xs bg-slate-100 text-center" value="${initRating}" readonly>
+            </td>
+            <td class="p-1 border-r border-slate-200 bg-green-50">
+                <input type="text" class="hazard-pred-desc w-full p-1 border border-slate-300 rounded text-xs" placeholder="Future controls">
+            </td>
+            <td class="p-1 border-r border-slate-200 bg-green-50">
+                <select class="hazard-pred-ladder w-full p-1 border border-slate-300 rounded text-xs bg-white" multiple size="4" style="min-height: 70px;" title="Hold Ctrl/Cmd to select multiple">
+                    ${ladderOptions}
+                </select>
+            </td>
+            <td class="p-1 border-r border-slate-200 bg-green-50">
+                <select class="hazard-pred-freq w-full p-1 border border-slate-300 rounded text-xs bg-white text-center" onchange="calcTablePredRisk('${hazardId}')">
+                    <option value="">--</option>
+                    ${freqOpts(freqValues, '')}
+                </select>
+            </td>
+            <td class="p-1 border-r border-slate-200 bg-green-50">
+                <select class="hazard-pred-sev w-full p-1 border border-slate-300 rounded text-xs bg-white text-center" onchange="calcTablePredRisk('${hazardId}')">
+                    <option value="">--</option>
+                    ${freqOpts(sevValues, '')}
+                </select>
+            </td>
+            <td class="p-1 border-r border-slate-200 bg-green-50">
+                <select class="hazard-pred-like w-full p-1 border border-slate-300 rounded text-xs bg-white text-center" onchange="calcTablePredRisk('${hazardId}')">
+                    <option value="">--</option>
+                    ${freqOpts(likeValues, '')}
+                </select>
+            </td>
+            <td class="p-1 border-r border-slate-200 bg-green-50">
+                <input type="text" class="hazard-pred-score w-full p-1 border border-slate-300 rounded text-xs bg-slate-100 text-center" value="" readonly placeholder="--">
+            </td>
+            <td class="p-1 border-r border-slate-200 bg-green-50">
+                <input type="text" class="hazard-pred-rating w-full p-1 border border-slate-300 rounded text-xs bg-slate-100 text-center" value="" readonly placeholder="--">
+            </td>
+            <td class="p-1 text-center">
+                <button type="button" onclick="removeHazardTableRow('${hazardId}')" class="text-red-500 hover:text-red-700 p-1">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+            </td>
+        `;
+        
+        tbody.appendChild(row);
+    });
+    
+    // Update count display
+    if (countDisplay) countDisplay.textContent = tableData.hazards.length;
+    
+    // Auto-apply countermeasure ladder suggestions based on control descriptions
+    setTimeout(() => autoApplyCountermeasureSuggestions(), 100);
+    
+    console.log(`✅ Populated ${tableData.hazards.length} hazards in table format from risk table`);
+}
+
+// Auto-apply countermeasure ladder suggestions on data load
+// Only applies keyword-based suggestions if NO pre-tagged ladder was set from parent table
+function autoApplyCountermeasureSuggestions() {
+    const hazardRows = document.querySelectorAll('.hazard-table-row');
+    let appliedCount = 0;
+    let skippedPreTagged = 0;
+    
+    hazardRows.forEach(row => {
+        const counterDesc = row.querySelector('.hazard-counter-desc')?.value || '';
+        const counterLadderSelect = row.querySelector('.hazard-counter-ladder');
+        
+        if (counterLadderSelect) {
+            // Check if already has pre-selected values (from parent table AI tagging)
+            const hasPreSelection = Array.from(counterLadderSelect.selectedOptions).length > 0;
+            
+            if (hasPreSelection) {
+                // Already has pre-tagged values from parent table - just add visual indicator
+                counterLadderSelect.classList.add('goehs-ai-prefilled');
+                skippedPreTagged++;
+            } else if (counterDesc) {
+                // No pre-selection, use keyword-based suggestion
+                const suggestions = suggestCountermeasureLadder(counterDesc);
+                if (suggestions.length > 0) {
+                    // Select suggested options
+                    suggestions.forEach(s => {
+                        const opt = Array.from(counterLadderSelect.options).find(o => o.value === s);
+                        if (opt) {
+                            opt.selected = true;
+                            appliedCount++;
+                        }
+                    });
+                    // Add visual indicator for AI-suggested
+                    counterLadderSelect.classList.add('goehs-ai-prefilled');
+                }
+            }
+        }
+    });
+    
+    if (appliedCount > 0 || skippedPreTagged > 0) {
+        console.log(`✅ Countermeasure ladder: ${skippedPreTagged} pre-tagged from parent, ${appliedCount} auto-suggested from keywords`);
+    }
+}
+
+// Add empty hazard table row
+function addHazardTableRow() {
+    hazardIdCounter++;
+    const hazardId = `hazard-${hazardIdCounter}`;
+    goehsHazards.push({ id: hazardId, data: {} });
+    
+    const tbody = document.getElementById('hazardTableBody');
+    if (!tbody) return;
+    
+    const index = goehsHazards.length;
+    
+    // Get task names for dropdown
+    const tasks = collectTaskData();
+    const taskOptions = tasks.length > 0 
+        ? tasks.map(t => `<option value="${escapeHtml(t.taskName)}">${escapeHtml(t.taskName)}</option>`).join('')
+        : '';
+    
+    // Generate hazard category options
+    const categoryOptions = Object.keys(HAZARD_CATEGORIES).map(cat => 
+        `<option value="${cat}">${goehsUiLabel(cat)}</option>`
+    ).join('');
+    
+    // Generate frequency/severity/likelihood options
+    const freqOpts = (vals) => vals.map(v => `<option value="${v}">${v}</option>`).join('');
+    const freqValues = ['1', '1.25', '1.5', '1.75', '2'];
+    const sevValues = ['1', '3', '5', '7', '9', '10'];
+    const likeValues = ['1', '3', '5', '8', '10'];
+    
+    // Countermeasure ladder options
+    const ladderOptions = ['', ...COUNTERMEASURE_LADDER].map(l => `<option value="${l}">${l ? goehsUiLabel(l) : '--'}</option>`).join('');
+    
+    const row = document.createElement('tr');
+    row.id = hazardId;
+    row.className = 'hazard-table-row border-b border-slate-200 hover:bg-slate-50';
+    row.dataset.hazardIndex = index - 1;
+    
+    row.innerHTML = `
+        <td class="p-1 border-r border-slate-200 text-center font-medium text-slate-600">${index}</td>
+        <td class="p-1 border-r border-slate-200">
+            <select class="hazard-task w-full p-1 border border-slate-300 rounded text-xs bg-white">
+                <option value="">--</option>
+                ${taskOptions}
+            </select>
+        </td>
+        <td class="p-1 border-r border-slate-200 bg-orange-50">
+            <select class="hazard-category w-full p-1 border border-slate-300 rounded text-xs bg-white" onchange="updateTableSubHazards(this, '${hazardId}')">
+                <option value="">--</option>
+                ${categoryOptions}
+            </select>
+        </td>
+        <td class="p-1 border-r border-slate-200 bg-orange-50">
+            <select class="hazard-sub w-full p-1 border border-slate-300 rounded text-xs bg-white">
+                <option value="">--</option>
+            </select>
+        </td>
+        <td class="p-1 border-r border-slate-200">
+            <input type="text" class="hazard-outcome w-full p-1 border border-slate-300 rounded text-xs" placeholder="Outcome">
+        </td>
+        <td class="p-1 border-r border-slate-200">
+            <input type="text" class="hazard-desc w-full p-1 border border-slate-300 rounded text-xs" placeholder="Description">
+        </td>
+        <td class="p-1 border-r border-slate-200 bg-amber-50">
+            <select class="hazard-init-freq w-full p-1 border border-slate-300 rounded text-xs bg-white text-center" onchange="calcTableInitRisk('${hazardId}')">
+                ${freqOpts(freqValues)}
+            </select>
+        </td>
+        <td class="p-1 border-r border-slate-200 bg-amber-50">
+            <select class="hazard-init-sev w-full p-1 border border-slate-300 rounded text-xs bg-white text-center" onchange="calcTableInitRisk('${hazardId}')">
+                ${freqOpts(sevValues)}
+            </select>
+        </td>
+        <td class="p-1 border-r border-slate-200 bg-amber-50">
+            <select class="hazard-init-like w-full p-1 border border-slate-300 rounded text-xs bg-white text-center" onchange="calcTableInitRisk('${hazardId}')">
+                ${freqOpts(likeValues)}
+            </select>
+        </td>
+        <td class="p-1 border-r border-slate-200 bg-amber-50">
+            <input type="text" class="hazard-init-score w-full p-1 border border-slate-300 rounded text-xs bg-slate-100 text-center font-semibold" value="" readonly placeholder="--">
+        </td>
+        <td class="p-1 border-r border-slate-200 bg-amber-50">
+            <input type="text" class="hazard-init-rating w-full p-1 border border-slate-300 rounded text-xs bg-slate-100 text-center font-semibold" value="" readonly placeholder="--">
+        </td>
+        <td class="p-1 border-r border-slate-200 bg-blue-50">
+            <input type="text" class="hazard-counter-desc w-full p-1 border border-slate-300 rounded text-xs" placeholder="Controls">
+        </td>
+        <td class="p-1 border-r border-slate-200 bg-blue-50">
+            <select class="hazard-counter-ladder w-full p-1 border border-slate-300 rounded text-xs bg-white" multiple size="4" style="min-height: 70px;" title="Hold Ctrl/Cmd to select multiple">
+                ${ladderOptions}
+            </select>
+        </td>
+        <td class="p-1 border-r border-slate-200 bg-blue-50">
+            <select class="hazard-res-freq w-full p-1 border border-slate-300 rounded text-xs bg-white text-center" onchange="calcTableResRisk('${hazardId}')">
+                <option value="">--</option>
+                ${freqOpts(freqValues)}
+            </select>
+        </td>
+        <td class="p-1 border-r border-slate-200 bg-blue-50">
+            <select class="hazard-res-sev w-full p-1 border border-slate-300 rounded text-xs bg-white text-center" onchange="calcTableResRisk('${hazardId}')">
+                <option value="">--</option>
+                ${freqOpts(sevValues)}
+            </select>
+        </td>
+        <td class="p-1 border-r border-slate-200 bg-blue-50">
+            <select class="hazard-res-like w-full p-1 border border-slate-300 rounded text-xs bg-white text-center" onchange="calcTableResRisk('${hazardId}')">
+                <option value="">--</option>
+                ${freqOpts(likeValues)}
+            </select>
+        </td>
+        <td class="p-1 border-r border-slate-200 bg-blue-50">
+            <input type="text" class="hazard-res-score w-full p-1 border border-slate-300 rounded text-xs bg-slate-100 text-center" value="" readonly placeholder="--">
+        </td>
+        <td class="p-1 border-r border-slate-200 bg-blue-50">
+            <input type="text" class="hazard-res-rating w-full p-1 border border-slate-300 rounded text-xs bg-slate-100 text-center" value="" readonly placeholder="--">
+        </td>
+        <td class="p-1 border-r border-slate-200 bg-green-50">
+            <input type="text" class="hazard-pred-desc w-full p-1 border border-slate-300 rounded text-xs" placeholder="Future controls">
+        </td>
+        <td class="p-1 border-r border-slate-200 bg-green-50">
+            <select class="hazard-pred-ladder w-full p-1 border border-slate-300 rounded text-xs bg-white" multiple size="4" style="min-height: 70px;" title="Hold Ctrl/Cmd to select multiple">
+                ${ladderOptions}
+            </select>
+        </td>
+        <td class="p-1 border-r border-slate-200 bg-green-50">
+            <select class="hazard-pred-freq w-full p-1 border border-slate-300 rounded text-xs bg-white text-center" onchange="calcTablePredRisk('${hazardId}')">
+                <option value="">--</option>
+                ${freqOpts(freqValues)}
+            </select>
+        </td>
+        <td class="p-1 border-r border-slate-200 bg-green-50">
+            <select class="hazard-pred-sev w-full p-1 border border-slate-300 rounded text-xs bg-white text-center" onchange="calcTablePredRisk('${hazardId}')">
+                <option value="">--</option>
+                ${freqOpts(sevValues)}
+            </select>
+        </td>
+        <td class="p-1 border-r border-slate-200 bg-green-50">
+            <select class="hazard-pred-like w-full p-1 border border-slate-300 rounded text-xs bg-white text-center" onchange="calcTablePredRisk('${hazardId}')">
+                <option value="">--</option>
+                ${freqOpts(likeValues)}
+            </select>
+        </td>
+        <td class="p-1 border-r border-slate-200 bg-green-50">
+            <input type="text" class="hazard-pred-score w-full p-1 border border-slate-300 rounded text-xs bg-slate-100 text-center" value="" readonly placeholder="--">
+        </td>
+        <td class="p-1 border-r border-slate-200 bg-green-50">
+            <input type="text" class="hazard-pred-rating w-full p-1 border border-slate-300 rounded text-xs bg-slate-100 text-center" value="" readonly placeholder="--">
+        </td>
+        <td class="p-1 text-center">
+            <button type="button" onclick="removeHazardTableRow('${hazardId}')" class="text-red-500 hover:text-red-700 p-1">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+            </button>
+        </td>
+    `;
+    
+    tbody.appendChild(row);
+    updateHazardCount();
+}
+
+// Remove hazard table row
+function removeHazardTableRow(hazardId) {
+    if (goehsHazards.length <= 1) {
+        showGoehsAlert('You must have at least one hazard.', 'warning');
+        return;
+    }
+    goehsHazards = goehsHazards.filter(h => h.id !== hazardId);
+    document.getElementById(hazardId)?.remove();
+    renumberHazardTableRows();
+    updateHazardCount();
+}
+
+// Renumber hazard table rows
+function renumberHazardTableRows() {
+    document.querySelectorAll('.hazard-table-row').forEach((row, index) => {
+        row.querySelector('td:first-child').textContent = index + 1;
+        row.dataset.hazardIndex = index;
+    });
+}
+
+// Update hazard count display
+function updateHazardCount() {
+    const countDisplay = document.getElementById('hazardCountDisplay');
+    if (countDisplay) {
+        countDisplay.textContent = document.querySelectorAll('.hazard-table-row').length;
+    }
+}
+
+// Update sub-hazards dropdown in table format
+function updateTableSubHazards(selectElement, hazardId) {
+    const hazardCategory = selectElement.value;
+    const row = document.getElementById(hazardId);
+    const subSelect = row.querySelector('.hazard-sub');
+    
+    subSelect.innerHTML = '<option value="">--</option>';
+    
+    if (hazardCategory && HAZARD_CATEGORIES[hazardCategory]) {
+        HAZARD_CATEGORIES[hazardCategory].forEach(sub => {
+            const opt = document.createElement('option');
+            opt.value = sub;
+            opt.textContent = goehsUiLabel(sub);
+            subSelect.appendChild(opt);
+        });
+    }
+}
+
+// Calculate initial risk in table format
+function calcTableInitRisk(hazardId) {
+    const row = document.getElementById(hazardId);
+    const freq = row.querySelector('.hazard-init-freq').value;
+    const sev = row.querySelector('.hazard-init-sev').value;
+    const like = row.querySelector('.hazard-init-like').value;
+    
+    if (freq && sev && like) {
+        const score = (parseFloat(freq) * parseFloat(sev) * parseFloat(like)).toFixed(2);
+        const rating = getRiskRating(parseFloat(score));
+        row.querySelector('.hazard-init-score').value = score;
+        row.querySelector('.hazard-init-rating').value = rating;
+    }
+}
+
+// Calculate residual risk in table format
+function calcTableResRisk(hazardId) {
+    const row = document.getElementById(hazardId);
+    const freq = row.querySelector('.hazard-res-freq').value;
+    const sev = row.querySelector('.hazard-res-sev').value;
+    const like = row.querySelector('.hazard-res-like').value;
+    
+    if (freq && sev && like) {
+        const score = (parseFloat(freq) * parseFloat(sev) * parseFloat(like)).toFixed(2);
+        const rating = getRiskRating(parseFloat(score));
+        row.querySelector('.hazard-res-score').value = score;
+        row.querySelector('.hazard-res-rating').value = rating;
+    } else {
+        row.querySelector('.hazard-res-score').value = '';
+        row.querySelector('.hazard-res-rating').value = '';
+    }
+}
+
+// Calculate predictive risk in table format
+function calcTablePredRisk(hazardId) {
+    const row = document.getElementById(hazardId);
+    const freq = row.querySelector('.hazard-pred-freq').value;
+    const sev = row.querySelector('.hazard-pred-sev').value;
+    const like = row.querySelector('.hazard-pred-like').value;
+    
+    if (freq && sev && like) {
+        const score = (parseFloat(freq) * parseFloat(sev) * parseFloat(like)).toFixed(2);
+        const rating = getRiskRating(parseFloat(score));
+        row.querySelector('.hazard-pred-score').value = score;
+        row.querySelector('.hazard-pred-rating').value = rating;
+    } else {
+        row.querySelector('.hazard-pred-score').value = '';
+        row.querySelector('.hazard-pred-rating').value = '';
+    }
+}
+
+// Helper function to escape HTML
+function escapeHtml(str) {
+    if (!str) return '';
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+}
+
+// ============ MODAL FUNCTIONS ============
+
+function openGoehsModal() {
+    const modal = document.getElementById('goehsModal');
+    if (modal) {
+        modal.style.display = 'flex';
+        initializeGoehsForm();
+        
+        // Auto-extract and populate from risk table
+        autoPopulateFromRiskTable();
+        
+        // Note: Intelligent Fill will be triggered when user navigates to Tool 2 (Task Batch)
+        // This prevents the "No tasks to populate" error on modal open
+    }
+}
+
+// Auto-populate GOEHS tools from existing risk table
+function autoPopulateFromRiskTable() {
+    const tableData = extractRiskTableData();
+    const banner = document.getElementById('goehsAutoPopulateBanner');
+    
+    if (tableData.hazards.length === 0) {
+        // Update banner to show no data
+        if (banner) {
+            banner.className = 'mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg';
+            banner.innerHTML = `
+                <div class="flex items-start gap-3">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-yellow-600 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+                    <div>
+                        <h4 class="font-semibold text-yellow-800">No Risk Table Data Found</h4>
+                        <p class="text-yellow-700 text-sm mt-1">No risk assessment data was detected. Please generate a risk assessment first using the main app, or enter data manually in Tools 2 and 3.</p>
+                    </div>
+                </div>
+            `;
+        }
+        return;
+    }
+    
+    // Show success info
+    const count = tableData.hazards.length;
+    const taskCount = tableData.tasks.length;
+    
+    // Update banner to show data found
+    if (banner) {
+        banner.className = 'mb-6 p-4 bg-green-50 border border-green-200 rounded-lg';
+        banner.innerHTML = `
+            <div class="flex items-start gap-3">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-green-600 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                <div>
+                    <h4 class="font-semibold text-green-800">✓ Risk Table Data Detected: ${taskCount} Task(s), ${count} Hazard(s)</h4>
+                    <p class="text-green-700 text-sm mt-1">Your risk assessment data will automatically populate Tools 2 and 3 when you navigate to them.</p>
+                    <p class="text-green-700 text-sm mt-2"><strong>Next:</strong> Complete the assessment header below, then click "Next: Task Batch →" to continue.</p>
+                </div>
+            </div>
+        `;
+    }
+    
+    // Store for later use
+    window.goehsTableData = tableData;
+    
+    // Populate tasks (Tool 2) - will be called when user navigates to Tool 2
+    // Populate hazards (Tool 3) - will be called when user navigates to Tool 3
+}
+// Re-sync tasks from risk table (user-triggered)
+function resyncTasksFromTable() {
+    if (!confirm('This will replace all current tasks with data from the risk table. Continue?')) {
+        return;
+    }
+    
+    const tableData = extractRiskTableData();
+    window.goehsTableData = tableData;
+    
+    if (tableData.tasks.length === 0) {
+        showGoehsAlert('No tasks found in the risk table. Please generate a risk assessment first.', 'warning');
+        return;
+    }
+    
+    populateGoehsTasksFromTable(tableData);
+    showGoehsAlert(`Re-synced ${tableData.tasks.length} task(s) from risk table.`, 'success');
+}
+
+// Re-sync hazards from risk table (user-triggered)
+function resyncHazardsFromTable() {
+    if (!confirm('This will replace all current hazards with data from the risk table. Continue?')) {
+        return;
+    }
+    
+    const tableData = extractRiskTableData();
+    window.goehsTableData = tableData;
+    
+    if (tableData.hazards.length === 0) {
+        showGoehsAlert('No hazards found in the risk table. Please generate a risk assessment first.', 'warning');
+        return;
+    }
+    
+    populateGoehsHazardsFromTable(tableData);
+    showGoehsAlert(`Re-synced ${tableData.hazards.length} hazard(s) from risk table.`, 'success');
+}
+
+function closeGoehsModal() {
+    const modal = document.getElementById('goehsModal');
+    if (modal) {
+        modal.style.display = 'none';
+    }
+}
+
+function goToTool(toolNum) {
+    // Validate before moving forward
+    if (toolNum > 1) {
+        const title = document.getElementById('goehsAssessmentTitle').value;
+        if (!title) {
+            showGoehsAlert('Please enter Assessment Title in Tool 1 first.', 'error');
+            return;
+        }
+        // Update title displays
+        document.getElementById('tool2AssessmentTitle').textContent = title;
+        document.getElementById('tool3AssessmentTitle').textContent = title;
+    }
+    
+    // Hide all tabs
+    document.querySelectorAll('.goehs-tab-content').forEach(tab => tab.classList.add('hidden'));
+    document.querySelectorAll('.goehs-tab-btn').forEach(btn => {
+        btn.classList.remove('active', 'text-orange-600', 'border-orange-600', 'bg-white');
+        btn.classList.add('text-slate-600', 'border-transparent');
+        btn.querySelector('span span').classList.remove('bg-orange-600');
+        btn.querySelector('span span').classList.add('bg-slate-400');
+    });
+    
+    // Show selected tab
+    const selectedTab = document.getElementById(`goehs-tool${toolNum}`);
+    const selectedBtn = document.querySelector(`.goehs-tab-btn[data-tab="tool${toolNum}"]`);
+    
+    if (selectedTab) selectedTab.classList.remove('hidden');
+    if (selectedBtn) {
+        selectedBtn.classList.add('active', 'text-orange-600', 'border-orange-600', 'bg-white');
+        selectedBtn.classList.remove('text-slate-600', 'border-transparent');
+        selectedBtn.querySelector('span span').classList.add('bg-orange-600');
+        selectedBtn.querySelector('span span').classList.remove('bg-slate-400');
+    }
+    
+    // Auto-populate from risk table when navigating to Tool 2 or 3
+    if (toolNum === 2 && goehsTasks.length === 0) {
+        // Check if we have table data
+        if (window.goehsTableData && window.goehsTableData.tasks.length > 0) {
+            populateGoehsTasksFromTable(window.goehsTableData);
+            // Run Intelligent Fill for Task fields after populating
+            setTimeout(() => {
+                aiPopulateTaskFields();
+            }, 300);
+        } else {
+            addTaskRow();
+        }
+    }
+    
+    if (toolNum === 3 && goehsHazards.length === 0) {
+        // Check if we have table data
+        if (window.goehsTableData && window.goehsTableData.hazards.length > 0) {
+            populateGoehsHazardsFromTable(window.goehsTableData);
+            // Run Intelligent Fill for Hazard fields after populating
+            setTimeout(() => {
+                aiPopulateHazardFields();
+            }, 300);
+        } else {
+            addHazardRow();
+        }
+    }
+}
+
+// ============ INITIALIZATION ============
+
+function initializeGoehsForm() {
+    // Populate OrgName dropdown with vendor org names
+    const orgSelect = document.getElementById('goehsOrgName');
+    orgSelect.innerHTML = '<option value="">-- Select Organization --</option>';
+    
+    // Add vendor org names directly
+    const vendorOrgs = [
+        'Demonstration', 'Global Remediation', 'Global Technology', 'Mfg - Americas', 
+        'Mfg - Asia Pacific', 'Mfg - Chemical', 'Mfg - EMEA', 'SAG - AP NM', 'SAG - CTSC',
+        'SAG - EMEA NM', 'SAG - EMEA Offices', 'SAG - LA NM', 'SAG - NA NM', 
+        'SAG - NA Tire Retail', 'Yokohama'
+    ];
+    
+    vendorOrgs.forEach(org => {
+        const opt = document.createElement('option');
+        opt.value = org;
+        opt.textContent = org;
+        orgSelect.appendChild(opt);
+    });
+    
+    // Also add locations from GOEHS_LOCATION_DATA as fallback
+    Object.keys(GOEHS_LOCATION_DATA).forEach(orgKey => {
+        if (!vendorOrgs.includes(orgKey)) {
+            const opt = document.createElement('option');
+            opt.value = orgKey;
+            opt.textContent = GOEHS_LOCATION_DATA[orgKey].name;
+            orgSelect.appendChild(opt);
+        }
+    });
+    
+    // Pre-populate date
+    const dateInput = document.getElementById('goehsAssessmentDate');
+    if (dateInput && !dateInput.value) {
+        dateInput.value = formatGoehsDate(new Date());
+    }
+    
+    // Pre-populate assessment title from project name if available
+    const titleInput = document.getElementById('goehsAssessmentTitle');
+    const projectName = document.getElementById('projectNameInput')?.value;
+    if (titleInput && !titleInput.value && projectName) {
+        titleInput.value = projectName;
+    }
+    
+    // Load saved assessment data from localStorage (except Assessment Title)
+    loadGoehsAssessmentData();
+}
+
+// Save assessment data to localStorage (except Assessment Title)
+function saveGoehsAssessmentData() {
+    const data = {
+        orgName: document.getElementById('goehsOrgName')?.value || '',
+        location: document.getElementById('goehsLocation')?.value || '',
+        department: document.getElementById('goehsDepartment')?.value || '',
+        workstation: document.getElementById('goehsWorkstation')?.value || ''
+    };
+    localStorage.setItem('goehsAssessmentData', JSON.stringify(data));
+    console.log('✅ GOEHS assessment data saved to localStorage');
+}
+
+// Load assessment data from localStorage
+function loadGoehsAssessmentData() {
+    try {
+        const saved = localStorage.getItem('goehsAssessmentData');
+        if (!saved) return;
+        
+        const data = JSON.parse(saved);
+        console.log('📋 Loading saved GOEHS assessment data:', data);
+        
+        // Load organization and trigger cascade
+        if (data.orgName) {
+            const orgSelect = document.getElementById('goehsOrgName');
+            if (orgSelect) {
+                orgSelect.value = data.orgName;
+                orgSelect.dispatchEvent(new Event('change'));
+                
+                // Load location after a brief delay to allow cascade
+                setTimeout(() => {
+                    if (data.location) {
+                        const locSelect = document.getElementById('goehsLocation');
+                        if (locSelect) {
+                            locSelect.value = data.location;
+                            locSelect.dispatchEvent(new Event('change'));
+                            
+                            // Load department and workstation after cascade
+                            setTimeout(() => {
+                                if (data.department) {
+                                    const deptSelect = document.getElementById('goehsDepartment');
+                                    if (deptSelect) deptSelect.value = data.department;
+                                }
+                                if (data.workstation) {
+                                    const wsSelect = document.getElementById('goehsWorkstation');
+                                    if (wsSelect) wsSelect.value = data.workstation;
+                                }
+                            }, 100);
+                        }
+                    }
+                }, 100);
+            }
+        }
+    } catch (e) {
+        console.error('Error loading GOEHS assessment data:', e);
+    }
+}
+
+function formatGoehsDate(date) {
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = months[date.getMonth()];
+    const year = date.getFullYear();
+    return `${day}-${month}-${year}`;
+}
+
+// ============ CASCADING DROPDOWNS ============
+
+document.addEventListener('DOMContentLoaded', function() {
+    // OrgName change handler
+    document.getElementById('goehsOrgName')?.addEventListener('change', function() {
+        const selectedOrg = this.value;
+        const locationSelect = document.getElementById('goehsLocation');
+        const deptSelect = document.getElementById('goehsDepartment');
+        const wsSelect = document.getElementById('goehsWorkstation');
+        
+        // Reset downstream
+        locationSelect.innerHTML = '<option value="">-- Select Location --</option>';
+        deptSelect.innerHTML = '<option value="">-- Select Department --</option>';
+        wsSelect.innerHTML = '<option value="">-- Select Workstation --</option>';
+        deptSelect.disabled = true;
+        wsSelect.disabled = true;
+        
+        if (selectedOrg && VENDOR_LOCATIONS[selectedOrg]) {
+            const locations = VENDOR_LOCATIONS[selectedOrg];
+            locations.forEach(locName => {
+                const opt = document.createElement('option');
+                opt.value = locName;
+                opt.textContent = locName;
+                locationSelect.appendChild(opt);
+            });
+            locationSelect.disabled = false;
+        } else {
+            locationSelect.disabled = true;
+        }
+        
+        // Save to localStorage
+        saveGoehsAssessmentData();
+    });
+    
+    // Location change handler
+    document.getElementById('goehsLocation')?.addEventListener('change', function() {
+        const selectedOrg = document.getElementById('goehsOrgName').value;
+        const selectedLoc = this.value;
+        const deptSelect = document.getElementById('goehsDepartment');
+        const wsSelect = document.getElementById('goehsWorkstation');
+        
+        // Reset downstream
+        deptSelect.innerHTML = '<option value="">-- Select Department --</option>';
+        wsSelect.innerHTML = '<option value="">-- Select Workstation --</option>';
+        
+        if (selectedOrg && selectedLoc && GOEHS_LOCATION_DATA[selectedOrg]) {
+            const locData = GOEHS_LOCATION_DATA[selectedOrg].locations[selectedLoc];
+            if (locData) {
+                locData.departments?.forEach(dept => {
+                    const opt = document.createElement('option');
+                    opt.value = dept;
+                    opt.textContent = dept;
+                    deptSelect.appendChild(opt);
+                });
+                deptSelect.disabled = false;
+                
+                locData.workstations?.forEach(ws => {
+                    const opt = document.createElement('option');
+                    opt.value = ws;
+                    opt.textContent = ws;
+                    wsSelect.appendChild(opt);
+                });
+                wsSelect.disabled = false;
+            }
+        }
+        
+        // Save to localStorage
+        saveGoehsAssessmentData();
+    });
+    
+    // Department change handler - save to localStorage
+    document.getElementById('goehsDepartment')?.addEventListener('change', saveGoehsAssessmentData);
+    
+    // Workstation change handler - save to localStorage
+    document.getElementById('goehsWorkstation')?.addEventListener('change', saveGoehsAssessmentData);
+    
+    // Tab switching
+    document.querySelectorAll('.goehs-tab-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const tabNum = this.dataset.tab.replace('tool', '');
+            goToTool(parseInt(tabNum));
+        });
+    });
+    
+    // GOEHS Integration button
+    document.getElementById('goehsIntegrationBtn')?.addEventListener('click', openGoehsModal);
+    
+    // Remap Columns button - opens manual column mapper with existing file
+    document.getElementById('remapColumnsBtn')?.addEventListener('click', function() {
+        if (window.ra2025LoadedFile) {
+            // Re-open the column mapper with the stored file and sheet index
+            window.ra2025PendingFile = window.ra2025LoadedFile;
+            window.openRA2025ColumnMapper(window.ra2025LoadedFile, window.ra2025SelectedSheetIndex || null);
+        } else {
+            alert('No RA 2025 file loaded. Please upload an Excel file first using the GOEHS Integration upload.');
+        }
+    });
+    
+    // Close on overlay click
+    document.getElementById('goehsModal')?.addEventListener('click', function(e) {
+        if (e.target === this) closeGoehsModal();
+    });
+});
+
+// ============ TASK MANAGEMENT (Tool 2) ============
+
+function addTaskRow() {
+    taskIdCounter++;
+    const taskId = `task-${taskIdCounter}`;
+    
+    const taskData = {
+        id: taskId,
+        taskName: '',
+        taskDescription: '',
+        conditionMode: '',
+        coreActivity: '',
+        jobTitle: ''
+    };
+    goehsTasks.push(taskData);
+    
+    const container = document.getElementById('taskRowsContainer');
+    const row = document.createElement('div');
+    row.id = taskId;
+    row.className = 'task-row bg-slate-50 border border-slate-200 rounded-lg p-4';
+    
+    row.innerHTML = `
+        <div class="flex justify-between items-center mb-4">
+            <h4 class="font-semibold text-slate-800">Task #${goehsTasks.length}</h4>
+            <button type="button" onclick="removeTaskRow('${taskId}')" class="text-red-500 hover:text-red-700 text-sm flex items-center gap-1">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                Remove
+            </button>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
+            <div class="lg:col-span-1">
+                <label class="block text-sm font-medium text-slate-700 mb-1">Task Name <span class="text-red-500">*</span></label>
+                <input type="text" class="task-name w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500" placeholder="Enter task name" required>
+            </div>
+            <div class="lg:col-span-2">
+                <label class="block text-sm font-medium text-slate-700 mb-1">Task Description</label>
+                <input type="text" class="task-description w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500" placeholder="Describe the task">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1">Condition Mode <span class="text-red-500">*</span></label>
+                <select class="task-condition w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500">
+                    <option value="">-- Select --</option>
+                    <option value="Routine" selected>Routine</option>
+                    <option value="Non-Routine">Non-Routine</option>
+                    <option value="Emergency Situation">Emergency Situation</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1">Core Activity</label>
+                <select class="task-activity w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500">
+                    <option value="">-- Select --</option>
+                    ${CORE_ACTIVITIES.map(a => `<option value="${a}">${a}</option>`).join('')}
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1">Job Title</label>
+                <select class="task-jobtitle w-full p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500">
+                    <option value="">-- Select --</option>
+                    ${JOB_TITLES.map(j => `<option value="${j}">${j}</option>`).join('')}
+                </select>
+            </div>
+        </div>
+    `;
+    
+    container.appendChild(row);
+}
+
+function removeTaskRow(taskId) {
+    if (goehsTasks.length <= 1) {
+        showGoehsAlert('You must have at least one task.', 'warning');
+        return;
+    }
+    goehsTasks = goehsTasks.filter(t => t.id !== taskId);
+    document.getElementById(taskId)?.remove();
+    renumberTasks();
+}
+
+function renumberTasks() {
+    document.querySelectorAll('.task-row').forEach((row, index) => {
+        row.querySelector('h4').textContent = `Task #${index + 1}`;
+    });
+}
+
+function collectTaskData() {
+    const tasks = [];
+    document.querySelectorAll('.task-row').forEach(row => {
+        const taskName = row.querySelector('.task-name').value;
+        const taskDescription = row.querySelector('.task-description').value;
+        tasks.push({
+            taskName: taskName,
+            taskDescription: taskDescription,  // Use the actual task description field value
+            conditionMode: row.querySelector('.task-condition').value,
+            coreActivity: row.querySelector('.task-activity').value,
+            jobTitle: row.querySelector('.task-jobtitle').value
+        });
+    });
+    return tasks;
+}
+
+// ============ INTELLIGENT FILL FUNCTIONS ============
+
+// AI populate task fields (Core Activity and Job Title)
+async function aiPopulateTaskFields() {
+    const taskRows = document.querySelectorAll('.task-row');
+    if (taskRows.length === 0) {
+        showGoehsAlert('No tasks to populate. Add tasks first.', 'warning');
+        return;
+    }
+    
+    let updated = 0;
+    let couldNotMatch = 0;
+    
+    taskRows.forEach(row => {
+        const taskName = row.querySelector('.task-name')?.value || '';
+        const activitySelect = row.querySelector('.task-activity');
+        const jobSelect = row.querySelector('.task-jobtitle');
+        
+        // Use intelligent suggestion functions
+        const suggestedActivity = suggestCoreActivity(taskName);
+        const suggestedJob = suggestJobTitle(taskName);
+        
+        // Update Core Activity - even if already has value (force update)
+        if (suggestedActivity && activitySelect) {
+            activitySelect.value = suggestedActivity;
+            // Add AI-filled visual indicator
+            activitySelect.classList.add('goehs-ai-prefilled');
+            activitySelect.classList.remove('goehs-empty-required');
+            updated++;
+        } else if (activitySelect && !activitySelect.value) {
+            // Mark as needing attention if no suggestion and empty
+            activitySelect.classList.add('goehs-empty-required');
+            activitySelect.classList.remove('goehs-ai-prefilled');
+            couldNotMatch++;
+        }
+        
+        // Update Job Title - even if already has value (force update)
+        if (suggestedJob && jobSelect) {
+            jobSelect.value = suggestedJob;
+            // Add AI-filled visual indicator
+            jobSelect.classList.add('goehs-ai-prefilled');
+            jobSelect.classList.remove('goehs-empty-required');
+            updated++;
+        } else if (jobSelect && !jobSelect.value) {
+            // Mark as needing attention if no suggestion and empty
+            jobSelect.classList.add('goehs-empty-required');
+            jobSelect.classList.remove('goehs-ai-prefilled');
+            couldNotMatch++;
+        }
+    });
+    
+    if (updated > 0) {
+        showGoehsAlert(`✅ Intelligent Fill: Updated ${updated} field(s) based on task name keywords.${couldNotMatch > 0 ? ` ${couldNotMatch} field(s) need manual selection (highlighted in red).` : ''}`, 'success');
+    } else {
+        showGoehsAlert('� ️ Could not find matching suggestions for any task names. Fields that need attention are highlighted in red.', 'warning');
+        // Highlight all empty fields
+        highlightEmptyTaskFields();
+    }
+}
+
+// Highlight empty Core Activity and Job Title fields
+function highlightEmptyTaskFields() {
+    document.querySelectorAll('.task-row').forEach(row => {
+        const activitySelect = row.querySelector('.task-activity');
+        const jobSelect = row.querySelector('.task-jobtitle');
+        
+        if (activitySelect && !activitySelect.value) {
+            activitySelect.classList.add('goehs-empty-required');
+        }
+        if (jobSelect && !jobSelect.value) {
+            jobSelect.classList.add('goehs-empty-required');
+        }
+    });
+}
+
+// AI populate hazard fields (Countermeasure Ladder based on control description)
+async function aiPopulateHazardFields() {
+    const hazardRows = document.querySelectorAll('.hazard-table-row');
+    if (hazardRows.length === 0) {
+        showGoehsAlert('No hazards to populate. Add hazards first.', 'warning');
+        return;
+    }
+    
+    let updated = 0;
+    hazardRows.forEach(row => {
+        const counterDesc = row.querySelector('.hazard-counter-desc')?.value || '';
+        const counterLadderSelect = row.querySelector('.hazard-counter-ladder');
+        const predDesc = row.querySelector('.hazard-pred-desc')?.value || '';
+        const predLadderSelect = row.querySelector('.hazard-pred-ladder');
+        
+        // Suggest countermeasure ladder based on description
+        if (counterDesc && counterLadderSelect) {
+            const suggestions = suggestCountermeasureLadder(counterDesc);
+            if (suggestions.length > 0) {
+                // Clear existing selections
+                Array.from(counterLadderSelect.options).forEach(opt => opt.selected = false);
+                // Select suggested options
+                suggestions.forEach(s => {
+                    const opt = Array.from(counterLadderSelect.options).find(o => o.value === s);
+                    if (opt) opt.selected = true;
+                });
+                // Add visual indicator
+                counterLadderSelect.classList.add('goehs-ai-prefilled');
+                updated++;
+            }
+        }
+        
+        if (predDesc && predLadderSelect) {
+            const suggestions = suggestCountermeasureLadder(predDesc);
+            if (suggestions.length > 0) {
+                Array.from(predLadderSelect.options).forEach(opt => opt.selected = false);
+                suggestions.forEach(s => {
+                    const opt = Array.from(predLadderSelect.options).find(o => o.value === s);
+                    if (opt) opt.selected = true;
+                });
+                // Add visual indicator
+                predLadderSelect.classList.add('goehs-ai-prefilled');
+                updated++;
+            }
+        }
+    });
+    
+    if (updated > 0) {
+        showGoehsAlert(`✅ Intelligent Fill: Updated ${updated} countermeasure ladder field(s) based on control description keywords.`, 'success');
+    } else {
+        showGoehsAlert('ℹ️ No control descriptions found to analyze. Enter control descriptions first.', 'info');
+    }
+}
+
+// Intelligent countermeasure ladder suggestion based on control description
+// Uses comprehensive keyword matching for hierarchy of controls
+// Also handles multiple countermeasures in single input and extracts numeric codes
+function suggestCountermeasureLadder(description) {
+    const desc = (description || '').toLowerCase().trim();
+    const suggestions = [];
+    // Also collect structured suggestion metadata (code + translations + matchedSynonym)
+    const suggestionsMeta = [];
+    
+    // HELPER: Extract all countermeasures with optional embedded numeric codes
+    // Examples:
+    //   "Code de la route(2)Panneaux de signalisation(3)Ceinture de securité(1)"
+    //   "training(5), guards(3)"
+    const extractCountermeasures = (text) => {
+        const result = [];
+        // Match patterns like "text(digit)" or "text" separated by common delimiters
+        const regex = /([^()]+)(?:\((\d)\))?/g;
+        let match;
+        while ((match = regex.exec(text)) !== null) {
+            const itemText = (match[1] || '').trim();
+            const embeddedCode = match[2] ? parseInt(match[2]) : null;
+            if (itemText && itemText.length > 1) {
+                result.push({ text: itemText, code: embeddedCode });
+            }
+        }
+        return result;
+    };
+    
+    // HELPER: Map numeric code (1-6) to English level label
+    const codeToLabel = {
+        6: 'Level 6 - Elimination',
+        5: 'Level 5 - Substitution',
+        4: 'Level 4 - Engineering Controls',
+        3: 'Level 3 - Visual Controls',
+        2: 'Level 2 - Administrative Controls',
+        1: 'Level 1 - Individual Target'
+    };
+
+    // COUNTERMEASURE_INFO maps the canonical English label to:
+    // - code: numeric (1 = Elimination, 2 = Substitution, ...)
+    // - fr: French translation
+    // - de: German translation
+    // - synonyms: array of regexes or strings used for matching
+    const COUNTERMEASURE_INFO = {
+        'Level 6 - Elimination': {
+            code: 6,
+            fr: 'Niveau 6 - Élimination',
+            de: 'Ebene 6 - Beseitigung',
+            synonyms: [
+                /\beliminat/i,
+                /\bremove\b/i,
+                /phase\s*out/i,
+                /supprimer/i,
+                /beseitigen/i,
+                /decom?mission/i,
+                /shut\s*down/i,
+                /stop\s*using/i,
+                /no\s*longer/i,
+                /discontinue/i,
+                /close\s*(down)?/i,
+                /take\s*out\s*of\s*service/i,
+                /mise\s*hors\s*service/i,
+                /außer\s*betrieb/i,
+                /stillleg(en|ung)/i,
+                /deinstallier/i
+            ]
+        },
+        'Level 5 - Substitution': {
+            code: 5,
+            fr: 'Niveau 5 - Substitution',
+            de: 'Ebene 5 - Substitution',
+            synonyms: [
+                /\bsubstitut/i,
+                /\breplac(e|ement|ing)\b/i,
+                /\bswitch\s*(to|over)\b/i,
+                /\bswap\s*(to|with)?\b/i,
+                /alternative/i,
+                /safer\s*/i,
+                /less\s*hazardous/i,
+                /remplac(er|ement)/i,
+                /ersatz|ersetzen|statt/i
+            ]
+        },
+        'Level 4 - Engineering Controls': {
+            code: 4,
+            fr: "Niveau 4 - Contrôles d'ingénierie",
+            de: 'Ebene 4 - Technische Schutzmaßnahmen',
+            synonyms: [
+                /guard(s?)\b/i,
+                /barrier(s?)\b/i,
+                /enclosur(e|es)?\b/i,
+                /ventilat/i,
+                /interlock/i,
+                /machine\s*guard/i,
+                /safety\s*device/i,
+                /exhaust/i,
+                /isolat/i,
+                /shield/i,
+                /hood\b/i,
+                /fume\s*hood/i,
+                /local\s*exhaust/i,
+                /dust\s*collector/i,
+                /noise\s*enclos/i,
+                /bau|retrofit|redesign/i,
+                /schutzvorrichtung|schutz/i,
+                /absaug/i,
+                /abluft|lüftung/i
+            ]
+        },
+        'Level 3 - Visual Controls': {
+            code: 3,
+            fr: 'Niveau 3 - Contrôles visuels',
+            de: 'Ebene 3 - Sichtbare Kontrollen',
+            synonyms: [
+                /\bsign(s?)\b/i,
+                /label(s?)\b/i,
+                /mark(ing|ed|er)s?\b/i,
+                /color\s*cod(e)?/i,
+                /floor\s*mark(ing|ings)?/i,
+                /beacon|strobe|flash/i,
+                /poster|placard|banner/i,
+                /tape|striping|reflective/i,
+                /mirror(s?)\b/i,
+                /pancarte|marquage|étiquette/i,
+                /schild|kennzeichnung|markierung/i
+            ]
+        },
+        'Level 2 - Administrative Controls': {
+            code: 2,
+            fr: 'Niveau 2 - Contrôles administratifs',
+            de: 'Ebene 2 - Administrative Maßnahmen',
+            synonyms: [
+                /procedure(s?)\b/i,
+                /training|formation|schulung/i,
+                /sop|work\s*instruction/i,
+                /permit\s*to\s*work|permit\b/i,
+                /inspection|audit|checklist/i,
+                /rotation|job\s*rotation/i,
+                /schedule|policy|guideline/i,
+                /supervision|monitoring/i,
+                /method\s*statement|risk\s*assessment/i,
+                /procédure|verfahren|anweisung/i
+            ]
+        },
+        'Level 1 - Individual Target': {
+            code: 1,
+            fr: 'Niveau 1 - Objectif individuel (EPI)',
+            de: 'Ebene 1 - Individuelles Ziel (PSA)',
+            synonyms: [
+                /\bppe\b|personal\s*protective/i,
+                /glove(s?)|handschutz|handschuh/i,
+                /goggle(s?)|safety\s*glass(es)?|schutzbrille/i,
+                /helmet|hard\s*hat|helm/i,
+                /respirator|mask|masque|atemschutz/i,
+                /safety\s*shoe(s?)|boot(s?)|sicherheitschuh/i,
+                /vest|high\s*vis|hi[- ]?vis/i,
+                /harness|fall\s*arrest|lanyard/i,
+                /apron|coverall|overall|schutzkleidung/i,
+                /protective\s*equipment|équipement\s*personnel|schutzausrüstung/i
+            ]
+        }
+    };
+    
+    // Skip empty, N/A, or very short descriptions
+    if (!desc || desc === 'n/a' || desc === 'na' || desc === '-' || desc === 'none' || desc.length < 3) {
+        return suggestions;
+    }
+    
+    // HELPER: Check a single item (text) against countermeasure info
+    // Returns matched label if found, null otherwise
+    const checkCountermeasureItem = (itemText) => {
+        // 1. Check direct level references (e.g., "Level 1", "L1")
+        if (itemText.match(/\blevel\s*6\b|\bl6\b|\beliminat/i)) return 'Level 6 - Elimination';
+        if (itemText.match(/\blevel\s*5\b|\bl5\b|substitut/i)) return 'Level 5 - Substitution';
+        if (itemText.match(/\blevel\s*4\b|\bl4\b|engineering\s*control/i)) return 'Level 4 - Engineering Controls';
+        if (itemText.match(/\blevel\s*3\b|\bl3\b|visual\s*control/i)) return 'Level 3 - Visual Controls';
+        if (itemText.match(/\blevel\s*2\b|\bl2\b|\badmin\b|administrative\s*control/i)) return 'Level 2 - Administrative Controls';
+        if (itemText.match(/\blevel\s*1\b|\bl1\b|individual\s*target|ppe/i)) return 'Level 1 - Individual Target';
+        
+        // 2. Check synonyms for all levels
+        for (const [label, info] of Object.entries(COUNTERMEASURE_INFO)) {
+            if (info.synonyms.some(syn => (typeof syn === 'string' ? itemText.includes(syn) : syn.test(itemText)))) {
+                return label;
+            }
+        }
+        return null;
+    };
+    
+    // EXTRACT and PROCESS: Multiple countermeasures with embedded codes
+    // Example: "Code de la route(2)Panneaux de signalisation(3)Ceinture de securité(1)"
+    const countermeasures = extractCountermeasures(desc);
+    
+    if (countermeasures.length > 0) {
+        // Multi-item mode: process each extracted countermeasure
+        for (const item of countermeasures) {
+            let matchedLabel = null;
+            
+            // Priority 1: Use embedded numeric code (if present)
+            if (item.code && codeToLabel[item.code]) {
+                matchedLabel = codeToLabel[item.code];
+                if (!suggestions.includes(matchedLabel)) {
+                    suggestions.push(matchedLabel);
+                    suggestionsMeta.push({ 
+                        label: matchedLabel, 
+                        ...COUNTERMEASURE_INFO[matchedLabel], 
+                        matchedSynonym: `embedded-code-${item.code}`,
+                        source: item.text
+                    });
+                }
+            }
+            
+            // Priority 2: Fall back to synonym matching on item text
+            if (!matchedLabel) {
+                matchedLabel = checkCountermeasureItem(item.text.toLowerCase());
+                if (matchedLabel && !suggestions.includes(matchedLabel)) {
+                    suggestions.push(matchedLabel);
+                    suggestionsMeta.push({ 
+                        label: matchedLabel, 
+                        ...COUNTERMEASURE_INFO[matchedLabel], 
+                        matchedSynonym: 'text-synonym-match',
+                        source: item.text
+                    });
+                }
+            }
+        }
+    } else {
+        // Single-item mode: process entire description as one countermeasure
+        const matchedLabel = checkCountermeasureItem(desc);
+        if (matchedLabel && !suggestions.includes(matchedLabel)) {
+            suggestions.push(matchedLabel);
+            suggestionsMeta.push({ 
+                label: matchedLabel, 
+                ...COUNTERMEASURE_INFO[matchedLabel], 
+                matchedSynonym: 'text-synonym-match',
+                source: desc
+            });
+        }
+    }
+    
+    // Expose structured suggestion metadata for UI use (codes + translations)
+    window.lastCountermeasureSuggestionsMeta = suggestionsMeta;
+    return suggestions;
+}
+
+// ============ AI ASSIST FUNCTIONS (OpenRouter) ============
+
+// AI Assist for Task Fields - calls external AI to suggest Core Activity and Job Title
+async function aiAssistTaskFields() {
+    const taskRows = document.querySelectorAll('.task-row');
+    if (taskRows.length === 0) {
+        showGoehsAlert('No tasks to analyze. Add tasks first.', 'warning');
+        return;
+    }
+    
+    // Collect task names for AI analysis
+    const taskData = [];
+    taskRows.forEach((row, index) => {
+        const taskName = row.querySelector('.task-name')?.value || '';
+        if (taskName.trim()) {
+            taskData.push({ index, taskName, row });
+        }
+    });
+    
+    if (taskData.length === 0) {
+        showGoehsAlert('No task names entered. Enter task names first.', 'warning');
+        return;
+    }
+    
+    // Show loading state
+    const aiBtn = document.querySelector('button[onclick="aiAssistTaskFields()"]');
+    const originalText = aiBtn?.innerHTML;
+    if (aiBtn) {
+        aiBtn.innerHTML = '⏳ AI Processing...';
+        aiBtn.disabled = true;
+    }
+    
+    try {
+        // Build prompt for AI
+        const prompt = `You are a workplace safety expert helping categorize industrial tasks.
+
+Given the following task names from a Risk Assessment, match each task to the MOST appropriate Core Activity and Job Title from the provided lists.
+
+CORE_ACTIVITIES (choose exactly one per task):
+${CORE_ACTIVITIES.join(', ')}
+
+JOB_TITLES (choose exactly one per task):
+${JOB_TITLES.join(', ')}
+
+TASKS TO CATEGORIZE:
+${taskData.map((t, i) => `${i + 1}. "${t.taskName}"`).join('\n')}
+
+IMPORTANT RULES:
+1. ONLY use values from the exact lists provided above - do not invent new values
+2. Match based on the task description's keywords and context
+3. If unsure, pick the most generic applicable option
+
+Return ONLY a valid JSON array with this exact structure (no explanation, no markdown):
+[
+  {"taskIndex": 0, "coreActivity": "exact value from list", "jobTitle": "exact value from list"},
+  ...
+]`;
+
+        // Call the API - use global endpoint constant
+        let response;
+        try {
+            response = await fetch(GOEHS_GLOBAL_API_ENDPOINT, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    model: 'openai/gpt-4o-mini',  // Use same paid model as main app
+                    prompt: prompt
+                })
+            });
+        } catch (networkError) {
+            throw new Error('Network error - API server may be unavailable. Use Intelligent Fill instead.');
+        }
+        
+        if (!response.ok) {
+            const errorText = await response.text().catch(() => '');
+            if (response.status === 404) {
+                throw new Error('API endpoint not found (404). The AI service may be temporarily unavailable. Use Intelligent Fill instead.');
+            }
+            throw new Error(`API request failed: ${response.status} - ${errorText}. Use Intelligent Fill instead.`);
+        }
+        
+        const data = await response.json();
+        const content = data.choices?.[0]?.message?.content || '';
+        
+        // Parse the AI response
+        const jsonMatch = content.match(/\[[\s\S]*\]/);
+        if (!jsonMatch) {
+            throw new Error('AI did not return valid JSON array');
+        }
+        
+        const suggestions = JSON.parse(jsonMatch[0]);
+        
+        // Apply suggestions to task rows
+        let updated = 0;
+        suggestions.forEach(suggestion => {
+            const taskItem = taskData[suggestion.taskIndex];
+            if (!taskItem) return;
+            
+            const activitySelect = taskItem.row.querySelector('.task-activity');
+            const jobSelect = taskItem.row.querySelector('.task-jobtitle');
+            
+            // Update Core Activity if valid
+            if (suggestion.coreActivity && activitySelect) {
+                const validOption = Array.from(activitySelect.options).find(
+                    opt => opt.value.toLowerCase() === suggestion.coreActivity.toLowerCase()
+                );
+                if (validOption) {
+                    activitySelect.value = validOption.value;
+                    activitySelect.classList.add('goehs-ai-prefilled');
+                    activitySelect.classList.remove('goehs-empty-required');
+                    updated++;
+                }
+            }
+            
+            // Update Job Title if valid
+            if (suggestion.jobTitle && jobSelect) {
+                const validOption = Array.from(jobSelect.options).find(
+                    opt => opt.value.toLowerCase() === suggestion.jobTitle.toLowerCase()
+                );
+                if (validOption) {
+                    jobSelect.value = validOption.value;
+                    jobSelect.classList.add('goehs-ai-prefilled');
+                    jobSelect.classList.remove('goehs-empty-required');
+                    updated++;
+                }
+            }
+        });
+        
+        if (updated > 0) {
+            showGoehsAlert(`🤖 AI Assist: Updated ${updated} field(s) using external AI analysis.`, 'success');
+        } else {
+            showGoehsAlert('� ️ AI could not match any tasks. Try Intelligent Fill instead.', 'warning');
+        }
+        
+    } catch (error) {
+        console.error('AI Assist error:', error);
+        showGoehsAlert(`❌ AI Assist failed: ${error.message}. Try Intelligent Fill instead.`, 'error');
+    } finally {
+        // Restore button state
+        if (aiBtn) {
+            aiBtn.innerHTML = originalText;
+            aiBtn.disabled = false;
+        }
+    }
+}
+
+// AI Assist for Hazard Fields - calls external AI to suggest Countermeasure Ladder
+async function aiAssistHazardFields() {
+    const hazardRows = document.querySelectorAll('.hazard-table-row');
+    if (hazardRows.length === 0) {
+        showGoehsAlert('No hazards to analyze. Add hazards first.', 'warning');
+        return;
+    }
+    
+    // Collect control descriptions for AI analysis
+    const controlData = [];
+    hazardRows.forEach((row, index) => {
+        const counterDesc = row.querySelector('.hazard-counter-desc')?.value || '';
+        const predDesc = row.querySelector('.hazard-pred-desc')?.value || '';
+        if (counterDesc.trim() || predDesc.trim()) {
+            controlData.push({
+                index,
+                counterDesc,
+                predDesc,
+                row,
+                counterLadderSelect: row.querySelector('.hazard-counter-ladder'),
+                predLadderSelect: row.querySelector('.hazard-pred-ladder')
+            });
+        }
+    });
+    
+    if (controlData.length === 0) {
+        showGoehsAlert('No control descriptions found. Enter control descriptions first.', 'warning');
+        return;
+    }
+    
+    // Show loading state
+    const aiBtn = document.querySelector('button[onclick="aiAssistHazardFields()"]');
+    const originalText = aiBtn?.innerHTML;
+    if (aiBtn) {
+        aiBtn.innerHTML = '⏳ AI Processing...';
+        aiBtn.disabled = true;
+    }
+    
+    try {
+        // Build prompt for AI
+        const prompt = `You are a workplace safety expert classifying control measures using the Hierarchy of Controls.
+
+COUNTERMEASURE LADDER LEVELS (from most to least effective):
+- "Level 6 - Elimination" - Completely removing the hazard (discontinue, get rid of, stop using)
+- "Level 5 - Substitution" - Replacing with something safer (alternative material, less hazardous)
+- "Level 4 - Engineering Controls" - Physical changes (guards, barriers, interlocks, ventilation, automation)
+- "Level 3 - Visual Controls" - Visual warnings (signs, labels, floor markings, mirrors, lights, beacons)
+- "Level 2 - Administrative Controls" - Procedures (training, SOPs, permits, inspections, schedules, supervision)
+- "Level 1 - Individual Target" - PPE (gloves, goggles, helmets, respirators, safety shoes, harnesses)
+
+CONTROL DESCRIPTIONS TO CLASSIFY:
+${controlData.map((c, i) => {
+    let text = `${i + 1}. `;
+    if (c.counterDesc) text += `Current Control: "${c.counterDesc}"`;
+    if (c.predDesc) text += ` | Predicted Control: "${c.predDesc}"`;
+    return text;   
+}).join('\n')}
+
+IMPORTANT RULES:
+1. A control can match MULTIPLE levels (e.g., "guard with warning sign" = Level 4 + Level 3)
+2. Use the exact level names from the list above
+3. Analyze keywords carefully - mirrors, reflectors = Visual Controls; guards, barriers = Engineering Controls
+
+Return ONLY a valid JSON array with this exact structure (no explanation, no markdown):
+[
+  {"index": 0, "currentLevels": ["Level X - Name", "Level Y - Name"], "predictedLevels": ["Level Z - Name"]},
+  ...
+]`;
+
+        // Call the API - use global endpoint constant
+        let response;
+        try {
+            response = await fetch(GOEHS_GLOBAL_API_ENDPOINT, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    model: 'openai/gpt-4o-mini',  // Use same paid model as main app
+                    prompt: prompt
+                })
+            });
+        } catch (networkError) {
+            throw new Error('Network error - API server may be unavailable. Use Intelligent Fill instead.');
+        }
+        
+        if (!response.ok) {
+            const errorText = await response.text().catch(() => '');
+            if (response.status === 404) {
+                throw new Error('API endpoint not found (404). The AI service may be temporarily unavailable. Use Intelligent Fill instead.');
+            }
+            throw new Error(`API request failed: ${response.status} - ${errorText}. Use Intelligent Fill instead.`);
+        }
+        
+        const data = await response.json();
+        const content = data.choices?.[0]?.message?.content || '';
+        
+        // Parse the AI response
+        const jsonMatch = content.match(/\[[\s\S]*\]/);
+        if (!jsonMatch) {
+            throw new Error('AI did not return valid JSON array');
+        }
+        
+        const suggestions = JSON.parse(jsonMatch[0]);
+        
+        // Valid ladder levels for validation
+        const validLevels = [
+            'Level 6 - Elimination',
+            'Level 5 - Substitution',
+            'Level 4 - Engineering Controls',
+            'Level 3 - Visual Controls',
+            'Level 2 - Administrative Controls',
+            'Level 1 - Individual Target'
+        ];
+        
+        // Apply suggestions to hazard rows
+        let updated = 0;
+        suggestions.forEach(suggestion => {
+            const controlItem = controlData[suggestion.index];
+            if (!controlItem) return;
+            
+            // Update Current Control Ladder
+            if (suggestion.currentLevels?.length > 0 && controlItem.counterLadderSelect) {
+                // Clear existing selections
+                Array.from(controlItem.counterLadderSelect.options).forEach(opt => opt.selected = false);
+                
+                suggestion.currentLevels.forEach(level => {
+                    // Find matching option (case-insensitive)
+                    const matchingOpt = Array.from(controlItem.counterLadderSelect.options).find(
+                        opt => opt.value.toLowerCase() === level.toLowerCase() ||
+                               validLevels.some(v => v.toLowerCase() === level.toLowerCase() && opt.value.toLowerCase() === v.toLowerCase())
+                    );
+                    if (matchingOpt) {
+                        matchingOpt.selected = true;
+                        updated++;
+                    }
+                });
+                controlItem.counterLadderSelect.classList.add('goehs-ai-prefilled');
+            }
+            
+            // Update Predicted Control Ladder
+            if (suggestion.predictedLevels?.length > 0 && controlItem.predLadderSelect) {
+                // Clear existing selections
+                Array.from(controlItem.predLadderSelect.options).forEach(opt => opt.selected = false);
+                
+                suggestion.predictedLevels.forEach(level => {
+                    // Find matching option (case-insensitive)
+                    const matchingOpt = Array.from(controlItem.predLadderSelect.options).find(
+                        opt => opt.value.toLowerCase() === level.toLowerCase() ||
+                               validLevels.some(v => v.toLowerCase() === level.toLowerCase() && opt.value.toLowerCase() === v.toLowerCase())
+                    );
+                    if (matchingOpt) {
+                        matchingOpt.selected = true;
+                        updated++;
+                    }
+                });
+                controlItem.predLadderSelect.classList.add('goehs-ai-prefilled');
+            }
+        });
+        
+        if (updated > 0) {
+            showGoehsAlert(`🤖 AI Assist: Updated ${updated} countermeasure ladder selection(s) using external AI.`, 'success');
+        } else {
+            showGoehsAlert('� ️ AI could not classify any controls. Try Intelligent Fill instead.', 'warning');
+        }
+        
+    } catch (error) {
+        console.error('AI Assist error:', error);
+        showGoehsAlert(`❌ AI Assist failed: ${error.message}. Try Intelligent Fill instead.`, 'error');
+    } finally {
+        // Restore button state
+        if (aiBtn) {
+            aiBtn.innerHTML = originalText;
+            aiBtn.disabled = false;
+        }
+    }
+}
+
+// ============ HAZARD MANAGEMENT (Tool 3) ============
+
+function addHazardRow() {
+    hazardIdCounter++;
+    const hazardId = `hazard-${hazardIdCounter}`;
+    
+    goehsHazards.push({ id: hazardId });
+    
+    const container = document.getElementById('hazardRowsContainer');
+    const row = document.createElement('div');
+    row.id = hazardId;
+    row.className = 'hazard-row bg-slate-50 border border-slate-200 rounded-lg p-4';
+    
+    // Get task names for dropdown
+    const tasks = collectTaskData();
+    const taskOptions = tasks.length > 0 
+        ? tasks.map((t, i) => `<option value="${t.taskName || `Task ${i+1}`}">${t.taskName || `Task ${i+1}`}</option>`).join('')
+        : '<option value="">-- No tasks defined --</option>';
+    
+    row.innerHTML = `
+        <div class="flex justify-between items-center mb-4">
+            <h4 class="font-semibold text-slate-800">Hazard #${goehsHazards.length}</h4>
+            <button type="button" onclick="removeHazardRow('${hazardId}')" class="text-red-500 hover:text-red-700 text-sm flex items-center gap-1">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                Remove
+            </button>
+        </div>
+        
+        <!-- Section A: Initial Assessment -->
+        <div class="mb-4 pb-4 border-b border-slate-300">
+            <h5 class="text-sm font-semibold text-orange-600 mb-3">Initial Assessment</h5>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+                <div>
+                    <label class="block text-xs font-medium text-slate-600 mb-1">Task Name <span class="text-red-500">*</span></label>
+                    <select class="hazard-task w-full p-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500">
+                        <option value="">-- Select --</option>
+                        ${taskOptions}
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-600 mb-1">Hazard <span class="text-red-500">*</span></label>
+                    <select class="hazard-category w-full p-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500" onchange="updateSubHazards(this, '${hazardId}')">
+                        <option value="">-- Select --</option>
+                        ${Object.keys(HAZARD_CATEGORIES).map(h => `<option value="${h}">${h}</option>`).join('')}
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-600 mb-1">Sub-Hazard <span class="text-red-500">*</span></label>
+                    <select class="hazard-sub w-full p-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500" disabled>
+                        <option value="">-- Select Hazard First --</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-600 mb-1">Potential Outcome</label>
+                    <input type="text" class="hazard-outcome w-full p-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500" placeholder="Outcome">
+                </div>
+                <div class="md:col-span-2">
+                    <label class="block text-xs font-medium text-slate-600 mb-1">Hazard Description</label>
+                    <input type="text" class="hazard-desc w-full p-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500" placeholder="Description">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-600 mb-1">Initial Frequency</label>
+                    <select class="hazard-init-freq w-full p-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500" onchange="calculateInitialRisk('${hazardId}')">
+                        <option value="">--</option>
+                        ${FREQUENCY_VALUES.map(f => `<option value="${f}">${f}</option>`).join('')}
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-600 mb-1">Initial Severity</label>
+                    <select class="hazard-init-sev w-full p-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500" onchange="calculateInitialRisk('${hazardId}')">
+                        <option value="">--</option>
+                        ${SEVERITY_VALUES.map(s => `<option value="${s}">${s}</option>`).join('')}
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-600 mb-1">Initial Likelihood</label>
+                    <select class="hazard-init-like w-full p-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500" onchange="calculateInitialRisk('${hazardId}')">
+                        <option value="">--</option>
+                        ${LIKELIHOOD_VALUES.map(l => `<option value="${l}">${l}</option>`).join('')}
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-600 mb-1">Initial Risk Score</label>
+                    <input type="text" class="hazard-init-score w-full p-2 text-sm border border-slate-200 rounded-lg bg-slate-100" readonly>
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-600 mb-1">Initial Risk Rating</label>
+                    <input type="text" class="hazard-init-rating w-full p-2 text-sm border border-slate-200 rounded-lg bg-slate-100" readonly>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Section B: Countermeasures -->
+        <div class="mb-4 pb-4 border-b border-slate-300">
+            <h5 class="text-sm font-semibold text-blue-600 mb-3">Countermeasures (Residual)</h5>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+                <div class="md:col-span-2">
+                    <label class="block text-xs font-medium text-slate-600 mb-1">Description of Countermeasures</label>
+                    <input type="text" class="hazard-counter-desc w-full p-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500" placeholder="Countermeasures">
+                </div>
+                <div class="md:col-span-2">
+                    <label class="block text-xs font-medium text-slate-600 mb-1">Countermeasures Ladder</label>
+                    <select class="hazard-counter-ladder w-full p-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                        <option value="">-- Select --</option>
+                        ${COUNTERMEASURE_LADDER.map(c => `<option value="${c}">${c}</option>`).join('')}
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-600 mb-1">Residual Frequency</label>
+                    <select class="hazard-res-freq w-full p-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500" onchange="calculateResidualRisk('${hazardId}')">
+                        <option value="">--</option>
+                        ${FREQUENCY_VALUES.map(f => `<option value="${f}">${f}</option>`).join('')}
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-600 mb-1">Residual Severity</label>
+                    <select class="hazard-res-sev w-full p-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500" onchange="calculateResidualRisk('${hazardId}')">
+                        <option value="">--</option>
+                        ${SEVERITY_VALUES.map(s => `<option value="${s}">${s}</option>`).join('')}
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-600 mb-1">Residual Likelihood</label>
+                    <select class="hazard-res-like w-full p-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500" onchange="calculateResidualRisk('${hazardId}')">
+                        <option value="">--</option>
+                        ${LIKELIHOOD_VALUES.map(l => `<option value="${l}">${l}</option>`).join('')}
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-600 mb-1">Residual Risk Score</label>
+                    <input type="text" class="hazard-res-score w-full p-2 text-sm border border-slate-200 rounded-lg bg-blue-50" readonly>
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-600 mb-1">Residual Risk Rating</label>
+                    <input type="text" class="hazard-res-rating w-full p-2 text-sm border border-slate-200 rounded-lg bg-blue-50" readonly>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Section C: Predictive -->
+        <div>
+            <h5 class="text-sm font-semibold text-green-600 mb-3">Predictive Controls</h5>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+                <div class="md:col-span-2">
+                    <label class="block text-xs font-medium text-slate-600 mb-1">Description of Countermeasures Predictive</label>
+                    <input type="text" class="hazard-pred-desc w-full p-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500" placeholder="Future countermeasures">
+                </div>
+                <div class="md:col-span-2">
+                    <label class="block text-xs font-medium text-slate-600 mb-1">Countermeasures Ladder Predictive</label>
+                    <select class="hazard-pred-ladder w-full p-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500">
+                        <option value="">-- Select --</option>
+                        ${COUNTERMEASURE_LADDER.map(c => `<option value="${c}">${c}</option>`).join('')}
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-600 mb-1">Predictive Frequency</label>
+                    <select class="hazard-pred-freq w-full p-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500" onchange="calculatePredictiveRisk('${hazardId}')">
+                        <option value="">--</option>
+                        ${FREQUENCY_VALUES.map(f => `<option value="${f}">${f}</option>`).join('')}
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-600 mb-1">Predictive Severity</label>
+                    <select class="hazard-pred-sev w-full p-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500" onchange="calculatePredictiveRisk('${hazardId}')">
+                        <option value="">--</option>
+                        ${SEVERITY_VALUES.map(s => `<option value="${s}">${s}</option>`).join('')}
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-600 mb-1">Predictive Likelihood</label>
+                    <select class="hazard-pred-like w-full p-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500" onchange="calculatePredictiveRisk('${hazardId}')">
+                        <option value="">--</option>
+                        ${LIKELIHOOD_VALUES.map(l => `<option value="${l}">${l}</option>`).join('')}
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-600 mb-1">Predictive Risk Score</label>
+                    <input type="text" class="hazard-pred-score w-full p-2 text-sm border border-slate-200 rounded-lg bg-green-50" readonly>
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-600 mb-1">Predictive Risk Rating</label>
+                    <input type="text" class="hazard-pred-rating w-full p-2 text-sm border border-slate-200 rounded-lg bg-green-50" readonly>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    container.appendChild(row);
+}
+
+function removeHazardRow(hazardId) {
+    if (goehsHazards.length <= 1) {
+        showGoehsAlert('You must have at least one hazard.', 'warning');
+        return;
+    }
+    goehsHazards = goehsHazards.filter(h => h.id !== hazardId);
+    document.getElementById(hazardId)?.remove();
+    renumberHazards();
+}
+
+function renumberHazards() {
+    document.querySelectorAll('.hazard-row').forEach((row, index) => {
+        row.querySelector('h4').textContent = `Hazard #${index + 1}`;
+    });
+}
+
+function updateSubHazards(selectElement, hazardId) {
+    const hazardCategory = selectElement.value;
+    const row = document.getElementById(hazardId);
+    const subSelect = row.querySelector('.hazard-sub');
+    
+    subSelect.innerHTML = '<option value="">-- Select --</option>';
+    
+    if (hazardCategory && HAZARD_CATEGORIES[hazardCategory]) {
+        HAZARD_CATEGORIES[hazardCategory].forEach(sub => {
+            const opt = document.createElement('option');
+            opt.value = sub;
+            opt.textContent = sub;
+            subSelect.appendChild(opt);
+        });
+        subSelect.disabled = false;
+    } else {
+        subSelect.disabled = true;
+    }
+}
+
+// ============ RISK CALCULATIONS ============
+
+function calculateRiskScore(freq, sev, like) {
+    if (!freq || !sev || !like) return { score: '', rating: '' };
+    const score = parseFloat(freq) * parseFloat(sev) * parseFloat(like);
+    const rating = getRiskRating(score);
+    return { score: score.toFixed(2), rating };
+}
+
+function getRiskRating(score) {
+    if (score <= 10) return 'Low';
+    if (score <= 50) return 'Medium';
+    if (score <= 100) return 'High';
+    return 'Critical';
+}
+
+function calculateInitialRisk(hazardId) {
+    const row = document.getElementById(hazardId);
+    const freq = row.querySelector('.hazard-init-freq').value;
+    const sev = row.querySelector('.hazard-init-sev').value;
+    const like = row.querySelector('.hazard-init-like').value;
+    const { score, rating } = calculateRiskScore(freq, sev, like);
+    row.querySelector('.hazard-init-score').value = score;
+    row.querySelector('.hazard-init-rating').value = rating;
+}
+
+function calculateResidualRisk(hazardId) {
+    const row = document.getElementById(hazardId);
+    const freq = row.querySelector('.hazard-res-freq').value;
+    const sev = row.querySelector('.hazard-res-sev').value;
+    const like = row.querySelector('.hazard-res-like').value;
+    const { score, rating } = calculateRiskScore(freq, sev, like);
+    row.querySelector('.hazard-res-score').value = score;
+    row.querySelector('.hazard-res-rating').value = rating;
+}
+
+function calculatePredictiveRisk(hazardId) {
+    const row = document.getElementById(hazardId);
+    const freq = row.querySelector('.hazard-pred-freq').value;
+    const sev = row.querySelector('.hazard-pred-sev').value;
+    const like = row.querySelector('.hazard-pred-like').value;
+    const { score, rating } = calculateRiskScore(freq, sev, like);
+    row.querySelector('.hazard-pred-score').value = score;
+    row.querySelector('.hazard-pred-rating').value = rating;
+}
+
+// ============ CSV GENERATION ============
+
+/**
+ * SECURITY: Escape CSV field and prevent formula injection
+ * Protects against CSV injection attacks where fields starting with =, +, -, @ 
+ * could be interpreted as formulas in spreadsheet applications
+ */
+function escapeCSV(str) {
+    if (str === null || str === undefined) return '';
+    str = String(str).trim();
+    
+    // SECURITY: Prevent CSV formula injection
+    // Fields starting with =, +, -, @, tab, or carriage return can be interpreted as formulas
+    if (/^[=+\-@\t\r]/.test(str)) {
+        str = "'" + str; // Prefix with single quote to prevent formula execution
+    }
+    
+    // Standard CSV escaping
+    if (str.includes(',') || str.includes('"') || str.includes('\n') || str.includes("'")) {
+        return '"' + str.replace(/"/g, '""') + '"';
+    }
+    return str;
+}
+
+function generateAssessmentCSV() {
+    const orgName = document.getElementById('goehsOrgName').value;
+    const location = document.getElementById('goehsLocation').value;
+    const department = document.getElementById('goehsDepartment').value;
+    const workstation = document.getElementById('goehsWorkstation').value;
+    const title = document.getElementById('goehsAssessmentTitle').value;
+    const date = document.getElementById('goehsAssessmentDate').value;
+    const type = document.getElementById('goehsType').value || 'Safety';
+    const approver = document.getElementById('goehsApprover').value || 'Site Admin';
+    
+    // Validation - removed Equipment, Team Members, Completed By from validation
+    if (!orgName || !location || !title) {
+        showGoehsAlert('Please fill in all required fields (OrgName, Location, Assessment Title).', 'error');
+        return;
+    }
+    
+    // CSV Headers - these are still needed for GOEHS import format
+    const headers = ['OrgName', 'Location', 'Department', 'Workstation', 'Assessment Title', 'Assessment Date', 'Equipment', 'Type', 'Assessment Approver', 'Name of Risk Assessment Team Members', 'Completed By'];
+    
+    // CSV Row - empty values for removed fields (Equipment, Team Members, Completed By)
+    const row = [orgName, location, department, workstation, title, date, '', type, approver, '', ''];
+    
+    const csvContent = headers.map(escapeCSV).join(',') + '\n' + row.map(escapeCSV).join(',');
+    
+    downloadCSV(csvContent, 'GOEHS_Assessment_Batch.csv');
+    showGoehsAlert('Assessment CSV generated successfully!', 'success');
+}
+
+function generateTaskCSV() {
+    const orgName = document.getElementById('goehsOrgName').value;
+    const location = document.getElementById('goehsLocation').value;
+    const assessmentTitle = document.getElementById('goehsAssessmentTitle').value;
+    
+    if (!assessmentTitle) {
+        showGoehsAlert('Please enter Assessment Title in Tool 1 first.', 'error');
+        return;
+    }
+    
+    const tasks = collectTaskData();
+    
+    // Validate tasks
+    const invalidTasks = tasks.filter(t => !t.taskName || !t.conditionMode || !t.coreActivity);
+    if (invalidTasks.length > 0) {
+        showGoehsAlert('Please fill in all required task fields (Task Name, Condition Mode, Core Activity).', 'error');
+        return;
+    }
+    
+    // CSV Headers
+    const headers = ['OrgName', 'Location', 'Assessment Title', 'Task Name', 'Task Description', 'Condition Mode', 'Core Activity', 'Job Title / Occupation Field'];
+    
+    // CSV Rows
+    const rows = tasks.map(t => [
+        orgName, location, assessmentTitle, t.taskName, t.taskDescription, t.conditionMode, t.coreActivity, t.jobTitle
+    ]);
+    
+    const csvContent = headers.map(escapeCSV).join(',') + '\n' + rows.map(r => r.map(escapeCSV).join(',')).join('\n');
+    
+    downloadCSV(csvContent, 'GOEHS_Task_Batch.csv');
+    showGoehsAlert(`Task CSV generated with ${tasks.length} task(s)!`, 'success');
+}
+
+function generateHazardCSV() {
+    const orgName = document.getElementById('goehsOrgName').value;
+    const location = document.getElementById('goehsLocation').value;
+    const assessmentTitle = document.getElementById('goehsAssessmentTitle').value;
+    
+    if (!assessmentTitle) {
+        showGoehsAlert('Please enter Assessment Title in Tool 1 first.', 'error');
+        return;
+    }
+    
+    const hazards = collectHazardData();
+    
+    // Validate hazards
+    const invalidHazards = hazards.filter(h => !h.taskName || !h.hazardCategory || !h.subHazard);
+    if (invalidHazards.length > 0) {
+        showGoehsAlert('Please fill in all required hazard fields (Task Name, Hazard, Sub-Hazard).', 'error');
+        return;
+    }
+    
+    // CSV Headers (matching vendor format)
+    const headers = [
+        'OrgName', 'Location', 'Assessment Title', 'Task Name', 'Hazard', 'Sub-Hazard', 'Potential Outcome', 'Hazard Description',
+        'Initial Frequency', 'Initial Severity', 'Initial Likelihood', 'Initial Risk Score', 'Initial Risk Rating',
+        'Description of Countermeasures', 'Countermeasure Ladder', 'Residual Frequency', 'Residual Severity', 'Residual Likelihood', 'Residual Risk Score', 'Residual Risk Rating',
+        'Description of Countermeasures Predictive', 'Countermeasure Ladder Predictive', 'Predictive Frequency', 'Predictive Severity', 'Predictive Likelihood', 'Predictive Risk Score', 'Predictive Risk Rating'
+    ];
+    
+    // CSV Rows
+    const rows = hazards.map(h => [
+        orgName, location, assessmentTitle, h.taskName, h.hazardCategory, h.subHazard, h.outcome, h.description,
+        h.initFreq, h.initSev, h.initLike, h.initScore, h.initRating,
+        h.counterDesc, h.counterLadder, h.resFreq, h.resSev, h.resLike, h.resScore, h.resRating,
+        h.predDesc, h.predLadder, h.predFreq, h.predSev, h.predLike, h.predScore, h.predRating
+    ]);
+    
+    const csvContent = headers.map(escapeCSV).join(',') + '\n' + rows.map(r => r.map(escapeCSV).join(',')).join('\n');
+    
+    downloadCSV(csvContent, 'GOEHS_Hazard_Batch.csv');
+    showGoehsAlert(`Hazard CSV generated with ${hazards.length} hazard(s)!`, 'success');
+}
+
+// Generate a single unified CSV that merges Assessment + Task + Hazard data (one row per hazard)
+// Also copies the data to clipboard for easy pasting
+function generateUnifiedCSV() {
+    // --- Gather Assessment data (Tool 1) ---
+    const orgName = document.getElementById('goehsOrgName').value;
+    const location = document.getElementById('goehsLocation').value;
+    const department = document.getElementById('goehsDepartment').value;
+    const workstation = document.getElementById('goehsWorkstation').value;
+    const assessmentTitle = document.getElementById('goehsAssessmentTitle').value;
+    const date = document.getElementById('goehsAssessmentDate').value;
+    const type = document.getElementById('goehsType').value || 'Safety';
+    const approver = document.getElementById('goehsApprover').value || 'Site Admin';
+
+    if (!assessmentTitle) {
+        showGoehsAlert('Please enter Assessment Title in Tool 1 first.', 'error');
+        return;
+    }
+
+    // --- Gather Task data (Tool 2) ---
+    const tasks = collectTaskData();
+    // Build a lookup: taskName -> task details
+    const taskLookup = {};
+    tasks.forEach(t => {
+        taskLookup[t.taskName] = t;
+    });
+
+    // --- Gather Hazard data (Tool 3) ---
+    const hazards = collectHazardData();
+    if (hazards.length === 0) {
+        showGoehsAlert('No hazard rows to export. Add hazards first.', 'warning');
+        return;
+    }
+
+    // --- Unified CSV Headers (exact order requested) ---
+    const headers = [
+        'OrgName', 'Location', 'Department', 'Workstation',
+        'Assessment Title', 'Assessment Date', 'Equipment', 'Type',
+        'Assessment Approver', 'Name of Risk Assessment Team Members', 'Completed By',
+        'Assessment Title', 'Task Name', 'Task Description', 'Condition Mode',
+        'Core Activity', 'Job Title / Occupation Field',
+        'Hazard', 'Sub-Hazard', 'Potential Outcome', 'Hazard Description',
+        'Initial Frequency', 'Initial Severity', 'Initial Likelihood',
+        'Initial Risk Score', 'Initial Risk Rating',
+        'Description of Countermeasures', 'Countermeasure Ladder',
+        'Residual Frequency', 'Residual Severity', 'Residual Likelihood',
+        'Residual Risk Score', 'Residual Risk Rating',
+        'Description of Countermeasures Predictive', 'Countermeasure Ladder Predictive',
+        'Predictive Frequency', 'Predictive Severity'
+    ];
+
+    // --- Build one row per hazard, merging assessment + matched task + hazard ---
+    const rows = hazards.map(h => {
+        // Match the hazard's taskName to a task row for extra fields
+        const task = taskLookup[h.taskName] || {};
+
+        return [
+            // Assessment columns
+            orgName, location, department, workstation,
+            assessmentTitle, date, '', type,
+            approver, '', '',
+            // Task columns (Assessment Title repeated as per requested header order)
+            assessmentTitle,
+            h.taskName,
+            task.taskDescription || '',
+            task.conditionMode || '',
+            task.coreActivity || '',
+            task.jobTitle || '',
+            // Hazard columns
+            h.hazardCategory, h.subHazard, h.outcome, h.description,
+            h.initFreq, h.initSev, h.initLike, h.initScore, h.initRating,
+            h.counterDesc, h.counterLadder,
+            h.resFreq, h.resSev, h.resLike, h.resScore, h.resRating,
+            h.predDesc, h.predLadder,
+            h.predFreq, h.predSev
+        ];
+    });
+
+    const csvContent = headers.map(escapeCSV).join(',')
+        + '\n' + rows.map(r => r.map(escapeCSV).join(',')).join('\n');
+
+    const safeTitle = (assessmentTitle || 'export').replace(/[^a-zA-Z0-9]/g, '_');
+    const fileName = `GOEHS_Unified_${safeTitle}.csv`;
+    
+    // Download the CSV file
+    downloadCSV(csvContent, fileName);
+    
+    // Copy to clipboard
+    navigator.clipboard.writeText(csvContent).then(() => {
+        showGoehsAlert(
+            `✅ Unified CSV downloaded (${hazards.length} row${hazards.length !== 1 ? 's' : ''}) and copied to clipboard!\n📋 Ready to paste into spreadsheet or text editor.`,
+            'success'
+        );
+    }).catch(err => {
+        console.error('Clipboard error:', err);
+        // Still show success for download even if clipboard fails
+        showGoehsAlert(
+            `✅ Unified CSV downloaded (${hazards.length} row${hazards.length !== 1 ? 's' : ''})!\n� ️ Clipboard copy failed - please try copying manually.`,
+            'warning'
+        );
+    });
+}
+
+function collectHazardData() {
+    const hazards = [];
+    // Support both old card format (.hazard-row divs) and new table format (.hazard-table-row tr)
+    const rows = document.querySelectorAll('.hazard-table-row');
+    
+    rows.forEach(row => {
+        // Get multi-select values for ladder fields
+        const counterLadderSelect = row.querySelector('.hazard-counter-ladder');
+        const predLadderSelect = row.querySelector('.hazard-pred-ladder');
+        
+        // Join multiple selections with ", " separator (comma, not semicolon - vendor database requirement)
+        const counterLadderValues = counterLadderSelect ? 
+            Array.from(counterLadderSelect.selectedOptions).map(o => o.value).join(', ') : '';
+        const predLadderValues = predLadderSelect ? 
+            Array.from(predLadderSelect.selectedOptions).map(o => o.value).join(', ') : '';
+        
+        hazards.push({
+            taskName: row.querySelector('.hazard-task')?.value || '',
+            hazardCategory: row.querySelector('.hazard-category')?.value || '',
+            subHazard: row.querySelector('.hazard-sub')?.value || '',
+            outcome: row.querySelector('.hazard-outcome')?.value || '',
+            description: row.querySelector('.hazard-desc')?.value || '',
+            initFreq: row.querySelector('.hazard-init-freq')?.value || '',
+            initSev: row.querySelector('.hazard-init-sev')?.value || '',
+            initLike: row.querySelector('.hazard-init-like')?.value || '',
+            initScore: row.querySelector('.hazard-init-score')?.value || '',
+            initRating: row.querySelector('.hazard-init-rating')?.value || '',
+            counterDesc: row.querySelector('.hazard-counter-desc')?.value || '',
+            counterLadder: counterLadderValues,
+            resFreq: row.querySelector('.hazard-res-freq')?.value || '',
+            resSev: row.querySelector('.hazard-res-sev')?.value || '',
+            resLike: row.querySelector('.hazard-res-like')?.value || '',
+            resScore: row.querySelector('.hazard-res-score')?.value || '',
+            resRating: row.querySelector('.hazard-res-rating')?.value || '',
+            predDesc: row.querySelector('.hazard-pred-desc')?.value || '',
+            predLadder: predLadderValues,
+            predFreq: row.querySelector('.hazard-pred-freq')?.value || '',
+            predSev: row.querySelector('.hazard-pred-sev')?.value || '',
+            predLike: row.querySelector('.hazard-pred-like')?.value || '',
+            predScore: row.querySelector('.hazard-pred-score')?.value || '',
+            predRating: row.querySelector('.hazard-pred-rating')?.value || ''
+        });
+    });
+    return hazards;
+}
+
+
+
+// ============ VENDOR DATABASE MAPPING ============
+
+// Vendor OrgName values
+const VENDOR_ORG_NAMES = [
+    'Demonstration', 'Global Remediation', 'Global Technology', 'Mfg - Americas', 
+    'Mfg - Asia Pacific', 'Mfg - Chemical', 'Mfg - EMEA', 'SAG - AP NM', 'SAG - CTSC',
+    'SAG - EMEA NM', 'SAG - EMEA Offices', 'SAG - LA NM', 'SAG - NA NM', 
+    'SAG - NA Tire Retail', 'Yokohama'
+];
+
+// Vendor Location values (for Mfg - EMEA)
+const VENDOR_LOCATIONS = {
+    'Demonstration': ['Demonstration','Demonstration - Global'],
+    'Global Remediation': [],
+    'Global Technology': [],
+    'Mfg - Americas': [],
+    'Mfg - Asia Pacific': [],
+    'Mfg - Chemical': [],
+    'Mfg - EMEA': [
+        'Adapazari', 'Amiens', 'Dębica', 'Fulda', 'Furstenwalde', 'Goodyear Mounting Solutions',
+        'Hanau', 'Izmit', 'Kranj', 'Kruševac', 'Luxembourg Tire Plant', 'Lux-Mold Plant RCCE',
+        'Mercury Dudelange', 'Montlucon', 'Riesa', 'Riom', 'Tilburg', 'Uitenhage', 'Wittlich'
+    ],
+    'SAG - AP NM': [],
+    'SAG - CTSC': [],
+    'SAG - EMEA NM': [],
+    'SAG - EMEA Offices': [],
+    'SAG - LA NM': [],
+    'SAG - NA NM': [],
+    'SAG - NA Tire Retail': [],
+    'Yokohama': []
+};
+
+// Vendor Hazard Category mapping
+const HAZARD_MAPPING = {
+    'Biological Hazards': 'Biological Hazards',
+    'Chemical Hazards': 'Chemical Hazards',
+    'Ergonomic Hazards': 'Ergonomic Hazards',
+    'Fire and Explosion': 'Fire / Explosion Hazards',
+    'Hazardous Energy (Electrical, Potential, Kinetic, Pressure)': 'Hazardous Energy',
+    'Mechanical / Machinery Hazards': 'Mechanical / Machinery Hazards',
+    'Organizational / Psychosocial Hazards': 'Organizational / Psychosocial Hazards',
+    'Physical Health Hazards': 'Physical Health Hazards',
+    'Transportation Hazards': 'Transportation Hazards',
+    'Workplace / Infrastructure Design': 'Workplace / Infrastructure Design'
+};
+
+// Function to map hazard categories from app to vendor format
+function mapHazardToVendor(appHazard) {
+    return HAZARD_MAPPING[appHazard] || appHazard;
+}
+
+// ============ COPY CSV FUNCTIONS ============
+
+// Copy Assessment CSV to clipboard
+function copyAssessmentCSV() {
+    const assessmentTitle = document.getElementById('goehsAssessmentTitle').value;
+    if (!assessmentTitle) {
+        showGoehsAlert('Please enter Assessment Title first.', 'error');
+        return;
+    }
+    
+    let orgName = document.getElementById('goehsOrgName').value;
+    let location = document.getElementById('goehsLocation').value;
+    const department = document.getElementById('goehsDepartment').value;
+    const workstation = document.getElementById('goehsWorkstation').value;
+    const date = document.getElementById('goehsAssessmentDate').value;
+    const type = document.getElementById('goehsType').value || 'Safety';
+    const approver = document.getElementById('goehsApprover').value || 'Site Admin';
+    
+    // Map to vendor values
+    if (VENDOR_ORG_NAMES.includes(orgName)) {
+        orgName = orgName; // Already matches vendor format
+    }
+    if (orgName === 'Mfg - EMEA' && VENDOR_LOCATIONS['Mfg - EMEA'].includes(location)) {
+        location = location; // Already matches vendor format
+    }
+    
+    // Tab-separated values (no headers, single row)
+    const row = [orgName, location, department, workstation, assessmentTitle, date, '', type, approver, '', ''];
+    const tsvContent = row.map(v => (v || '').toString().replace(/\t/g, ' ')).join('\t');
+    
+    navigator.clipboard.writeText(tsvContent).then(() => {
+        showGoehsAlert('✅ Assessment data copied to clipboard! (Tab-separated, ready to paste)', 'success');
+    }).catch(err => {
+        showGoehsAlert('Failed to copy to clipboard. Please try again.', 'error');
+        console.error('Clipboard error:', err);
+    });
+}
+
+// Copy Task CSV to clipboard
+function copyTaskCSV() {
+    const assessmentTitle = document.getElementById('goehsAssessmentTitle').value;
+    if (!assessmentTitle) {
+        showGoehsAlert('Please enter Assessment Title in Tool 1 first.', 'error');
+        return;
+    }
+    
+    const orgName = document.getElementById('goehsOrgName').value;
+    const location = document.getElementById('goehsLocation').value;
+    const tasks = collectTaskData();
+    
+    if (tasks.length === 0) {
+        showGoehsAlert('No tasks to copy. Add tasks first.', 'warning');
+        return;
+    }
+    
+    // Tab-separated values (no headers)
+    const rows = tasks.map(t => [orgName, location, assessmentTitle, t.taskName, t.taskDescription, t.conditionMode, t.coreActivity, t.jobTitle]);
+    const tsvContent = rows.map(r => r.map(v => (v || '').toString().replace(/\t/g, ' ')).join('\t')).join('\n');
+    
+    navigator.clipboard.writeText(tsvContent).then(() => {
+        showGoehsAlert(`✅ Task data copied to clipboard! ${tasks.length} task(s) ready to paste.`, 'success');
+    }).catch(err => {
+        showGoehsAlert('Failed to copy to clipboard. Please try again.', 'error');
+        console.error('Clipboard error:', err);
+    });
+}
+
+// Copy Hazard CSV to clipboard
+function copyHazardCSV() {
+    const assessmentTitle = document.getElementById('goehsAssessmentTitle').value;
+    if (!assessmentTitle) {
+        showGoehsAlert('Please enter Assessment Title in Tool 1 first.', 'error');
+        return;
+    }
+    
+    let orgName = document.getElementById('goehsOrgName').value;
+    let location = document.getElementById('goehsLocation').value;
+    const hazards = collectHazardData();
+    
+    if (hazards.length === 0) {
+        showGoehsAlert('No hazards to copy. Add hazards first.', 'warning');
+        return;
+    }
+    
+    // Map to vendor values
+    if (VENDOR_ORG_NAMES.includes(orgName)) {
+        orgName = orgName; // Already matches vendor format
+    }
+    if (orgName === 'Mfg - EMEA' && VENDOR_LOCATIONS['Mfg - EMEA'].includes(location)) {
+        location = location; // Already matches vendor format
+    }
+    
+    // Tab-separated values (no headers) with hazard category mapping
+    const rows = hazards.map(h => [
+        orgName, location, assessmentTitle, h.taskName, mapHazardToVendor(h.hazardCategory), h.subHazard, h.outcome, h.description,
+        h.initFreq, h.initSev, h.initLike, h.initScore, h.initRating,
+        h.counterDesc, h.counterLadder, h.resFreq, h.resSev, h.resLike, h.resScore, h.resRating,
+        h.predDesc, h.predLadder, h.predFreq, h.predSev, h.predLike, h.predScore, h.predRating
+    ]);
+    const tsvContent = rows.map(r => r.map(v => (v || '').toString().replace(/\t/g, ' ')).join('\t')).join('\n');
+    
+    navigator.clipboard.writeText(tsvContent).then(() => {
+        showGoehsAlert(`✅ Hazard data copied to clipboard! ${hazards.length} hazard(s) ready to paste.`, 'success');
+    }).catch(err => {
+        showGoehsAlert('Failed to copy to clipboard. Please try again.', 'error');
+        console.error('Clipboard error:', err);
+    });
+}
+
+// Generate Excel file with 3 sheets (Assessment, Task, Hazard)
+function generateExcelWithSheets() {
+    const assessmentTitle = document.getElementById('goehsAssessmentTitle').value;
+    if (!assessmentTitle) {
+        showGoehsAlert('Please enter Assessment Title in Tool 1 first.', 'error');
+        return;
+    }
+
+    if (typeof XLSX === 'undefined') {
+        showGoehsAlert('Excel library not loaded. Please try the CSV download instead.', 'error');
+        return;
+    }
+
+    // Assessment header fields
+    const orgName     = document.getElementById('goehsOrgName').value;
+    const location    = document.getElementById('goehsLocation').value;
+    const department  = document.getElementById('goehsDepartment').value;
+    const workstation = document.getElementById('goehsWorkstation').value;
+    const date        = document.getElementById('goehsAssessmentDate').value;
+    const equipment   = document.getElementById('goehsEquipment')?.value || '';
+    const type        = document.getElementById('goehsType').value || 'Safety';
+    const approver    = document.getElementById('goehsApprover').value || '(Site Admin)';
+    const teamMembers = document.getElementById('goehsTeamMembers')?.value || '';
+    const completedBy = document.getElementById('goehsCompletedBy')?.value || '';
+
+    // Build task lookup map keyed by taskName (populated from Tool 2)
+    const tasks = collectTaskData();
+    const taskMap = {};
+    tasks.forEach(t => { taskMap[t.taskName] = t; });
+
+    // Collect hazard rows — values already validated against GOEHS whitelists in the UI
+    const hazards = collectHazardData();
+
+    if (hazards.length === 0) {
+        showGoehsAlert('No hazards found. Please add hazards in Tool 3 first.', 'error');
+        return;
+    }
+
+    // ── Language detection ──
+    // Reads from localStorage (same key used by the main app language switcher)
+    const exportLang = localStorage.getItem('appLanguage') || 'en';
+    const T = (exportLang !== 'en' && window.TRANSLATIONS?.[exportLang]) ? window.TRANSLATIONS[exportLang] : null;
+
+    // Translate a single English value to the export language using window.TRANSLATIONS
+    function xlate(val) {
+        if (!val || !T) return val;
+        return T[val] || val;
+    }
+
+    // Translate a Condition Mode value
+    function xlateCondition(val) {
+        if (!val || exportLang === 'en') return val;
+        return GOEHS_CONDITION_TRANSLATIONS[exportLang]?.[val] || xlate(val) || val;
+    }
+
+    // Translate a Countermeasure Ladder string (one or more comma-separated levels)
+    // Validates against English whitelist first, then maps to the target language.
+    function normalizeLadder(ladderStr) {
+        if (!ladderStr) return '';
+        const parts = ladderStr.split(',').map(s => s.trim()).filter(Boolean);
+        const valid = parts.filter(p => COUNTERMEASURE_LADDER.includes(p));
+        if (exportLang === 'en' || !GOEHS_LADDER_TRANSLATIONS[exportLang]) {
+            return valid.join(', ');
+        }
+        const lmap = GOEHS_LADDER_TRANSLATIONS[exportLang];
+        return valid.map(p => lmap[p] || p).join(', ');
+    }
+
+    // -- Flat 40-column header matching Risk_Registry_Batch_Upload_Template.xlsx --
+    const headers = [
+        'Row',
+        'OrgName*', 'Location*', 'Department', 'Workstation',
+        'Assessment Title*', 'Assessment Date', 'Equipment', 'Type', 'Assessment Approver*',
+        'Name of Risk Assessment Team Members', 'Completed By',
+        'Task Name *', 'Task Description *', 'Condition Mode *', 'Core Activity',
+        'Job Title / Occupation Field',
+        'Hazard *', 'Sub-Hazard *', 'Potential Outcome *', 'Hazard Description',
+        'Initial Frequency', 'Initial Severity', 'Initial Likelihood',
+        'Initial Risk Score', 'Initial Risk Rating',
+        'Description of Countermeasures', 'Countermeasure Ladder',
+        'Residual Frequency *', 'Residual Severity *', 'Residual Likelihood *',
+        'Residual Risk Score', 'Residual Risk Rating',
+        'Description of Countermeasures Predictive', 'Countermeasure Ladder Predictive',
+        'Predictive Frequency', 'Predictive Severity', 'Predictive Likelihood',
+        'Predictive Risk Score', 'Predictive Risk Rating'
+    ];
+
+    // -- One flat data row per hazard (denormalised) --
+    const dataRows = hazards.map((h, idx) => {
+        const task = taskMap[h.taskName] || {};
+        return [
+            idx + 1,                                      // Row
+            orgName,                                      // OrgName*
+            location,                                     // Location*
+            department,                                   // Department
+            workstation,                                  // Workstation
+            assessmentTitle,                              // Assessment Title*
+            date,                                         // Assessment Date
+            equipment,                                    // Equipment
+            type,                                         // Type
+            approver,                                     // Assessment Approver*
+            teamMembers,                                  // Name of Risk Assessment Team Members
+            completedBy,                                  // Completed By
+            h.taskName,                                           // Task Name *
+            task.taskDescription || h.taskName,                   // Task Description *
+            xlateCondition(task.conditionMode || 'Routine'),       // Condition Mode *
+            task.coreActivity    || '',                            // Core Activity
+            task.jobTitle        || '',                            // Job Title / Occupation Field
+            xlate(h.hazardCategory),                               // Hazard *
+            xlate(h.subHazard),                                    // Sub-Hazard *
+            h.outcome,                                             // Potential Outcome * (pre-translated in UI)
+            h.description,                                         // Hazard Description (pre-translated in UI)
+            h.initFreq,                                   // Initial Frequency
+            h.initSev,                                    // Initial Severity
+            h.initLike,                                   // Initial Likelihood
+            h.initScore,                                  // Initial Risk Score
+            h.initRating,                                 // Initial Risk Rating
+            h.counterDesc,                                // Description of Countermeasures
+            normalizeLadder(h.counterLadder),             // Countermeasure Ladder (whitelisted EN/FR/DE)
+            h.resFreq,                                    // Residual Frequency *
+            h.resSev,                                     // Residual Severity *
+            h.resLike,                                    // Residual Likelihood *
+            h.resScore,                                   // Residual Risk Score
+            h.resRating,                                  // Residual Risk Rating
+            h.predDesc,                                   // Description of Countermeasures Predictive
+            normalizeLadder(h.predLadder),                // Countermeasure Ladder Predictive (whitelisted)
+            h.predFreq,                                   // Predictive Frequency
+            h.predSev,                                    // Predictive Severity
+            h.predLike,                                   // Predictive Likelihood
+            h.predScore,                                  // Predictive Risk Score
+            h.predRating                                  // Predictive Risk Rating
+        ];
+    });
+
+    // -- Create workbook � single sheet named "Batch Upload Template" --
+    const wb = XLSX.utils.book_new();
+    const wsData = [headers, ...dataRows];
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
+
+    // Auto-size column widths
+    const colWidths = headers.map((h, i) => {
+        const maxLen = Math.max(h.length, ...dataRows.map(r => String(r[i] ?? '').length));
+        return { wch: Math.min(Math.max(maxLen + 2, 10), 50) };
+    });
+    ws['!cols'] = colWidths;
+
+    XLSX.utils.book_append_sheet(wb, ws, 'Batch Upload Template');
+
+    const langLabel = exportLang !== 'en' ? `_${exportLang.toUpperCase()}` : '';
+    const filename = `GOEHS_Batch_Upload_${assessmentTitle.replace(/[^a-zA-Z0-9]/g, '_')}${langLabel}.xlsx`;
+    XLSX.writeFile(wb, filename);
+
+    const langNote = exportLang !== 'en' ? ` (language: ${exportLang.toUpperCase()})` : '';
+    showGoehsAlert(`✅ GOEHS Batch Upload Excel downloaded${langNote} — ${hazards.length} hazard row(s) in "Batch Upload Template" sheet.`, 'success');
+}
+
+function downloadCSV(csvContent, filename) {
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+}
+
+function showGoehsAlert(message, type = 'info') {
+    // Use existing alert function or create simple alert
+    if (typeof showCustomAlert === 'function') {
+        showCustomAlert(message, type);
+    } else {
+        alert(message);
+    }
+}
+
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialize form when modal opens
+    const goehsBtn = document.getElementById('goehsIntegrationBtn');
+    if (goehsBtn) {
+        goehsBtn.addEventListener('click', openGoehsModal);
+    }
+    
+    // Direct GOEHS Upload handler
+    const directGoehsInput = document.getElementById('directGoehsUpload');
+    if (directGoehsInput) {
+        directGoehsInput.addEventListener('change', function(e) {
+            handleDirectGoehsUpload(e);
+        });
+    }
+    
+    // Collapsible AI Recommendations section
+    const toggleBtn = document.getElementById('toggleRecommendationsBtn');
+    const content = document.getElementById('recommendationsContent');
+    const chevron = document.getElementById('recommendationsChevron');
+    
+    if (toggleBtn) {
+        toggleBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            content.classList.toggle('hidden');
+            chevron.classList.toggle('rotate-180');
+        });
+    }
+});
