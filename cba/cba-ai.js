@@ -444,11 +444,11 @@ Return ONLY valid JSON — no markdown, no comments, no trailing commas.
     "2": { ... }, "3": { ... }, "4": { ... }, "5": { ... }
   },
   "medicalCostUSD": {
-    "1": { "value": <integer in EUR>, "unit": "EUR/case", "source": "<AAA Annual Report 2024>", "year": 2024, "notes": "<what AAA covers for this severity; severity 3 anchor = €4,053>"},
+    "1": { "value": <integer in EUR>, "unit": "EUR/case", "source": "<AAA Annual Report 2024>", "year": 2024, "rationaleFormula": "<COMPONENT BREAKDOWN — list each medical cost item with EUR amount e.g. 'emergency care €X + hospitalization €Y + pharmacy/rehab €Z = EUR total'>", "notes": "<brief narrative — do NOT repeat the formula or source citation; severity 3 anchor = €4,053>"},
     "2": { ... }, "3": { ... }, "4": { ... }, "5": { ... }
   },
   "injuryCostPerCase": {
-    "1": { "value": <integer in EUR, total direct+indirect iceberg>, "unit": "EUR/case", "source": "<Luxembourg iceberg model Sec.8.2 / AAA 2024>", "year": 2024, "notes": "<include 20% MDE deadweight + AAA Malus lagging + productivity loss; severity 3 verified core anchor = €27,341>" },
+    "1": { "value": <integer in EUR, total direct+indirect iceberg>, "unit": "EUR/case", "source": "<Luxembourg iceberg model Sec.8.2 / AAA 2024>", "year": 2024, "rationaleFormula": "<COMPONENT BREAKDOWN — list each component with its EUR amount separated by + e.g. 'MDE deadweight €X + productivity loss €Y + overtime premium €Z + admin overhead €A + asset damage €B + AAA Malus €C = EUR total'>", "notes": "<brief narrative — do NOT repeat the formula or source citation>"},
     "2": { ... }, "3": { ... }, "4": { ... }, "5": { ... }
   },
   "insurancePremiumChangePct": {
@@ -456,7 +456,7 @@ Return ONLY valid JSON — no markdown, no comments, no trailing commas.
     "2": { ... }, "3": { ... }, "4": { ... }, "5": { ... }
   },
   "regulatoryFineUSD": {
-    "1": { "value": <integer in EUR>, "unit": "EUR/violation", "source": "<ITM Annual Report 2024>", "year": 2024, "notes": "<€4,000/worker max, avg €5,530, 116 criminal referrals for fatal cases>" },
+    "1": { "value": <integer in EUR>, "unit": "EUR/violation", "source": "<ITM Annual Report 2024>", "year": 2024, "rationaleFormula": "<COMPONENT BREAKDOWN — list fine components with EUR amount e.g. 'ITM admin fine €X + criminal defence €Y + civil damages €Z = EUR total'>", "notes": "<brief narrative — do NOT repeat the formula; note €4,000/worker max, avg €5,530, 116 criminal referrals for fatal cases>" },
     "2": { ... }, "3": { ... }, "4": { ... }, "5": { ... }
   }
 }
@@ -468,6 +468,8 @@ CRITICAL RULES:
 - insurancePremiumChangePct must reference 0.70% × Bonus-Malus factor (0.85/1.00/1.10/1.30/1.50).
 - regulatoryFineUSD must use ITM Luxembourg data (avg €5,530/fine; max €4,000/worker; 116 criminal referrals for fatal accidents).
 - Every severity entry must include sourceUrl, evidenceKey, figureUsed, and rationaleFormula.
+- rationaleFormula MUST include per-component EUR amounts in the format "Label €amount + Label €amount + ... = EUR total". Do NOT write only component names without values. Do NOT write "=580K" — use the full integer value e.g. "= EUR 580,000".
+- notes MUST contain only a brief narrative explanation. Do NOT repeat the component formula or the source citation in notes — they are already captured in rationaleFormula and source fields.
 - No speculative assumptions: if a value is not supported by a cited Luxembourg source, keep it conservative and explain in notes.
 - All sources must cite real Luxembourg bodies: AAA, MDE, ITM, STATEC, CCSS, Luxembourg Social Security Code.`;
 

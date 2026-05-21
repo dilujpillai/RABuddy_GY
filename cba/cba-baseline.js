@@ -66,9 +66,21 @@
                     if (metricKey === 'medicalCostUSD' && sev === '3') {
                         entry.rationaleFormula = 'AAA 2024 reported average direct cost per recognized accident = EUR 4,053';
                     } else if (metricKey === 'injuryCostPerCase' && sev === '3') {
-                        entry.rationaleFormula = 'EUR 1,536 + 5,760 + 1,920 + 1,625 + 2,500 + 14,000 = EUR 27,341 (verified core; excludes unverified MDE class uplift)';
+                        entry.rationaleFormula = 'Unrecovered salary (MDE 20% deadweight) €1,536 + Lost productivity €5,760 + Overtime premium €1,920 + Admin & investigation overhead €1,625 + Asset damage €2,500 + AAA Malus €14,000 = EUR 27,341 (verified core; excludes unverified MDE class uplift)';
+                    } else if (metricKey === 'injuryCostPerCase' && sev === '4') {
+                        entry.rationaleFormula = 'MDE 20% deadweight €8,800 + lost productivity €24,000 + overtime premium €5,200 + admin overhead €4,000 + AAA Malus (1.50×) €35,000 + asset damage €3,000 = EUR 80,000';
+                    } else if (metricKey === 'injuryCostPerCase' && sev === '5') {
+                        entry.rationaleFormula = 'AAA max Malus (1.50×) €75,000 + ITM criminal prosecution costs €60,000 + civil litigation damages €85,000 + legal defence €80,000 + recruitment / retraining €120,000 + productivity & knowledge loss €120,000 + investigation & admin €60,000 = EUR 600,000';
+                    } else if (metricKey === 'medicalCostUSD' && sev === '4') {
+                        entry.rationaleFormula = 'Emergency & hospitalization €8,000 + physiotherapy / rehabilitation €4,000 + specialist follow-up €2,000 + medical aids / prosthetics €1,000 = EUR 15,000';
+                    } else if (metricKey === 'medicalCostUSD' && sev === '5') {
+                        entry.rationaleFormula = 'Acute trauma care & ICU €15,000 + long-term rehabilitation €8,000 + permanent disability pension capitalised value (AAA Art. 92) €60,000 + physiological & moral prejudice (TAL-2021-02459) €6,635 = EUR 89,635';
                     } else if (metricKey === 'regulatoryFineUSD' && sev === '3') {
                         entry.rationaleFormula = 'EUR 6,370,500 / 1,152 fines = EUR 5,530 average ITM fine';
+                    } else if (metricKey === 'regulatoryFineUSD' && sev === '4') {
+                        entry.rationaleFormula = 'ITM administrative fine €4,000 × 10 workers = €40,000 + CCSS declaration penalty €500 = EUR 40,500';
+                    } else if (metricKey === 'regulatoryFineUSD' && sev === '5') {
+                        entry.rationaleFormula = 'ITM administrative fine €4,000 × 15 workers = €60,000 + criminal defence costs €80,000 + civil damages €40,000 + mandatory PDCA programme €20,000 = EUR 200,000';
                     } else if (metricKey === 'insurancePremiumChangePct') {
                         entry.rationaleFormula = 'Effective AAA rate = 0.70% x bonus-malus factor (0.85 to 1.50)';
                     } else {

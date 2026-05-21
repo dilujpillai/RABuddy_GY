@@ -633,7 +633,6 @@
         addParam('Sigma total', 'Sum of all component subtotals. This syncs back to the line total.');
         addParam('Rationale', 'Plain-language reason for your number so reviewers understand your logic.');
         addParam('Source / evidence', 'Where the number came from (invoice, payroll data, supplier quote, baseline, etc.).');
-        addParam('Quantity notes', 'Short note explaining why the chosen quantity is realistic for your process.');
         body.appendChild(list);
 
         const recurringExplain = cat.recurring
@@ -1888,60 +1887,155 @@
         const text = String(rationaleText || '').trim();
         if (!text) return [];
 
-        // Search all lines for a compound expression (must contain at least two `+` separated segments each ending with a currency amount)
-        const lines = text.split(/\r?\n/);
-        let expr = '';
-        for (const line of lines) {
-            let candidate = line.split(/\bSource\s*:/i)[0] || '';
-            if (candidate.includes('=')) candidate = candidate.split('=')[0];
-            candidate = candidate.trim();
-            // Must have at least one `+` AND at least two segments that each end with a euro/dollar amount
-            if (!candidate.includes('+')) continue;
-            const segments = candidate.split('+');
-            const withAmount = segments.filter(seg => /[€$£]\s*[0-9][\d\s.,]*\s*$/.test(seg.trim()) || /[0-9][\d\s.,]*\s*$/.test(seg.trim()));
-            if (withAmount.length >= 2) { expr = candidate; break; }
-        }
-        if (!expr) return [];
-
         const sourceMeta = extractRationaleSourceMeta(text, []);
         const unit = cat && cat.recurring
             ? (uiState.recurringPeriod === 'month' ? 'per month' : 'per year')
             : 'one-off';
 
+        // Strip source lines from the text before parsing
+        const formulaText = text.split(/\r?\n/)
+            .filter(l => !/^Source[\s:]/i.test(l.trim()) && !/^Source link[\s:]/i.test(l.trim()))
+            .join('\n').trim();
+
+        // Extract grand-total value (from "= €N" or "= EUR N" pattern anywhere in text)
+        let grandTotal = 0;
+        const totalMatch = formulaText.match(/=\s*(?:EUR|USD|GBP|[€$£])?\s*([\d,]+(?:\.\d+)?)\s*[KMkm]?\b/i);
+        if (totalMatch) {
+            grandTotal = parseFloat(totalMatch[1].replace(/,/g, ''));
+            const sfx = formulaText.slice(formulaText.indexOf(totalMatch[0]) + totalMatch[0].length).trimStart().charAt(0).toUpperCase();
+            if (sfx === 'K') grandTotal *= 1000;
+            else if (sfx === 'M') grandTotal *= 1000000;
+        }
+
+        // Determine split character: prefer ';' if present, otherwise '+'
+        const hasSemi = formulaText.includes(';');
+        const hasPlus = formulaText.includes('+');
+        if (!hasSemi && !hasPlus) return [];
+
+        const separator = hasSemi ? ';' : '+';
+
+        // Strip trailing grand-total clause before splitting
+        let expr = formulaText;
+        if (separator === ';') {
+            expr = expr.replace(/\s*;?\s*(?:grand\s+)?total\b[^;]*$/i, '');
+        } else {
+            expr = expr.replace(/\s*=\s*(?:EUR|USD|GBP|[€$£])?\s*[\d,]+.*$/i, '');
+        }
+
+        const UNIT_WORD = /^(years?|months?|days?|workers?|employees?|persons?|hrs?|hours?|%|×|x\b)/i;
+        const CUR_RE = /(?:EUR|USD|GBP|[€$£])\s*/gi;
+
+        const parts = expr.split(separator).map(p => p.trim()).filter(Boolean);
+        if (parts.length < 2) return [];
+
         const rows = [];
-        const parts = expr.split('+').map(p => String(p || '').trim()).filter(Boolean);
         parts.forEach((part, i) => {
-            const amountMatch = part.match(/(?:[A-Z]{3}\s*)?[€$£]?\s*([0-9][0-9\s.,]*)\s*$/i);
-            if (!amountMatch || !amountMatch[1]) return;
+            const s2 = part.replace(CUR_RE, '').trim();
+            if (!s2) return;
 
-            const rate = parseNumericTextToValue(amountMatch[1]);
-            if (!(rate > 0)) return;
+            let value = 0, labelEnd = -1;
 
-            let label = part.slice(0, amountMatch.index).trim();
-            label = label.replace(/[\s,:;\-–—]+$/, '').trim();
+            // Try "label × qty = value" — take value after '='
+            const eqPos = s2.lastIndexOf('=');
+            if (eqPos >= 0) {
+                const afterEq = s2.slice(eqPos + 1).trim();
+                const m = afterEq.match(/^([\d][\d,]*(?:\.\d+)?)\s*([KMkm]?)\b/);
+                if (m) {
+                    const afterNum = afterEq.slice(m[0].length).trimStart();
+                    if (!UNIT_WORD.test(afterNum)) {
+                        let v = parseFloat(m[1].replace(/,/g, ''));
+                        const sfx = m[2].toUpperCase();
+                        if (sfx === 'K') v *= 1000;
+                        else if (sfx === 'M') v *= 1000000;
+                        if (v > 0) { value = v; labelEnd = eqPos; }
+                    }
+                }
+            }
+            // Fallback: last number not followed by a unit word
+            if (!(value > 0)) {
+                const nums = [...s2.matchAll(/([\d][\d,]*(?:\.\d+)?)\s*([KMkm]?)\b/g)];
+                for (let ni = nums.length - 1; ni >= 0; ni--) {
+                    const last = nums[ni];
+                    const afterNum = s2.slice(last.index + last[0].length).trimStart();
+                    if (UNIT_WORD.test(afterNum)) continue;
+                    let v = parseFloat(last[1].replace(/,/g, ''));
+                    const sfx = last[2].toUpperCase();
+                    if (sfx === 'K') v *= 1000;
+                    else if (sfx === 'M') v *= 1000000;
+                    if (v > 0) { value = v; labelEnd = last.index; break; }
+                }
+            }
+
+            let label = (labelEnd > 0 ? s2.slice(0, labelEnd) : s2)
+                .replace(/[\d,]+(?:\.\d+)?\s*[KMkm]?\b/g, '')
+                .replace(/[×*/÷\-–]+/g, ' ')
+                .replace(/^[\s:;,.]+|[\s:;,.]+$/g, '')
+                .replace(/\s{2,}/g, ' ').trim();
             if (!label) label = `Component ${i + 1}`;
+
+            // Look up rich definition/basis/formula from the rationale map
+            const catKey = cat && cat.key;
+            const mapEntry = (typeof CBA !== 'undefined' && CBA.COMPONENT_RATIONALE_MAP)
+                ? CBA.COMPONENT_RATIONALE_MAP.find(e => {
+                    if (e.category && catKey && e.category !== catKey) return false;
+                    const lc = label.toLowerCase();
+                    return e.patterns.some(p => lc.includes(p));
+                  })
+                : null;
 
             const row = {
                 label,
                 qty: 1,
-                qtyReason: `Split from rationale line item: ${label}.`,
-                rate,
+                rate: value,
                 unit,
-                source: sourceMeta.sourceText || 'Manual user split',
+                source: sourceMeta.sourceText || 'Pasted baseline',
                 sourceUrl: sourceMeta.sourceUrl || '',
+                qtyReason: '',
                 noteDetails: {
-                    definition: label,
-                    basis: `Split automatically from rationale expression so each component can be fine-tuned independently.`,
-                    parameters: '',
-                    formula: 'Qty x Rate',
-                    autoParams: true
+                    definition: mapEntry ? mapEntry.definition : label,
+                    basis: mapEntry ? mapEntry.basis : `Component extracted from pasted formula. ${value > 0 ? `Value: ${sym || '€'}${formatNum(value)}.` : 'Enter the value for this component.'}`,
+                    parameters: `Qty = 1; Rate = ${sym || '€'}${formatNum(value)} per ${unit}`,
+                    formula: mapEntry ? mapEntry.formula : 'Qty × Rate',
+                    autoParams: false
                 }
             };
-            syncRowQtyReasonFromNote(row, sym || currencySymbol());
+            const nd = row.noteDetails;
+            row.qtyReason = `Audit basis: ${nd.basis}; Parameters: ${nd.parameters}; Formula: ${nd.formula}`;
             rows.push(row);
         });
 
-        return rows.length >= 2 ? rows : [];
+        if (rows.length < 2) return [];
+
+        // If all rows have value=0 (label-only formula), distribute grandTotal equally
+        const hasAnyValue = rows.some(r => r.rate > 0);
+        if (!hasAnyValue && grandTotal > 0) {
+            const share = Math.round(grandTotal / rows.length);
+            rows.forEach((r, i) => {
+                r.rate = i < rows.length - 1 ? share : grandTotal - share * (rows.length - 1);
+                r.noteDetails.parameters = `Qty = 1; Rate = ${sym || '€'}${formatNum(r.rate)} per ${unit} (estimated equal share — update with actual figure)`;
+                r.qtyReason = `Audit basis: ${r.noteDetails.basis}; Parameters: ${r.noteDetails.parameters}; Formula: Qty × Rate`;
+            });
+        }
+
+        // Add balancing row if sum ≠ grandTotal (and grandTotal is known)
+        if (grandTotal > 0 && hasAnyValue) {
+            const sum = rows.reduce((t, r) => t + (r.rate || 0), 0);
+            const diff = Math.round(grandTotal - sum);
+            if (Math.abs(diff) > 1) {
+                rows.push({
+                    label: 'Residual / unallocated',
+                    qty: 1,
+                    rate: diff,
+                    unit,
+                    source: sourceMeta.sourceText || 'Pasted baseline',
+                    sourceUrl: sourceMeta.sourceUrl || '',
+                    qtyReason: `Audit basis: Balancing line — subtotals differ from grand total of ${sym || '€'}${formatNum(grandTotal)}. Adjust rows above or remove this line.`,
+                    noteDetails: { definition: 'Residual / unallocated', basis: `Balancing line so component subtotals equal the grand total of ${sym || '€'}${formatNum(grandTotal)}. Remove once all items are correctly split.`, formula: 'Qty × Rate', autoParams: false }
+                });
+            }
+        }
+
+        return rows;
     }
 
     function extractRationaleSourceMeta(rationaleText, fallbackRows) {
@@ -2234,13 +2328,45 @@
         ratInp.addEventListener('paste', () => {
             setTimeout(() => {
                 autoResize(ratInp);
-                // If no value yet, try to auto-fill total from a pasted number
-                const suggested = extractSuggestedDisplayValueFromRationale(ratInp.value);
+                const pastedText = ratInp.value;
+                saveRationaleToState(pastedText);
+
+                // ── 1. Auto-fill the total input from a pasted figure ──────────────
+                const suggested = extractSuggestedDisplayValueFromRationale(pastedText);
                 if (suggested > 0 && !(toDisplay(items[cat.key] || 0, cat.recurring) > 0.5)) {
                     items[cat.key] = toAnnual(suggested, cat.recurring);
                     totalInp.value = String(Math.round(suggested));
                     refreshResults();
                 }
+
+                // ── 2. Auto-split pasted formula into component rows ───────────────
+                // Only attempt when the panel currently has zero or one generic/seeded rows
+                // so we never overwrite rows the user already edited.
+                const existingRows = isCost
+                    ? ((s.proposedMeasure.costBreakdowns || {})[cat.key] || [])
+                    : ((s.benefits.breakdowns || {})[cat.key] || []);
+                const isBlank = existingRows.length === 0 ||
+                    (existingRows.length === 1 &&
+                        ['Manual user split', 'Unverified source'].includes(existingRows[0].source));
+
+                if (isBlank) {
+                    const splitRows = splitRationaleIntoBreakdownRows(cat, pastedText, sym);
+                    if (splitRows.length >= 2) {
+                        if (isCost) {
+                            if (!s.proposedMeasure.costBreakdowns) s.proposedMeasure.costBreakdowns = {};
+                            s.proposedMeasure.costBreakdowns[cat.key] = splitRows;
+                        } else {
+                            if (!s.benefits.breakdowns) s.benefits.breakdowns = {};
+                            s.benefits.breakdowns[cat.key] = splitRows;
+                        }
+                        uiState.openCalcPanels[panelKey] = true;
+                        renderPreservingView(panelKey, true);
+                        return; // re-render handles everything
+                    }
+                }
+
+                // ── 3. Refresh source chip from any URL in the pasted text ─────────
+                refreshSourceChip(pastedText);
             }, 0);
         });
 
@@ -2336,10 +2462,6 @@
             bkPanel.appendChild(toolsRow);
 
             let sumLabel = null;
-            const parameterEditors = {};
-            const qtyEditors = {};
-            const rateEditors = {};
-            const recalcFns = {};
             const updateTotalFromBreakdown = () => {
                 const newTotal = bkRows.reduce((sum, br) => sum + ((br.qty || 0) * (br.rate || 0)), 0);
                 items[cat.key] = toAnnual(newTotal, cat.recurring);
@@ -2371,6 +2493,9 @@
                 lblInp.value = row.label || '';
                 lblInp.addEventListener('input', (e) => {
                     bkRows[idx].label = e.target.value;
+                    bkRows[idx].noteDetails = bkRows[idx].noteDetails || {};
+                    bkRows[idx].noteDetails.definition = e.target.value;
+                    syncRowQtyReasonFromNote(bkRows[idx], sym);
                 });
                 const lblWrap = el('div', { className: 'flex flex-col', style: { minWidth: 0, overflow: 'hidden' } });
                 lblWrap.appendChild(lblInp);
@@ -2403,7 +2528,6 @@
                 const qtyWrap = el('div', { className: 'flex flex-col items-center' });
                 const qtyInp = el('input', { type: 'number', className: 'cba-bkdn-inp', min: '0', step: 'any' });
                 qtyInp.value = row.qty || 0;
-                qtyEditors[idx] = qtyInp;
                 qtyWrap.appendChild(qtyInp);
                 bkRow.appendChild(qtyWrap);
 
@@ -2412,7 +2536,6 @@
                 // Rate input
                 const rateInp = el('input', { type: 'number', className: 'cba-bkdn-inp', min: '0', step: 'any' });
                 rateInp.value = row.rate || 0;
-                rateEditors[idx] = rateInp;
                 bkRow.appendChild(rateInp);
 
                 bkRow.appendChild(el('span', { className: 'text-slate-400 text-xs font-bold text-center' }, '='));
@@ -2427,16 +2550,12 @@
                     bkRows[idx].qty = q;
                     bkRows[idx].rate = r;
                     syncRowQtyReasonFromNote(bkRows[idx], sym);
-                    if (parameterEditors[idx] && (bkRows[idx].noteDetails || {}).autoParams !== false) {
-                        parameterEditors[idx].value = getRowQtyNoteParts(bkRows[idx], sym).parameters;
-                    }
                     sub.textContent = `${sym}${Math.round(q * r).toLocaleString()}`;
                     updateTotalFromBreakdown();
                 };
                 sub.textContent = `${sym}${Math.round((row.qty || 0) * (row.rate || 0)).toLocaleString()}`;
                 qtyInp.addEventListener('input', calcSub);
                 rateInp.addEventListener('input', calcSub);
-                recalcFns[idx] = calcSub;
                 bkRow.appendChild(sub);
 
                 const delBtn = el('button', {
@@ -2458,6 +2577,62 @@
                 bkRow.appendChild(delBtn);
 
                 bkPanel.appendChild(bkRow);
+
+                const rationaleRow = el('div', {
+                    className: 'mb-2 mt-1 ml-1 mr-1 rounded-lg border border-slate-200 bg-slate-50 p-2'
+                });
+
+                const calcLine = el('div', { className: 'text-[11px] text-slate-600 font-mono mb-1' });
+                const refreshCalcLine = () => {
+                    const q = Number(bkRows[idx].qty) || 0;
+                    const r = Number(bkRows[idx].rate) || 0;
+                    calcLine.textContent = `Calculation: ${formatNum(q)} x ${sym}${formatNum(r)} = ${sym}${Math.round(q * r).toLocaleString()}`;
+                };
+                refreshCalcLine();
+                rationaleRow.appendChild(calcLine);
+
+                const note = getRowQtyNoteParts(bkRows[idx], sym);
+                const ratInp = el('textarea', {
+                    className: 'w-full rounded border border-slate-300 bg-white p-2 text-xs text-slate-700 outline-none focus:ring-2 focus:ring-indigo-300',
+                    rows: '2',
+                    placeholder: 'Rationale: explain why this quantity and rate were chosen for this component.'
+                });
+                ratInp.value = note.basis || '';
+                ratInp.addEventListener('input', (e) => {
+                    bkRows[idx].noteDetails = bkRows[idx].noteDetails || {};
+                    bkRows[idx].noteDetails.basis = e.target.value;
+                    syncRowQtyReasonFromNote(bkRows[idx], sym);
+                });
+                rationaleRow.appendChild(ratInp);
+
+                const srcRow = el('div', { className: 'mt-2 grid grid-cols-2 gap-2' });
+                const srcInp = el('input', {
+                    type: 'text',
+                    className: 'w-full rounded border border-slate-300 bg-white px-2 py-1 text-xs text-slate-700 outline-none focus:ring-2 focus:ring-indigo-300',
+                    placeholder: 'Source label (optional)',
+                    value: bkRows[idx].source || ''
+                });
+                srcInp.addEventListener('input', (e) => {
+                    bkRows[idx].source = e.target.value;
+                });
+                srcRow.appendChild(srcInp);
+
+                const srcUrlInp = el('input', {
+                    type: 'url',
+                    className: 'w-full rounded border border-slate-300 bg-white px-2 py-1 text-xs text-slate-700 outline-none focus:ring-2 focus:ring-indigo-300',
+                    placeholder: 'Source URL (optional)',
+                    value: bkRows[idx].sourceUrl || sourceUrlForText(bkRows[idx].source, bkRows[idx].sourceUrl) || ''
+                });
+                srcUrlInp.addEventListener('input', (e) => {
+                    bkRows[idx].sourceUrl = e.target.value;
+                });
+                srcRow.appendChild(srcUrlInp);
+                rationaleRow.appendChild(srcRow);
+
+                qtyInp.addEventListener('input', refreshCalcLine);
+                rateInp.addEventListener('input', refreshCalcLine);
+
+                bkPanel.appendChild(rationaleRow);
             });
 
             // Unit summary + formula under breakdown
@@ -2489,193 +2664,8 @@
             refreshFormulaDiv();
             bkPanel.appendChild(formulaDiv);
             // Keep formula div in sync when rows change
-            const _origUpdateTotal = updateTotalFromBreakdown;
-            // Patch updateTotalFromBreakdown to also refresh the formula div
-            // We do this by wrapping via a closure-level override
             Object.defineProperty(bkPanel, '_refreshFormula', { value: refreshFormulaDiv, writable: true });
             bkPanel.addEventListener('input', () => { refreshFormulaDiv(); });
-
-            // Quantity notes footer — shows qtyReason for each row
-            const reasons = bkRows
-                .map((row, rowIndex) => ({ row, rowIndex }))
-                .filter(({ row }) => !!(row.qtyReason || row.noteDetails));
-            if (reasons.length > 0) {
-                const notesDiv = el('div', { className: 'cba-bkdn-notes' });
-                const notesHead = el('div', { className: 'cba-bkdn-notes-head' });
-                notesHead.appendChild(el('span', { className: 'cba-bkdn-notes-title' }, 'Quantity notes'));
-                notesHead.appendChild(el('span', { className: 'cba-bkdn-notes-help' }, 'Edit each assumption clearly and keep source evidence linked.'));
-                notesDiv.appendChild(notesHead);
-                reasons.forEach(({ row: noteRow, rowIndex }) => {
-                    syncRowQtyReasonFromNote(noteRow, sym);
-                    const note = getRowQtyNoteParts(noteRow, sym);
-                    const line = el('div', { className: 'cba-note-item' });
-                    const head = el('div', { className: 'cba-note-head' });
-                    head.appendChild(el('div', { className: 'cba-note-title' }, noteRow.label || 'Component note'));
-                    const liveSubtotal = Math.round((Number(noteRow.qty) || 0) * (Number(noteRow.rate) || 0));
-                    const subtotalBadge = el('span', { className: 'cba-note-badge' }, `${sym}${liveSubtotal.toLocaleString()}`);
-                    head.appendChild(subtotalBadge);
-                    line.appendChild(head);
-
-                    const fieldGrid = el('div', { className: 'cba-note-grid' });
-
-                    const buildField = (labelText, controlEl, wide) => {
-                        const field = el('div', { className: `cba-note-field${wide ? ' cba-note-field-wide' : ''}` });
-                        field.appendChild(el('label', { className: 'cba-note-label' }, labelText));
-                        field.appendChild(controlEl);
-                        return field;
-                    };
-
-                    const defInp = el('input', {
-                        type: 'text',
-                        className: 'cba-note-edit',
-                        value: note.definition || noteRow.label || ''
-                    });
-                    defInp.addEventListener('input', (e) => {
-                        noteRow.noteDetails = noteRow.noteDetails || {};
-                        noteRow.noteDetails.definition = e.target.value;
-                        syncRowQtyReasonFromNote(noteRow, sym);
-                    });
-                    fieldGrid.appendChild(buildField('Definition', defInp, false));
-
-                    const basisInp = el('textarea', {
-                        className: 'cba-note-edit',
-                        rows: '2'
-                    });
-                    basisInp.value = note.basis || '';
-                    basisInp.addEventListener('input', (e) => {
-                        noteRow.noteDetails = noteRow.noteDetails || {};
-                        noteRow.noteDetails.basis = e.target.value;
-                        syncRowQtyReasonFromNote(noteRow, sym);
-                    });
-                    fieldGrid.appendChild(buildField('Basis', basisInp, true));
-
-                    const figWrap = el('div', { className: 'cba-note-inline' });
-                    const figQtyWrap = el('div', { className: 'cba-note-mini' });
-                    figQtyWrap.appendChild(el('span', { className: 'cba-note-mini-label' }, 'Qty'));
-                    const figQty = el('input', {
-                        type: 'number',
-                        className: 'cba-note-edit',
-                        min: '0',
-                        step: 'any',
-                        placeholder: 'Qty',
-                        value: noteRow.qty || 0
-                    });
-                    figQtyWrap.appendChild(figQty);
-
-                    const figRateWrap = el('div', { className: 'cba-note-mini' });
-                    figRateWrap.appendChild(el('span', { className: 'cba-note-mini-label' }, 'Rate'));
-                    const figRate = el('input', {
-                        type: 'number',
-                        className: 'cba-note-edit',
-                        min: '0',
-                        step: 'any',
-                        placeholder: 'Rate',
-                        value: noteRow.rate || 0
-                    });
-                    figRateWrap.appendChild(figRate);
-                    figQty.addEventListener('input', (e) => {
-                        noteRow.qty = parseFloat(e.target.value) || 0;
-                        if (qtyEditors[rowIndex]) qtyEditors[rowIndex].value = noteRow.qty;
-                        if (rateEditors[rowIndex]) rateEditors[rowIndex].value = noteRow.rate;
-                        if (recalcFns[rowIndex]) recalcFns[rowIndex]();
-                        subtotalBadge.textContent = `${sym}${Math.round((noteRow.qty || 0) * (noteRow.rate || 0)).toLocaleString()}`;
-                    });
-                    figRate.addEventListener('input', (e) => {
-                        noteRow.rate = parseFloat(e.target.value) || 0;
-                        if (qtyEditors[rowIndex]) qtyEditors[rowIndex].value = noteRow.qty;
-                        if (rateEditors[rowIndex]) rateEditors[rowIndex].value = noteRow.rate;
-                        if (recalcFns[rowIndex]) recalcFns[rowIndex]();
-                        subtotalBadge.textContent = `${sym}${Math.round((noteRow.qty || 0) * (noteRow.rate || 0)).toLocaleString()}`;
-                    });
-                    figWrap.appendChild(figQtyWrap);
-                    figWrap.appendChild(figRateWrap);
-                    fieldGrid.appendChild(buildField('Figures', figWrap, true));
-
-                    const pInp = el('textarea', {
-                        className: 'cba-note-edit',
-                        rows: '2'
-                    });
-                    pInp.value = note.parameters || '';
-                    parameterEditors[rowIndex] = pInp;
-                    pInp.addEventListener('input', (e) => {
-                        noteRow.noteDetails = noteRow.noteDetails || {};
-                        noteRow.noteDetails.parameters = e.target.value;
-                        noteRow.noteDetails.autoParams = false;
-                        syncRowQtyReasonFromNote(noteRow, sym);
-                    });
-                    const pWrap = el('div', { className: 'cba-note-field cba-note-field-wide' });
-                    pWrap.appendChild(el('label', { className: 'cba-note-label' }, 'Parameters'));
-                    pWrap.appendChild(pInp);
-                    const pTools = el('div', { className: 'cba-note-tools' });
-                    pTools.appendChild(el('button', {
-                        className: 'cba-note-sync-btn',
-                        onClick: () => {
-                            noteRow.noteDetails = noteRow.noteDetails || {};
-                            noteRow.noteDetails.autoParams = true;
-                            noteRow.noteDetails.parameters = '';
-                            syncRowQtyReasonFromNote(noteRow, sym);
-                            pInp.value = getRowQtyNoteParts(noteRow, sym).parameters;
-                        }
-                    }, 'Sync with Qty x Rate'));
-                    pWrap.appendChild(pTools);
-                    fieldGrid.appendChild(pWrap);
-
-                    const fInp = el('input', {
-                        type: 'text',
-                        className: 'cba-note-edit',
-                        value: note.formula || 'Qty x Rate'
-                    });
-                    fInp.addEventListener('input', (e) => {
-                        noteRow.noteDetails = noteRow.noteDetails || {};
-                        noteRow.noteDetails.formula = e.target.value;
-                        syncRowQtyReasonFromNote(noteRow, sym);
-                    });
-                    fieldGrid.appendChild(buildField('Formula', fInp, false));
-
-                    const srcInp = el('input', {
-                        type: 'text',
-                        className: 'cba-note-edit',
-                        value: noteRow.source || ''
-                    });
-                    srcInp.addEventListener('input', (e) => {
-                        noteRow.source = e.target.value;
-                    });
-                    fieldGrid.appendChild(buildField('Source', srcInp, false));
-
-                    const srcUrlInp = el('input', {
-                        type: 'url',
-                        className: 'cba-note-edit',
-                        value: noteRow.sourceUrl || sourceUrlForText(noteRow.source, noteRow.sourceUrl) || ''
-                    });
-                    srcUrlInp.addEventListener('input', (e) => {
-                        noteRow.sourceUrl = e.target.value;
-                    });
-                    fieldGrid.appendChild(buildField('Source URL', srcUrlInp, false));
-
-                    const noteSrcUrl = sourceUrlForText(noteRow.source, noteRow.sourceUrl);
-                    if (noteSrcUrl) {
-                        const srcLinkRow = el('div', { className: 'cba-note-field cba-note-field-wide' });
-                        srcLinkRow.appendChild(el('a', {
-                            href: noteSrcUrl,
-                            target: '_blank',
-                            rel: 'noopener noreferrer',
-                            className: 'cba-note-source-link'
-                        }, 'Open source'));
-                        fieldGrid.appendChild(srcLinkRow);
-                    }
-
-                    const ctxLines = getSourceContextLines(noteRow.source, noteRow.qtyReason);
-                    if (ctxLines.length > 0) {
-                        const ctx = el('div', { className: 'cba-note-context cba-note-field-wide' }, `Context: ${ctxLines.join(' ')}`);
-                        fieldGrid.appendChild(ctx);
-                    }
-
-                    line.appendChild(fieldGrid);
-
-                    notesDiv.appendChild(line);
-                });
-                bkPanel.appendChild(notesDiv);
-            }
 
             card.appendChild(bkPanel);
         }
@@ -2930,8 +2920,9 @@
                     const days = day.value || 0;
                     const wage = uiState.avgHourlyWage || 28; // STATEC median €28/hr
                     s.benefits.items.manhours = Math.round(days * 8 * wage);
-                    // insurance   = AAA Bonus-Malus % change is a ratio; set 0 (requires payroll to compute)
-                    // Leave insurance as-is — too payroll-dependent to auto-fill
+                    // insurance   = AAA Bonus-Malus % change is a ratio; reset to 0 because
+                    //               we now seed an editable Insurance row that needs payroll input.
+                    s.benefits.items.insurance = 0;
                     // Store rationales so user can see where each value came from
                     s.benefits.rationales = s.benefits.rationales || {};
                     s.benefits.rationales.injuryCost  =
@@ -2974,99 +2965,462 @@
                         ? `${incRate} case(s) per 100 FTE-year (approximately 1 case per ${formatNum(hoursPerCase)} man-hours worked)`
                         : 'no validated incident-rate anchor available in the current baseline';
 
-                    s.benefits.breakdowns = s.benefits.breakdowns || {};
-                    
-                    // Medical Cost template injection
-                    try {
-                        const medRows = CBA.buildTemplateRows('benefit', 'medical', 'per year');
-                        if (medRows && medRows.length > 0) {
-                            medRows[0].qty = (med.value || 0) > 0 ? 1 : 0;
-                            medRows[0].rate = med.value || 0;
-                            s.benefits.breakdowns.medical = medRows;
-                        }
-                    } catch(e) {}
+                    // Parse cost-component formulas produced by the baseline module or the AI.
+                    //
+                    // Handles all three styles the AI and baseline data produce:
+                    //
+                    //  Style A — bare-number '+' list (baseline default):
+                    //    "EUR 1,536 + 5,760 + 1,920 + 1,625 + 2,500 + 14,000 = EUR 27,341 (notes)"
+                    //
+                    //  Style B — labelled '+' list (AI-refreshed):
+                    //    "Direct medical €85,000 + ITM fines €60,000 + legal defence €80,000 = €580,000"
+                    //
+                    //  Style C — semicolon-separated with sub-formulas (AI-refreshed):
+                    //    "ITM admin: €4,000 × 15 workers = €60,000; criminal fine: €40,000;
+                    //     criminal defence: €80,000; mandatory PDCA: €20,000; total = €200,000"
+                    //
+                    // Returns [{ label, value, generic }] with ≥2 items, or [] if unsplittable.
+                    const parseBaselineComponents = (text) => {
+                        let raw = String(text || '').replace(/\n+/g, ' ').replace(/\s+/g, ' ').trim();
+                        if (!raw) return [];
 
-                    // Regulatory Cost template injection
-                    try {
-                        const regRows = CBA.buildTemplateRows('benefit', 'regulatory', 'one-off');
-                        if (regRows && regRows.length > 0) {
-                            regRows[0].qty = (reg.value || 0) > 0 ? 1 : 0;
-                            regRows[0].rate = reg.value || 0;
-                            s.benefits.breakdowns.regulatory = regRows;
-                        }
-                    } catch(e) {}
+                        // Strip all parenthetical commentary.
+                        raw = raw.replace(/\([^)]*\)/g, ' ').replace(/\s+/g, ' ').trim();
 
-                    // Manhours template injection
-                    try {
-                        const mhRows = CBA.buildTemplateRows('benefit', 'manhours', 'per year');
-                        if (mhRows && mhRows.length > 0) {
-                            mhRows[0].qty = hoursRecovered;
-                            mhRows[0].rate = wage;
-                            s.benefits.breakdowns.manhours = mhRows;
-                        }
-                    } catch(e) {}
+                        // Detect separator: prefer ';' when present, otherwise '+'.
+                        const hasSemi = raw.includes(';');
+                        const hasPlus = raw.includes('+');
+                        if (!hasSemi && !hasPlus) return [];
 
-                    // Injury Cost template injection
-                    try {
-                        const injRows = CBA.buildTemplateRows('benefit', 'injuryCost', 'per year');
-                        if (injRows && injRows.length > 0) {
-                            const formula = inj.rationaleFormula || '';
-                            let parsedSuccessfully = false;
-                            
-                            if (formula.includes('+') && formula.includes('=')) {
-                                const eqSplit = formula.split('=');
-                                const parts = eqSplit[0].split('+');
-                                let parsedRows = [];
-                                
-                                parts.forEach(part => {
-                                    // Match all currency amounts in the part
-                                    const regex = /[€\\$£]\s*([\d,.]+)/g;
-                                    let match;
-                                    let lastMatch = null;
-                                    while ((match = regex.exec(part)) !== null) {
-                                        lastMatch = match;
-                                    }
-                                    
-                                    if (lastMatch) {
-                                        const lbl = part.substring(0, lastMatch.index).replace(/^Direct\s+/i, '').trim();
-                                        const val = parseFloat(lastMatch[1].replace(/,/g, ''));
-                                        if (val > 0) {
-                                            parsedRows.push({ lbl, val });
-                                        }
-                                    }
-                                });
-                                
-                                if (parsedRows.length > 1) {
-                                    parsedSuccessfully = true;
-                                    // Map parsedRows into injRows
-                                    let targetIdx = 0;
-                                    parsedRows.forEach(pr => {
-                                        if (targetIdx < injRows.length) {
-                                            injRows[targetIdx].label = pr.lbl || injRows[targetIdx].label;
-                                            injRows[targetIdx].qty = 1;
-                                            injRows[targetIdx].rate = pr.val;
-                                            targetIdx++;
-                                        } else {
-                                            const newRow = JSON.parse(JSON.stringify(injRows[injRows.length-1]));
-                                            newRow.label = pr.lbl;
-                                            newRow.qty = 1;
-                                            newRow.rate = pr.val;
-                                            newRow.noteDetails.definition = 'From baseline: ' + pr.lbl;
-                                            injRows.push(newRow);
-                                        }
-                                    });
+                        if (hasSemi) {
+                            // Style C: strip trailing ";? total = €N ..." or "; total ..." clause only.
+                            raw = raw.replace(/\s*;?\s*(?:grand\s+)?total\b[^;]*$/i, '').trim();
+                        } else {
+                            // Styles A & B: strip a trailing "= EUR/€ N ..." at end of the whole string.
+                            raw = raw.replace(/\s*=\s*(?:EUR|USD|GBP|[€$£])\s*[\d,]+.*$/i, '').trim();
+                        }
+
+                        const parts = hasSemi
+                            ? raw.split(';').map(p => p.trim()).filter(Boolean)
+                            : raw.split('+').map(p => p.trim()).filter(Boolean);
+                        if (parts.length < 2) return [];
+
+                        const CUR_RE = /(?:EUR|USD|GBP|[€$£])\s*/gi;
+
+                        const parsed = [];
+                        parts.forEach((part, idx) => {
+                            // Strip currency symbols so numbers stand alone.
+                            const stripped = part.replace(CUR_RE, '').trim();
+                            if (!stripped) return;
+
+                            // For sub-formulas like "4,000 × 15 workers = 60,000":
+                            // take the result (number AFTER the '=').
+                            let value = 0;
+                            let valueStartIdx = -1;
+                            const eqIdx = stripped.lastIndexOf('=');
+                            if (eqIdx >= 0) {
+                                const afterEq = stripped.slice(eqIdx + 1).trim();
+                                const m = afterEq.match(/^([\d][\d,]*(?:\.\d+)?)/);
+                                if (m) {
+                                    value = parseFloat(m[1].replace(/,/g, ''));
+                                    valueStartIdx = eqIdx;
                                 }
                             }
-                            
-                            if (!parsedSuccessfully) {
-                                // Fallback if no clean parse
-                                injRows[0].qty = indirectOverhead > 0 ? 1 : 0;
-                                injRows[0].rate = indirectOverhead;
+                            // Fallback: take the LAST standalone number in the segment.
+                            if (!(value > 0)) {
+                                const allNums = [...stripped.matchAll(/([\d][\d,]*(?:\.\d+)?)/g)];
+                                if (!allNums.length) return;
+                                const lastNum = allNums[allNums.length - 1];
+                                value = parseFloat(lastNum[1].replace(/,/g, ''));
+                                valueStartIdx = lastNum.index;
                             }
-                            
-                            s.benefits.breakdowns.injuryCost = injRows;
+                            if (!(value > 0)) return;
+
+                            // Label = text before the value boundary, cleaned up.
+                            let label = (valueStartIdx > 0 ? stripped.slice(0, valueStartIdx) : stripped)
+                                .replace(/[\d,]+(?:\.\d+)?/g, '') // strip stray numbers from label
+                                .replace(/[×*/÷\-–]+/g, ' ')       // strip arithmetic operators
+                                .replace(/^(?:Why this value|Value|What|Audit basis|Formula)\s*:?\s*/i, '')
+                                .replace(/^Direct\s+/i, '')
+                                .replace(/^[\s:;,.]+|[\s:;,.]+$/g, '')
+                                .replace(/\s{2,}/g, ' ')
+                                .trim();
+
+                            const generic = !label || /^Component\s+\d+$/i.test(label);
+                            if (!label) label = `Component ${idx + 1}`;
+
+                            parsed.push({ label, value, generic });
+                        });
+
+                        return parsed.length >= 2 ? parsed : [];
+                    };
+
+                    const applySplitRowsFromText = (rows, text, fallbackValue, sourceText, sourceUrl, defaultLabel) => {
+                        if (!rows || rows.length === 0) return;
+
+                        const parsed = parseBaselineComponents(text);
+
+                        // ── Single-component fallback: collapse to one editable row.
+                        if (!parsed.length) {
+                            const r0 = rows[0];
+                            r0.label = r0.label || defaultLabel;
+                            r0.qty = fallbackValue > 0 ? 1 : 0;
+                            r0.rate = fallbackValue || 0;
+                            r0.source = sourceText || r0.source || 'Luxembourg baseline';
+                            r0.sourceUrl = sourceUrl || r0.sourceUrl || '';
+                            r0.noteDetails = Object.assign({}, r0.noteDetails || {}, {
+                                definition: r0.label,
+                                basis: 'Baseline figure applied from researched benchmark.',
+                                formula: 'Qty x Rate',
+                                autoParams: true
+                            });
+                            // Trim extra template scaffold rows so total = fallbackValue.
+                            rows.splice(1, rows.length - 1);
+                            syncRowQtyReasonFromNote(r0, sym);
+                            return;
                         }
-                    } catch(e) {}
+
+                        // ── Multi-component path: rebuild rows from parsed components,
+                        //    preserving rich template labels/definitions when the parsed
+                        //    label is generic ("Component N").
+                        const seed = rows[0] ? JSON.parse(JSON.stringify(rows[0])) : {
+                            label: defaultLabel,
+                            qty: 1,
+                            rate: 0,
+                            unit: 'per year',
+                            source: sourceText || 'Luxembourg baseline',
+                            sourceUrl: sourceUrl || '',
+                            noteDetails: { definition: defaultLabel, basis: '', parameters: '', formula: 'Qty x Rate', autoParams: true }
+                        };
+
+                        const rebuilt = parsed.map((item, idx) => {
+                            const tplRow = rows[idx] ? JSON.parse(JSON.stringify(rows[idx])) : JSON.parse(JSON.stringify(seed));
+                            const useParsedLabel = item.label && !item.generic;
+                            const finalLabel = useParsedLabel
+                                ? item.label
+                                : (tplRow.label || `${defaultLabel} ${idx + 1}`);
+                            const finalDef = useParsedLabel
+                                ? item.label
+                                : ((tplRow.noteDetails && tplRow.noteDetails.definition) || finalLabel);
+                            const finalBasis = useParsedLabel
+                                ? 'Component extracted from baseline rationale formula.'
+                                : ((tplRow.noteDetails && tplRow.noteDetails.basis)
+                                    ? `${tplRow.noteDetails.basis}\n\nValue prefilled from Luxembourg baseline component (${sym}${formatNum(item.value)}). Edit if your site differs.`
+                                    : 'Component prefilled from Luxembourg baseline.');
+
+                            tplRow.label = finalLabel;
+                            tplRow.qty = 1;
+                            tplRow.rate = item.value;
+                            tplRow.source = sourceText || tplRow.source || 'Luxembourg baseline';
+                            tplRow.sourceUrl = sourceUrl || tplRow.sourceUrl || '';
+                            tplRow.noteDetails = Object.assign({}, tplRow.noteDetails || {}, {
+                                definition: finalDef,
+                                basis: finalBasis,
+                                formula: 'Qty x Rate',
+                                autoParams: true
+                            });
+                            syncRowQtyReasonFromNote(tplRow, sym);
+                            return tplRow;
+                        });
+
+                        // Residual balancing line so subtotals equal fallbackValue.
+                        const parsedTotal = rebuilt.reduce((sum, r) => sum + ((Number(r.qty) || 0) * (Number(r.rate) || 0)), 0);
+                        const residual = Math.round((Number(fallbackValue) || 0) - parsedTotal);
+                        if (Math.abs(residual) > 1 && fallbackValue > 0) {
+                            const residualRow = JSON.parse(JSON.stringify(seed));
+                            residualRow.label = `Residual ${defaultLabel.toLowerCase()} factors`;
+                            residualRow.qty = 1;
+                            residualRow.rate = residual;
+                            residualRow.source = sourceText || residualRow.source || 'Luxembourg baseline';
+                            residualRow.sourceUrl = sourceUrl || residualRow.sourceUrl || '';
+                            residualRow.noteDetails = Object.assign({}, residualRow.noteDetails || {}, {
+                                definition: residualRow.label,
+                                basis: 'Balancing line so component subtotals equal the applied baseline value. Delete if you have itemised everything above.',
+                                formula: 'Qty x Rate',
+                                autoParams: true
+                            });
+                            syncRowQtyReasonFromNote(residualRow, sym);
+                            rebuilt.push(residualRow);
+                        }
+
+                        rows.splice(0, rows.length, ...rebuilt);
+                    };
+
+                    // ─────────────────────────────────────────────────────────────────────
+                    // DIRECT BREAKDOWN INJECTION
+                    // Build rows from scratch — no template lookup, no parser dependency.
+                    // Mark every row autoUpgraded=true so the render-time auto-upgrade
+                    // guard never replaces these rows with blank template rows.
+                    // ─────────────────────────────────────────────────────────────────────
+
+                    function makeRow(label, qty, rate, unit, source, sourceUrl, basis, noteOverride) {
+                        const definition = (noteOverride && noteOverride.definition) || label;
+                        const basisText  = (noteOverride && noteOverride.basis)       || basis || '';
+                        const formula    = (noteOverride && noteOverride.formula)     || 'Qty × Rate';
+                        const r = {
+                            label: label,
+                            qty: qty,
+                            rate: rate,
+                            unit: unit || 'per year',
+                            source: source || 'Luxembourg baseline',
+                            sourceUrl: sourceUrl || '',
+                            qtyReason: '',
+                            autoUpgraded: true,
+                            noteDetails: {
+                                definition: definition,
+                                basis: basisText,
+                                parameters: `Qty = ${qty}; Rate = ${sym}${formatNum(rate)} per ${unit || 'year'}`,
+                                formula: formula,
+                                autoParams: false
+                            }
+                        };
+                        r.qtyReason = `Audit basis: ${basisText || 'Baseline figure.'}; Parameters: ${r.noteDetails.parameters}; Formula: ${formula}`;
+                        return r;
+                    }
+
+                    // Look up a rich definition/basis/formula from COMPONENT_RATIONALE_MAP
+                    // for a component label extracted from the baseline formula string.
+                    function findComponentRationale(label, category) {
+                        const map = (typeof CBA !== 'undefined' && CBA.COMPONENT_RATIONALE_MAP) ? CBA.COMPONENT_RATIONALE_MAP : [];
+                        if (!label || !map.length) return null;
+                        const lc = String(label).toLowerCase();
+                        for (const entry of map) {
+                            if (entry.category && category && entry.category !== category) continue;
+                            if (entry.patterns.some(p => lc.includes(p))) return entry;
+                        }
+                        return null;
+                    }
+
+                    // Deduplicate text — removes repeated lines/phrases that appear twice
+                    // when rationaleFormula and notes both embed the same source citation.
+                    function dedupText(text) {
+                        const lines = String(text || '').split(/\n+/).map(l => l.trim()).filter(Boolean);
+                        const seen = new Set();
+                        return lines.filter(l => {
+                            const key = l.replace(/\s+/g, ' ').toLowerCase();
+                            if (seen.has(key)) return false;
+                            seen.add(key);
+                            return true;
+                        }).join('\n');
+                    }
+
+                    // Parse components from a formula string. Handles:
+                    //   Style A (valued): "EUR 1,536 + 5,760 + 1,920 = EUR 27,341"
+                    //   Style B (labelled+valued): "AAA medical €85,000 + ITM fines €60,000 + ... = €580,000"
+                    //   Style C (semicolon-separated): "ITM admin: €4,000 × 15 = €60,000; criminal fine: €40,000; total = €200,000"
+                    //   Style D (labels only, NO per-component values): "AAA medical + ITM fines + legal defence + ... = €580,000"
+                    //     → returns label-only rows (value=0, needsValue=true) so the user can fill in the individual amounts.
+                    // Returns [{label, value, needsValue?}] or [] if fewer than 2 components.
+                    function extractComponents(formulaText) {
+                        let raw = String(formulaText || '').replace(/\n+/g, ' ').replace(/\s+/g, ' ').trim();
+                        if (!raw) return [];
+                        raw = raw.replace(/\([^)]*\)/g, ' ').replace(/\s+/g, ' ').trim();
+
+                        // Prefer '+' separator over ';' — semicolon is often a sentence connector,
+                        // while '+' is the true arithmetic component separator.
+                        const isPlus = raw.includes('+');
+                        const isSemi = !isPlus && raw.includes(';');
+                        if (!isSemi && !isPlus) return [];
+
+                        // Strip trailing grand-total suffix before splitting
+                        if (isSemi) {
+                            raw = raw.replace(/\s*;?\s*(?:grand\s+)?total\b[^;]*$/i, '').trim();
+                        } else {
+                            raw = raw.replace(/\s*=\s*(?:EUR|USD|GBP|[€$£])?\s*[\d,]+\s*[KMkm]?\b.*$/i, '').trim();
+                        }
+
+                        const parts = (isSemi ? raw.split(';') : raw.split('+')).map(p => p.trim()).filter(Boolean);
+                        if (parts.length < 2) return [];
+
+                        const CUR = /(?:EUR|USD|GBP|[€$£])\s*/gi;
+                        const result = [];
+                        let allLabelOnly = true; // track whether ANY part has a numeric value
+
+                        // Numbers followed by these words are QUANTITIES/COUNTS, not EUR amounts
+                        const UNIT_WORD = /^(years?|months?|days?|workers?|employees?|persons?|hrs?|hours?|%|×|x\b)/i;
+
+                        parts.forEach((part, idx) => {
+                            const s2 = part.replace(CUR, '').trim();
+                            if (!s2) return;
+                            let value = 0, labelEnd = -1;
+
+                            // For "Label × N = Result" take the value after '='
+                            const eqPos = s2.lastIndexOf('=');
+                            if (eqPos >= 0) {
+                                const afterEq = s2.slice(eqPos + 1).trim();
+                                const m = afterEq.match(/^([\d][\d,]*(?:\.\d+)?)\s*([KMkm]?)\b/);
+                                if (m) {
+                                    const afterNum = afterEq.slice(m[0].length).trimStart();
+                                    if (!UNIT_WORD.test(afterNum)) {
+                                        let v = parseFloat(m[1].replace(/,/g, ''));
+                                        const suffix = m[2].toUpperCase();
+                                        if (suffix === 'K') v *= 1000;
+                                        else if (suffix === 'M') v *= 1000000;
+                                        if (v > 0) { value = v; labelEnd = eqPos; }
+                                    }
+                                }
+                            }
+                            // Fallback: scan numbers from the end, skip unit-count numbers
+                            // e.g. "capitalised at 7 years" → skip 7; "€27,341" → use 27341
+                            if (!(value > 0)) {
+                                const nums = [...s2.matchAll(/([\d][\d,]*(?:\.\d+)?)\s*([KMkm]?)\b/g)];
+                                for (let ni = nums.length - 1; ni >= 0; ni--) {
+                                    const last = nums[ni];
+                                    const afterNum = s2.slice(last.index + last[0].length).trimStart();
+                                    if (UNIT_WORD.test(afterNum)) continue; // "7 years", "15 workers" etc → skip
+                                    let v = parseFloat(last[1].replace(/,/g, ''));
+                                    const sfx = last[2].toUpperCase();
+                                    if (sfx === 'K') v *= 1000;
+                                    else if (sfx === 'M') v *= 1000000;
+                                    if (v > 0) { value = v; labelEnd = last.index; break; }
+                                }
+                            }
+
+                            let label = (labelEnd > 0 ? s2.slice(0, labelEnd) : s2)
+                                .replace(/[\d,]+(?:\.\d+)?\s*[KMkm]?\b/g, '')
+                                .replace(/[×*/÷\-–]+/g, ' ')
+                                .replace(/^(?:why this value|value|what|audit basis|formula)\s*:?\s*/i, '')
+                                .replace(/^direct\s+/i, '')
+                                .replace(/^[\s:;,.]+|[\s:;,.]+$/g, '')
+                                .replace(/\s{2,}/g, ' ').trim();
+                            if (!label) label = `Component ${idx + 1}`;
+
+                            if (value > 0) {
+                                allLabelOnly = false;
+                                result.push({ label, value });
+                            } else {
+                                result.push({ label, value: 0, needsValue: true });
+                            }
+                        });
+
+                        if (result.length < 2) return [];
+
+                        // Style D — all labels with no individual values: still return the
+                        // label list so the user gets pre-named rows to fill in individually.
+                        // (The caller distributes the baseline total or leaves at 0.)
+                        return result;
+                    }
+
+                    s.benefits.breakdowns = s.benefits.breakdowns || {};
+
+                    // ── Injury Cost (non-medical iceberg)
+                    // Helper — build formula text from an entry's rationaleFormula + notes,
+                    // deduplicating repeated lines so the source citation never shows twice.
+                    function entryFormula(entry) {
+                        const rf = String(entry.rationaleFormula || '').trim();
+                        const nt = String(entry.notes || '').trim();
+                        // Use rationaleFormula as primary; append notes only if it adds content
+                        // not already present in rationaleFormula (simple substring check).
+                        if (!nt || rf.toLowerCase().includes(nt.toLowerCase().slice(0, 40))) return rf;
+                        return dedupText(`${rf}\n${nt}`);
+                    }
+
+                    // Helper — inject comps into rows:
+                    //   • Valued comps  → direct row-per-component + optional balancing row
+                    //   • Label-only    → spread total equally, label each row
+                    //   • Fallback      → template rows or single named row
+                    // Each row receives a rich noteDetails pulled from COMPONENT_RATIONALE_MAP
+                    // so users can read the audit narrative without leaving the table.
+                    function buildBenefitRows(comps, totalValue, unit, src, srcUrl, basisDefault, tplKey) {
+                        if (comps.length >= 2) {
+                            const hasValues = comps.some(c => c.value > 0);
+                            if (hasValues) {
+                                const rows = comps.map(c => {
+                                    const note = findComponentRationale(c.label, tplKey);
+                                    return makeRow(c.label, 1, c.value, unit, src, srcUrl,
+                                        note ? note.basis : basisDefault,
+                                        note ? { definition: note.definition, basis: note.basis, formula: note.formula } : null);
+                                });
+                                const sum = comps.reduce((t, c) => t + c.value, 0);
+                                const diff = Math.round(totalValue - sum);
+                                if (Math.abs(diff) > 1 && totalValue > 0) {
+                                    rows.push(makeRow('Residual / unallocated', 1, diff, unit, src, srcUrl,
+                                        'Balancing line — the component subtotals above differ from the baseline total. Review and adjust the individual rows to match your site conditions, then remove this row.'));
+                                }
+                                return rows;
+                            } else {
+                                // Label-only: distribute total equally, each row gets the rationale
+                                const share = comps.length > 0 ? Math.round(totalValue / comps.length) : 0;
+                                return comps.map((c, i) => {
+                                    const note = findComponentRationale(c.label, tplKey);
+                                    const rowRate = i < comps.length - 1 ? share : totalValue - share * (comps.length - 1);
+                                    return makeRow(c.label, 1, rowRate, unit, src, srcUrl,
+                                        note ? note.basis : `Estimated equal share of ${sym}${formatNum(totalValue)} baseline total. No per-component value was found in the source formula — update each row with the actual split.`,
+                                        note ? { definition: note.definition, basis: note.basis, formula: note.formula } : null);
+                                });
+                            }
+                        }
+                        // Fallback — template rows or single row
+                        const tplRows = tplKey && typeof CBA !== 'undefined' && CBA.buildTemplateRows
+                            ? CBA.buildTemplateRows('benefit', tplKey, unit) : [];
+                        if (tplRows.length > 0) {
+                            return tplRows.map((t, i) => Object.assign({}, t, {
+                                qty: i === 0 ? 1 : 0,
+                                rate: i === 0 ? totalValue : 0,
+                                unit: unit,
+                                autoUpgraded: true,
+                                source: src,
+                                noteDetails: Object.assign({}, t.noteDetails || {}, { autoParams: false })
+                            }));
+                        }
+                        return [makeRow(basisDefault || 'Cost component', 1, totalValue, unit, src, srcUrl,
+                            'Baseline total — edit or add rows to break this into sub-components.')];
+                    }
+
+                    // ── Injury Cost (non-medical iceberg)
+                    {
+                        const comps = extractComponents(entryFormula(inj));
+                        s.benefits.breakdowns.injuryCost = buildBenefitRows(
+                            comps, indirectOverhead, 'per year',
+                            inj.source || 'Luxembourg baseline', inj.sourceUrl || '',
+                            'Non-medical injury impact (MDE deadweight, productivity loss, admin, AAA Malus).',
+                            'injuryCost');
+                    }
+
+                    // ── Medical Cost
+                    {
+                        const comps = extractComponents(entryFormula(med));
+                        s.benefits.breakdowns.medical = buildBenefitRows(
+                            comps, med.value || 0, 'per year',
+                            med.source || 'Luxembourg baseline', med.sourceUrl || '',
+                            'Direct AAA/CNS-covered medical and rehabilitation cost per prevented case.',
+                            'medical');
+                    }
+
+                    // ── Regulatory Fine
+                    {
+                        const comps = extractComponents(entryFormula(reg));
+                        s.benefits.breakdowns.regulatory = buildBenefitRows(
+                            comps, reg.value || 0, 'one-off',
+                            reg.source || 'Luxembourg baseline', reg.sourceUrl || '',
+                            'Expected ITM fine / enforcement exposure avoided per serious violation.',
+                            'regulatory');
+                    }
+
+                    // ── Man-Hours
+                    {
+                        s.benefits.breakdowns.manhours = [
+                            makeRow(
+                                `Recovered hours — ${days} day(s) × 8 hr/day`,
+                                hoursRecovered, wage, 'per year',
+                                day.source || 'Luxembourg STATEC / baseline', day.sourceUrl || '',
+                                `Severity ${sev}: ${days} day(s) away from work × 8 hours = ${hoursRecovered} hours recovered per prevented case. Hourly wage: ${sym}${formatNum(wage)}/hr (STATEC 2024 median). ${incidenceNarrative}.`
+                            )
+                        ];
+                    }
+
+                    // ── Insurance (AAA Bonus-Malus placeholder)
+                    {
+                        const ins = bundle.insurancePremiumChangePct || {};
+                        s.benefits.breakdowns.insurance = [
+                            makeRow(
+                                'AAA Bonus-Malus premium impact — enter your annual payroll',
+                                0, 0, 'per year',
+                                ins.source || 'AAA Bonus-Malus tables', ins.sourceUrl || '',
+                                `Effective AAA rate = 0.70% × bonus-malus factor (0.85–1.50). Preventing this case avoids a Malus step. Set Qty = your annual gross payroll (€) and Rate = the avoided rate increment (e.g., 0.003 for a 0.3 percentage-point increase).`
+                            )
+                        ];
+                    }
 
                     normalizeInjuryMedicalBenefitSeparation(s);
 
@@ -3083,7 +3437,7 @@
             strip.appendChild(el('span', { className: 'font-semibold' }, '✅ Baseline figures applied'));
             const sevValue = normalizeScaleValue('severity', s.currentRisk.severity || 1, 1);
             const sevBand = toBaselineSeverityLevel(sevValue);
-            strip.appendChild(document.createTextNode(` — Severity S=${formatScaleValue(sevValue)} mapped to baseline level ${sevBand} (${baselineSeverityName(sevBand)}) values pre-filled into Injury Cost, Medical, Regulatory Fine & Man-Hours with editable split rows. Insurance requires your payroll figure. Edit any value freely.`));
+            strip.appendChild(document.createTextNode(` — Severity S=${formatScaleValue(sevValue)} mapped to baseline level ${sevBand} (${baselineSeverityName(sevBand)}) values pre-filled into Injury Cost, Medical, Regulatory Fine, Man-Hours & Insurance with editable split rows. Insurance row needs your payroll figure to compute the saving. Edit any value freely.`));
             strip.appendChild(el('button', {
                 className: 'ml-auto text-violet-400 hover:text-violet-700 font-bold',
                 onClick: () => { uiState.baselineApplied = false; render(); }
@@ -4389,14 +4743,18 @@
                         const basis = note.basis || parsed.basis || '';
                         const parameters = note.parameters || parsed.parameters || '';
                         const formula = note.formula || String(parsed.formula || '').replace(/^Formula\s*=\s*/i, '') || '';
+                    const qty = Number(row.qty) || 0;
+                    const rate = Number(row.rate) || 0;
+                    const subtotal = qty * rate;
                         const ctx = htmlSourceContext(row.source, row.qtyReason);
                         const srcUrl = sourceUrlForText(row.source, row.sourceUrl);
             return `
               <div style="margin-top:5px;padding:6px 8px;background:#ffffff;border:1px solid #e2e8f0;border-radius:6px;">
-                                ${definition ? `<div style="font-size:11px;line-height:1.45;color:#475569;"><b style="color:#1e293b;">Definition:</b> ${definition}</div>` : ''}
-                                ${basis ? `<div style="font-size:11px;line-height:1.45;color:#475569;margin-top:2px;"><b style="color:#1e293b;">Basis:</b> ${basis}</div>` : ''}
-                                ${parameters ? `<div style="font-size:11px;line-height:1.45;color:#475569;margin-top:2px;"><b style="color:#1e293b;">Parameters:</b> ${parameters}</div>` : ''}
-                                ${formula ? `<div style="font-size:11px;line-height:1.45;color:#475569;margin-top:2px;"><b style="color:#1e293b;">Formula:</b> ${formula}</div>` : ''}
+                        ${definition ? `<div style="font-size:11px;line-height:1.45;color:#475569;"><b style="color:#1e293b;">Component:</b> ${definition}</div>` : ''}
+                        <div style="font-size:11px;line-height:1.45;color:#475569;margin-top:2px;"><b style="color:#1e293b;">Rationale:</b> ${basis || 'No rationale provided.'}</div>
+                        <div style="font-size:11px;line-height:1.45;color:#475569;margin-top:2px;"><b style="color:#1e293b;">Calculation:</b> ${formatNum(qty)} × ${sym}${formatNum(rate)} = ${sym}${fmtN(subtotal)}</div>
+                        ${parameters ? `<div style="font-size:11px;line-height:1.45;color:#475569;margin-top:2px;"><b style="color:#1e293b;">Inputs:</b> ${parameters}</div>` : ''}
+                        ${formula ? `<div style="font-size:11px;line-height:1.45;color:#475569;margin-top:2px;"><b style="color:#1e293b;">Formula:</b> ${formula}</div>` : ''}
                                 <div style="font-size:11px;line-height:1.45;color:#475569;margin-top:3px;"><b style="color:#1e293b;">Source:</b> ${row.source ? htmlTermLink(row.source) : 'Not specified'}${srcUrl ? ` <a href="${srcUrl}" target="_blank" rel="noopener noreferrer">[source]</a>` : ''}</div>
                 ${ctx.length ? `<div style="margin-top:4px;font-size:10px;line-height:1.4;color:#0f766e;background:#f0fdfa;border:1px solid #99f6e4;border-radius:5px;padding:4px 6px;"><b>Context:</b> ${ctx.join(' ')}</div>` : ''}
               </div>`;
@@ -4418,8 +4776,8 @@
                                 const srcHtml = bk.source
                                         ? `📎 ${htmlTermLink(bk.source)}${srcUrl ? ` <a href="${srcUrl}" target="_blank" rel="noopener noreferrer">[source]</a>` : ''}`
                                         : '';
-                                const qtyNoteHtml = (bk.qtyReason || bk.noteDetails) ? `
-              <tr class="qty-note"><td colspan="8" style="padding:2px 12px 8px 44px;font-size:11px;color:#64748b;font-style:italic;">
+                                const rationaleHtml = (bk.qtyReason || bk.noteDetails) ? `
+              <tr class="bkdn-rationale"><td colspan="8" style="padding:2px 12px 8px 44px;font-size:11px;color:#64748b;font-style:italic;">
                                                                 ${htmlQtyReasonBlock(bk)}
               </td></tr>` : '';
                 return `
@@ -4432,7 +4790,7 @@
                 <td style="text-align:right;font-size:12px;font-weight:600;padding:5px 8px;">${sym}${fmtN((bk.qty||0)*(bk.rate||0))}</td>
                 <td style="font-size:10px;color:#94a3b8;padding:5px 8px;font-style:italic;">${bk.unit || ''}</td>
                 <td style="font-size:10px;color:#94a3b8;padding:5px 8px;">${srcHtml}</td>
-              </tr>${qtyNoteHtml}`;
+                            </tr>${rationaleHtml}`;
             }).join('');
             return `
               <tr><td colspan="2" style="padding:0;">
@@ -4463,7 +4821,7 @@
                 const bkRowsHtml = bkRows.map(bk => {
                     const srcUrl = sourceUrlForText(bk.source, bk.sourceUrl);
                     const srcHtml = bk.source ? `<span style="font-size:10px;color:#94a3b8;font-style:italic;">📎 ${htmlTermLink(bk.source)}${srcUrl ? ` <a href="${srcUrl}" target="_blank" rel="noopener noreferrer">[source]</a>` : ''}</span>` : '';
-                                        const qtyNoteHtml = (bk.qtyReason || bk.noteDetails) ? `<tr><td colspan="8" style="padding:3px 10px 7px 36px;font-size:11px;color:#64748b;background:linear-gradient(to right,#f0f9ff88,#f8fafc44);">${htmlQtyReasonBlock(bk)}</td></tr>` : '';
+                                                                                const rationaleHtml = (bk.qtyReason || bk.noteDetails) ? `<tr><td colspan="8" style="padding:3px 10px 7px 36px;font-size:11px;color:#64748b;background:linear-gradient(to right,#f0f9ff88,#f8fafc44);">${htmlQtyReasonBlock(bk)}</td></tr>` : '';
                     return `<tr style="border-bottom:1px solid ${accent.bkAccent}22;">
                       <td style="padding:6px 8px 6px 14px;font-size:12px;color:#475569;">${bk.label || '—'}<br>${srcHtml}</td>
                       <td style="padding:6px 8px;text-align:center;font-weight:600;font-size:13px;">${bk.qty}</td>
@@ -4471,19 +4829,9 @@
                       <td style="padding:6px 8px;text-align:center;font-weight:600;font-size:13px;">${bk.rate}</td>
                       <td style="padding:6px 4px;text-align:center;font-size:11px;color:#94a3b8;">=</td>
                       <td style="padding:6px 10px;text-align:right;font-weight:700;font-size:13px;color:${accent.chip};">${sym}${fmtN((bk.qty||0)*(bk.rate||0))}</td>
-                      <td style="padding:6px 8px;font-size:10px;color:#94a3b8;white-space:nowrap;">${bk.unit||''}</td>
-                    </tr>${qtyNoteHtml}`;
+                                            <td style="padding:6px 8px;font-size:10px;color:#94a3b8;white-space:nowrap;">${bk.unit||''}</td>
+                                        </tr>${rationaleHtml}`;
                 }).join('');
-
-                // ── Quantity notes footer ──
-                                const qtNotes = bkRows.filter(r => r.qtyReason || r.noteDetails);
-                const qtNotesHtml = qtNotes.length ? `
-                  <div style="margin-top:10px;padding:10px 14px;background:${accent.notesBg};border-top:1px dashed ${accent.bkAccent};border-radius:0 0 8px 8px;font-size:11px;">
-                    <div style="font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.06em;font-size:10px;margin-bottom:5px;">Quantity Notes:</div>
-                                        ${qtNotes.map(n => {
-                                                                                                return `<div style="margin-bottom:5px;"><div style="font-size:11px;font-weight:700;color:#334155;margin-bottom:3px;">• ${n.label}</div>${htmlQtyReasonBlock(n)}</div>`;
-                                        }).join('')}
-                  </div>` : '';
 
                 // ── Unit & sigma row ──
                 const units = [...new Set(bkRows.map(r => r.unit).filter(Boolean))].join(' / ');
@@ -4513,7 +4861,6 @@
                         <tbody>${bkRowsHtml}</tbody>
                         ${unitSigmaHtml}
                       </table>
-                      ${qtNotesHtml}
                     </div>
                   </details>` : '';
 
@@ -4667,7 +5014,7 @@
   .term-def { font-size: 12px; color: #475569; margin-top: 2px; line-height: 1.5; }
   .term-link { color: #4f46e5; font-weight: 600; border-bottom: 1px dashed #4f46e5; text-decoration: none; cursor: pointer; }
   .term-link:hover { color: #3730a3; }
-  .qty-note td { background: linear-gradient(to right, #f0f9ff, #f8fafc); }
+    .bkdn-rationale td { background: linear-gradient(to right, #f0f9ff, #f8fafc); }
   .rationale-row td { padding: 0 12px 10px; }
   .rationale-box { border-left: 3px solid; padding: 7px 12px; font-size: 12px; color: #475569; font-style: italic; border-radius: 0 6px 6px 0; }
   details > summary::marker, details > summary::-webkit-details-marker { display:none; }
