@@ -3202,6 +3202,18 @@
             "Occupational disease/illness not otherwise listed",
             "Work related injury not otherwise listed"
         ];
+
+        // Keep master registries alphabetically ordered so all dependent dropdowns
+        // are consistently sorted wherever they are rendered.
+        const sortedHazardEntries = Object.entries(HAZARD_REGISTRY)
+            .sort((a, b) => a[0].localeCompare(b[0], undefined, { sensitivity: 'base' }));
+        Object.keys(HAZARD_REGISTRY).forEach(key => delete HAZARD_REGISTRY[key]);
+        sortedHazardEntries.forEach(([key, value]) => {
+            HAZARD_REGISTRY[key] = value;
+        });
+
+        CONSEQUENCE_REGISTRY.sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+
         const FREQUENCY_SCALE = { "1": "RARELY (<30 min/day)", "1.25": "OCCASIONAL (<2 hrs/wk)", "1.5": "INTERMEDIATE (2-8 hrs/wk)", "1.75": "FREQUENTLY (1-3 days/wk)", "2": "PERMANENT (>3 days/wk)" };
         const SEVERITY_SCALE = { "1": "No potential of injury", "3": "Potential of FIRST AID", "5": "Potential of MEDICAL TREATMENT", "7": "Potential of DART", "9": "Potential of SIA", "10": "Potential of Fatality" };
         const LIKELIHOOD_SCALE = { "1": "Almost impossible", "3": "Very unlikely", "5": "Possible to happen", "8": "Likely to happen", "10": "Very likely to happen" };
