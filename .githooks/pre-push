@@ -1,0 +1,54 @@
+#!/bin/sh
+set -eu
+
+remote_name="${1:-unknown}"
+remote_url="${2:-unknown}"
+repo_root="$(git rev-parse --show-toplevel)"
+history_dir="${repo_root}/.local/commit-history"
+zero40="0000000000000000000000000000000000000000"
+
+sanitize_key() {
+    echo "$1" | tr '/\\ :*?"<>|' '_' | tr -cd 'A-Za-z0-9._-'
+}
+
+remote_key="$(sanitize_key "$remote_name")"
+if [ -z "$remote_key" ]; then
+    remote_key="unknown"
+fi
+
+mkdir -p "$history_dir"
+log_file="${history_dir}/${remote_key}.log"
+
+if [ ! -f "$log_file" ]; then
+    {
+        printf 'remote=%s\n' "$remote_name"
+        printf 'url=%s\n' "$remote_url"
+        printf 'format=timestamp|remote|branch|commit|subject\n\n'
+    } > "$log_file"
+fi
+
+while read -r local_ref local_sha remote_ref remote_sha
+do
+    if [ -z "${local_sha:-}" ] || [ "$local_sha" = "$zero40" ]; then
+        continue
+    fi
+
+    branch="${local_ref#refs/heads/}"
+
+    if [ "${remote_sha:-$zero40}" = "$zero40" ]; then
+        commits="$(git rev-list "$local_sha" --not --remotes="$remote_name" 2>/dev/null || git rev-list "$local_sha")"
+    else
+        commits="$(git rev-list "$remote_sha..$local_sha")"
+    fi
+
+    for sha in $commits
+    do
+        if [ -f "$log_file" ] && grep -Fq "|$sha|" "$log_file"; then
+            continue
+        fi
+
+        timestamp="$(git show -s --format=%cI "$sha")"
+        subject="$(git show -s --format=%s "$sha" | tr '|\r\n' '/  ')"
+        printf '%s|%s|%s|%s|%s\n' "$timestamp" "$remote_name" "$branch" "$sha" "$subject" >> "$log_file"
+    done
+done

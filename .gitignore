@@ -25,3 +25,6 @@ Testing minimalui.HTML
 # Personal batch upload template
 Risk_Registry_Batch_Upload_Template.xlsx
 
+# Local per-remote commit/push history tracker files
+.local/commit-history/
+
