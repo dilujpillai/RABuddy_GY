@@ -28,3 +28,6 @@ Risk_Registry_Batch_Upload_Template.xlsx
 # Local per-remote commit/push history tracker files
 .local/commit-history/
 
+# SaaS planning docs (local planning workspace only)
+saas-plan/
+

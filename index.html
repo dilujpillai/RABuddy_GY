@@ -2772,7 +2772,6 @@
             };
             return String(text).replace(/[&<>"']/g, m => map[m]);
         };
-        window.escapeHtml = escapeHtml;
 
         // --- AUTO-DETECT LANGUAGE FROM CONTENT ---
         const detectLanguageFromContent = (text) => {
@@ -11915,7 +11914,7 @@ async function loadFile(file) {
             const matchOption = (itemVal, options) => {
                 if (!itemVal) return '';
                 const itemStr = String(itemVal).trim().toUpperCase();
-                const itemNum = parseFloat(itemStr);
+                const itemNum = parseFloat(itemVal);
                 
                 for (const opt of options) {
                     if (!opt.val) continue; // Skip "Not set" option
@@ -12705,7 +12704,9 @@ async function loadSourceImages(sheetIndex) {
                 downloadedAt: c.state.downloadedAt || '',
                 errorMsg: ''
             })),
-            activeIdx: 0
+            activeIdx: 0,
+            search: '',
+            searchSelectedOnly: false
         };
 
         function persistTabMeta(tab) {
@@ -12974,6 +12975,7 @@ async function loadSourceImages(sheetIndex) {
                 function getTabStatusInfo(tab) {
                         if (tab.downloadedAt) return { cls: 'mt-status-dl', label: 'Downloaded', meta: fmtWhen(tab.downloadedAt) };
                         if (tab.status === 'done' && tab.aiRows.length > 0) return { cls: 'mt-status-done', label: 'AI ready', meta: fmtWhen(tab.processedAt) };
+                    if (tab.status === 'cancelled') return { cls: 'mt-status-skip', label: 'Cancelled', meta: tab.errorMsg || '' };
                         if (tab.status === 'failed') return { cls: 'mt-pill-mm', label: 'Failed', meta: tab.errorMsg || '' };
                         if (tab.status === 'processing') return { cls: 'mt-status-proc', label: 'Processing', meta: '' };
                         if (tab.selected) return { cls: 'mt-status-proc', label: 'Queued', meta: '' };
@@ -13768,48 +13770,61 @@ async function loadSourceImages(sheetIndex) {
                         const downloadedCount = wiz.tabs.filter(t => !!t.downloadedAt).length;
                         const queuedCount = wiz.tabs.filter(t => t.selected && !(t.status === 'done' && t.aiRows.length > 0)).length;
 
+                        const queryRaw = String(wiz.search || '').trim();
+                        const query = queryRaw.toLowerCase();
+                        const onlySelected = !!wiz.searchSelectedOnly;
+
+                        const highlightSheetName = (name) => {
+                            const raw = String(name || '');
+                            if (!queryRaw) return escH(raw);
+
+                            const lowerRaw = raw.toLowerCase();
+                            let cursor = 0;
+                            let out = '';
+
+                            while (cursor < raw.length) {
+                                const matchAt = lowerRaw.indexOf(query, cursor);
+                                if (matchAt === -1) {
+                                    out += escH(raw.slice(cursor));
+                                    break;
+                                }
+                                out += escH(raw.slice(cursor, matchAt));
+                                out += `<mark class="bg-amber-200 text-slate-900 px-0.5 rounded">${escH(raw.slice(matchAt, matchAt + queryRaw.length))}</mark>`;
+                                cursor = matchAt + queryRaw.length;
+                            }
+
+                            return out;
+                        };
+
+                        const filteredTabs = wiz.tabs
+                            .map((t, i) => ({ t, i }))
+                            .filter(({ t }) => {
+                                const nameMatch = !query || String(t.sheet && t.sheet.name || '').toLowerCase().includes(query);
+                                const selectedMatch = !onlySelected || !!t.selected;
+                                return nameMatch && selectedMatch;
+                            });
+                        const visibleTotal = filteredTabs.length;
+                        const visibleSelCount = filteredTabs.filter(({ t }) => t.selected).length;
+
                         if (!wiz.tabs[wiz.activeIdx]) wiz.activeIdx = 0;
+                        if (filteredTabs.length > 0 && !filteredTabs.some(({ i }) => i === wiz.activeIdx)) {
+                            wiz.activeIdx = filteredTabs[0].i;
+                        }
 
-                        bodyEl.innerHTML = `
-<div class="p-7">
-    <div class="mb-4">
-        <h2 class="text-lg font-bold text-slate-800">Select sheets and verify mapped columns before AI</h2>
-        <p class="text-sm text-slate-500 mt-1">Click a tab row to inspect its exact Excel columns in the large preview. Update mapping on the right; it auto-applies instantly.</p>
-    </div>
-
-    <div class="flex gap-2 mb-3 flex-wrap">
-        <button id="mtSelAll" class="rab-btn rab-c-slate">Select all</button>
-        <button id="mtSelNone" class="rab-btn rab-c-slate" style="background:#94a3b8 !important;">Deselect all</button>
-        <button id="mtSelNonEmpty" class="rab-btn rab-c-slate" style="background:#0f766e !important;">Only with >=3 rows</button>
-    </div>
-
-    <div class="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm mb-4">
-        <table class="w-full text-sm">
-            <thead class="bg-slate-100 text-slate-600 text-xs uppercase tracking-wider">
-                <tr>
-                    <th class="p-3 text-left w-12"><input type="checkbox" id="mtSelHead" ${selCount===total && total>0?'checked':''}></th>
-                    <th class="p-3 text-left w-10">#</th>
-                    <th class="p-3 text-left">Sheet name</th>
-                    <th class="p-3 text-right">Rows detected</th>
-                    <th class="p-3 text-right">Images</th>
-                    <th class="p-3 text-left">Status</th>
-                    <th class="p-3 text-left">Preview</th>
-                </tr>
-            </thead>
-            <tbody>
-                ${wiz.tabs.map((t, i) => {
-                        const imgCount = Object.keys(t.state.imagesByRow || {}).length;
-                        const lowData = t.state.fullData.length < 3;
-                        const st = getTabStatusInfo(t);
-                        const audit = fuzzyMappingAudit(t);
-                        const prevCls = audit.issues.length > 0 ? 'mt-prev-pill mt-prev-bad' : 'mt-prev-pill';
-                        const prevTxt = audit.issues.length > 0 ? `Preview · ${audit.issues.length}` : 'Preview';
-                        const activeCls = i === wiz.activeIdx ? 'bg-blue-50' : 'hover:bg-slate-50';
-                        return `
+                        const tableRowsHtml = filteredTabs.length > 0
+                            ? filteredTabs.map(({ t, i }) => {
+                                const imgCount = Object.keys(t.state.imagesByRow || {}).length;
+                                const lowData = t.state.fullData.length < 3;
+                                const st = getTabStatusInfo(t);
+                                const audit = fuzzyMappingAudit(t);
+                                const prevCls = audit.issues.length > 0 ? 'mt-prev-pill mt-prev-bad' : 'mt-prev-pill';
+                                const prevTxt = audit.issues.length > 0 ? `Preview · ${audit.issues.length}` : 'Preview';
+                                const activeCls = i === wiz.activeIdx ? 'bg-blue-50' : 'hover:bg-slate-50';
+                                return `
                 <tr class="border-t border-slate-100 mt-sel-pick ${activeCls}" data-i="${i}">
                     <td class="p-3"><input type="checkbox" class="mt-sel-row" data-i="${i}" ${t.selected?'checked':''}></td>
                     <td class="p-3 text-slate-400">${i+1}</td>
-                    <td class="p-3 font-semibold text-slate-700">${escH(t.sheet.name)}</td>
+                    <td class="p-3 font-semibold text-slate-700">${highlightSheetName(t.sheet.name)}</td>
                     <td class="p-3 text-right ${lowData?'text-amber-600':''}">${t.state.fullData.length}${lowData?' !':''}</td>
                     <td class="p-3 text-right text-slate-500">${imgCount}</td>
                     <td class="p-3">
@@ -13818,7 +13833,50 @@ async function loadSourceImages(sheetIndex) {
                     </td>
                     <td class="p-3"><button class="mt-open-prev ${prevCls}" data-i="${i}">${prevTxt}</button></td>
                 </tr>`;
-                }).join('')}
+                            }).join('')
+                            : `<tr><td colspan="7" class="p-6 text-center text-sm text-slate-500">No sheets match this search.</td></tr>`;
+
+                        bodyEl.innerHTML = `
+<div class="p-7">
+    <div class="mb-4">
+        <h2 class="text-lg font-bold text-slate-800">Select sheets and verify mapped columns before AI</h2>
+        <p class="text-sm text-slate-500 mt-1">Click a tab row to inspect its exact Excel columns in the large preview. Update mapping on the right; it auto-applies instantly.</p>
+    </div>
+
+    <div class="flex gap-2 mb-3 flex-wrap items-center">
+        <button id="mtSelAll" class="rab-btn rab-c-slate">Select all</button>
+        <button id="mtSelNone" class="rab-btn rab-c-slate" style="background:#94a3b8 !important;">Deselect all</button>
+        <button id="mtSelNonEmpty" class="rab-btn rab-c-slate" style="background:#0f766e !important;">Only with >=3 rows</button>
+    </div>
+
+    <div class="text-xs text-slate-500 mb-2">Showing ${visibleTotal} of ${total} sheet(s)${onlySelected ? ' · selected only' : ''}${queryRaw ? ` · search: "${escH(queryRaw)}"` : ''}</div>
+
+    <div class="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm mb-4">
+        <table class="w-full text-sm">
+            <thead class="bg-slate-100 text-slate-600 text-xs uppercase tracking-wider">
+                <tr>
+                    <th class="p-3 text-left w-12"><input type="checkbox" id="mtSelHead" ${visibleSelCount===visibleTotal && visibleTotal>0?'checked':''} ${visibleTotal===0?'disabled':''}></th>
+                    <th class="p-3 text-left w-10">#</th>
+                    <th class="p-3 text-left">
+                        <div class="flex flex-col gap-1.5">
+                            <span>Sheet name</span>
+                            <div class="normal-case tracking-normal">
+                                <div class="flex items-center gap-1 w-full max-w-[520px] rounded-md border border-slate-200 bg-slate-50 px-1 py-1">
+                                    <input id="mtTabSearch" type="text" placeholder="Search..." title="Search by tab name" aria-label="Search by tab name" value="${escAttr(wiz.search || '')}" class="h-7 flex-1 min-w-[150px] border-0 bg-transparent px-2 text-xs text-slate-700 placeholder:text-slate-400 focus:outline-none">
+                                    <button id="mtTabSearchClear" type="button" class="h-7 rounded-md border border-slate-200 bg-white px-2 text-[11px] font-medium text-slate-600 hover:bg-slate-100" ${wiz.search ? '' : 'disabled'}>Clear</button>
+                                    <button id="mtSelOnlyToggle" type="button" class="h-7 rounded-md border px-2 text-[11px] font-medium" style="${onlySelected ? 'background:#e2e8f0;color:#334155;border-color:#cbd5e1;' : 'background:#ffffff;color:#64748b;border-color:#e2e8f0;'}">Selected</button>
+                                </div>
+                            </div>
+                        </div>
+                    </th>
+                    <th class="p-3 text-right">Rows detected</th>
+                    <th class="p-3 text-right">Images</th>
+                    <th class="p-3 text-left">Status</th>
+                    <th class="p-3 text-left">Preview</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${tableRowsHtml}
             </tbody>
         </table>
     </div>
@@ -13832,10 +13890,36 @@ async function loadSourceImages(sheetIndex) {
     </div>
 </div>`;
 
-                        document.getElementById('mtSelHead').onchange = (e) => { wiz.tabs.forEach(t => t.selected = e.target.checked); renderStep1(); };
+                        document.getElementById('mtSelHead').onchange = (e) => {
+                            filteredTabs.forEach(({ t }) => { t.selected = e.target.checked; });
+                            renderStep1();
+                        };
                         document.getElementById('mtSelAll').onclick = () => { wiz.tabs.forEach(t => t.selected = true); renderStep1(); };
                         document.getElementById('mtSelNone').onclick = () => { wiz.tabs.forEach(t => t.selected = false); renderStep1(); };
                         document.getElementById('mtSelNonEmpty').onclick = () => { wiz.tabs.forEach(t => t.selected = t.state.fullData.length >= 3); renderStep1(); };
+                        document.getElementById('mtSelOnlyToggle').onclick = () => { wiz.searchSelectedOnly = !wiz.searchSelectedOnly; renderStep1(); };
+
+                        const searchInput = document.getElementById('mtTabSearch');
+                        if (searchInput) {
+                            searchInput.oninput = (e) => {
+                                const caretPos = e.target.selectionStart;
+                                wiz.search = e.target.value || '';
+                                renderStep1();
+
+                                const nextInput = document.getElementById('mtTabSearch');
+                                if (nextInput) {
+                                    nextInput.focus();
+                                    const pos = Number.isFinite(caretPos) ? Math.min(caretPos, nextInput.value.length) : nextInput.value.length;
+                                    nextInput.setSelectionRange(pos, pos);
+                                }
+                            };
+                        }
+                        document.getElementById('mtTabSearchClear').onclick = () => {
+                            wiz.search = '';
+                            renderStep1();
+                            const nextInput = document.getElementById('mtTabSearch');
+                            if (nextInput) nextInput.focus();
+                        };
 
                         document.querySelectorAll('.mt-sel-pick').forEach(row => {
                                 row.addEventListener('click', (e) => {
@@ -13877,10 +13961,24 @@ async function loadSourceImages(sheetIndex) {
 
         // ============== STEP 2: SEQUENTIAL AI PROCESSING ==============
         let aiCancelled = false;
+        let aiCancelReason = '';
+        const aiAbortControllers = new Set();
+
+        function cancelAiProcessing(reason = 'Cancelled by user') {
+            aiCancelled = true;
+            aiCancelReason = reason;
+            aiAbortControllers.forEach(ctrl => {
+                try { ctrl.abort(); } catch (_) {}
+            });
+            aiAbortControllers.clear();
+        }
+
         async function runProcessing() {
             closeStep1TabPreview();
             setStep(2, 'AI processing each tab sequentially');
             aiCancelled = false;
+            aiCancelReason = '';
+            aiAbortControllers.clear();
             const selected = wiz.tabs.filter(t => t.selected);
             if (selected.length === 0) { renderStep1(); return; }
                         const queue = selected.filter(t => !(t.status === 'done' && t.aiRows.length > 0));
@@ -13893,7 +13991,9 @@ async function loadSourceImages(sheetIndex) {
                         });
 
             const renderProgress = () => {
+                                if (wiz.step !== 2) return;
                                 const done = queue.filter(t => t.status === 'done').length;
+                                const cancelled = queue.filter(t => t.status === 'cancelled').length;
                                 const failed = queue.filter(t => t.status === 'failed').length;
                                 const pct = Math.round((done / queue.length) * 100);
                 bodyEl.innerHTML = `
@@ -13912,13 +14012,16 @@ async function loadSourceImages(sheetIndex) {
             ${queue.map((t) => {
         const cls = t.status === 'done' ? 'border-emerald-200 bg-emerald-50'
                   : t.status === 'processing' ? 'border-blue-300 bg-blue-50'
+                  : t.status === 'cancelled' ? 'border-amber-200 bg-amber-50'
                   : t.status === 'failed' ? 'border-rose-200 bg-rose-50'
                   : 'border-slate-200 bg-white';
         const icon = t.status === 'done' ? '✓'
                    : t.status === 'processing' ? '<span class="mt-spin"></span>'
+                   : t.status === 'cancelled' ? '⏹'
                    : t.status === 'failed' ? '✗' : '·';
         const info = t.status === 'done' ? `${t.aiRows.length} AI row(s) generated`
                    : t.status === 'processing' ? `Sending ${t.state.fullData.length} entries to AI…`
+                   : t.status === 'cancelled' ? `${t.errorMsg || 'Cancelled by user'}`
                    : t.status === 'failed' ? `Failed — ${t.errorMsg || 'see console'}`
                    : `${t.state.fullData.length} entries queued`;
         return `<div class="flex items-center gap-3 p-3 rounded-lg border ${cls}">
@@ -13931,32 +14034,70 @@ async function loadSourceImages(sheetIndex) {
       }).join('')}
     </div>
   </div>
+  ${cancelled > 0 ? `<div class="mt-3 text-xs text-amber-700 font-semibold">Processing cancelled.</div>` : ''}
 </div>`;
+            };
+
+            const showCancelledActions = () => {
+                if (wiz.step !== 2) return;
+                const done = queue.filter(t => t.status === 'done').length;
+                footerInfoEl.textContent = done > 0
+                    ? 'AI processing cancelled. You can go back to selection or review processed tabs.'
+                    : 'AI processing cancelled. You can go back to selection.';
+                footerBtnsEl.innerHTML = `
+                    ${done > 0 ? '<button id="mtGoReviewAfterCancel" class="rab-btn rab-c-slate">Review Processed</button>' : ''}
+                    <button id="mtBackAfterCancel" class="rab-btn rab-c-slate">← Back to selection</button>`;
+                document.getElementById('mtBackAfterCancel').onclick = () => { closeStep1TabPreview(); renderStep1(); };
+                document.getElementById('mtGoReviewAfterCancel')?.addEventListener('click', () => renderStep3());
             };
 
             renderProgress();
             footerInfoEl.textContent = 'AI processing in progress — please don\'t close this window';
-            footerBtnsEl.innerHTML = `<button id="mtCancelAi" class="rab-btn rab-c-slate">Cancel</button>`;
-            document.getElementById('mtCancelAi').onclick = () => { aiCancelled = true; };
+            footerBtnsEl.innerHTML = `
+                <button id="mtBackDuringAi" class="rab-btn rab-c-slate">← Back</button>
+                <button id="mtCancelAi" class="rab-btn rab-c-slate">Cancel</button>`;
+            document.getElementById('mtCancelAi').onclick = () => {
+                if (aiCancelled) return;
+                cancelAiProcessing('Cancelled by user');
+                renderProgress();
+                showCancelledActions();
+            };
+            document.getElementById('mtBackDuringAi').onclick = () => {
+                cancelAiProcessing('Cancelled and returned to selection');
+                renderStep1();
+            };
 
             for (const tab of queue) {
                 if (aiCancelled) {
-                    tab.status = 'failed';
-                    tab.errorMsg = 'cancelled';
-                    tab.aiRows = buildFallback(tab.state.fullData);
-                    tab.processedAt = '';
-                    persistTabMeta(tab);
-                    renderProgress();
-                    continue;
+                    break;
                 }
                 tab.status = 'processing'; renderProgress();
                 try {
-                    tab.aiRows = await processOneTab(tab);
+                    const rows = await processOneTab(tab);
+                    if (aiCancelled) {
+                        tab.status = 'cancelled';
+                        tab.errorMsg = aiCancelReason || 'Cancelled by user';
+                        tab.aiRows = [];
+                        tab.processedAt = '';
+                        persistTabMeta(tab);
+                        renderProgress();
+                        break;
+                    }
+                    tab.aiRows = rows;
                     tab.status = 'done';
                     tab.processedAt = new Date().toISOString();
                     tab.errorMsg = '';
                     persistTabMeta(tab);
                 } catch (err) {
+                    if (aiCancelled) {
+                        tab.status = 'cancelled';
+                        tab.errorMsg = aiCancelReason || 'Cancelled by user';
+                        tab.aiRows = [];
+                        tab.processedAt = '';
+                        persistTabMeta(tab);
+                        renderProgress();
+                        break;
+                    }
                     console.error('[multi-tab] tab failed:', tab.sheet.name, err);
                     tab.status = 'failed';
                     tab.errorMsg = (err && err.message) || String(err);
@@ -13965,6 +14106,12 @@ async function loadSourceImages(sheetIndex) {
                     persistTabMeta(tab);
                 }
                 renderProgress();
+            }
+
+            if (aiCancelled) {
+                renderProgress();
+                showCancelledActions();
+                return;
             }
 
             renderStep3();
@@ -14064,24 +14211,31 @@ ${body}
         }
 
         async function callAI(prompt) {
-            const res = await fetch(AI_URL, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                // Server endpoint expects { model, prompt }. Keep "messages" too for compatibility
-                // with chat-completions style handlers.
-                body: JSON.stringify({
-                    model: AI_MODEL,
-                    prompt,
-                    messages: [{ role: 'user', content: prompt }]
-                })
-            });
-            if (!res.ok) {
-                let errText = '';
-                try { errText = await res.text(); } catch (_) {}
-                throw new Error(`AI HTTP ${res.status}${errText ? `: ${errText.slice(0, 260)}` : ''}`);
+            const controller = new AbortController();
+            aiAbortControllers.add(controller);
+            try {
+                const res = await fetch(AI_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    signal: controller.signal,
+                    // Server endpoint expects { model, prompt }. Keep "messages" too for compatibility
+                    // with chat-completions style handlers.
+                    body: JSON.stringify({
+                        model: AI_MODEL,
+                        prompt,
+                        messages: [{ role: 'user', content: prompt }]
+                    })
+                });
+                if (!res.ok) {
+                    let errText = '';
+                    try { errText = await res.text(); } catch (_) {}
+                    throw new Error(`AI HTTP ${res.status}${errText ? `: ${errText.slice(0, 260)}` : ''}`);
+                }
+                const data = await res.json();
+                return data.choices?.[0]?.message?.content || '';
+            } finally {
+                aiAbortControllers.delete(controller);
             }
-            const data = await res.json();
-            return data.choices?.[0]?.message?.content || '';
         }
 
         function parseAndExpand(content, batchItems) {
@@ -14135,11 +14289,13 @@ ${body}
                     if (myIdx >= batches.length) return;
                     try {
                         const content = await callAI(buildPrompt(batches[myIdx]));
+                        if (aiCancelled) return;
                         results[myIdx] = parseAndExpand(content, batches[myIdx]);
                         if (!Array.isArray(results[myIdx]) || results[myIdx].length === 0) {
                             batchErrors[myIdx] = 'AI returned no parseable JSON rows';
                         }
                     } catch (e) {
+                        if (aiCancelled) return;
                         console.warn('[multi-tab] batch failed:', e);
                         batchErrors[myIdx] = (e && e.message) ? e.message : String(e);
                         results[myIdx] = [];
@@ -14147,6 +14303,7 @@ ${body}
                 }
             }
             await Promise.all(Array.from({length: Math.min(PARALLEL_LANES, batches.length)}, lane));
+            if (aiCancelled) return [];
             const flat = [].concat(...results.filter(Boolean));
             if (flat.length === 0) {
                 const firstErr = batchErrors.find(Boolean);
