@@ -12508,7 +12508,7 @@ async function loadSourceImages(sheetIndex) {
                     const col = ra.replace(/[0-9]/g, '');
                     obj[col] = (getCellText(c, gyStrings) || '').trim();
                 }
-                if (Object.keys(obj).length > 1) out.push(obj);
+                if (Object.keys(obj).length > 1 || cells.length === 0) out.push(obj);
             }
             return out;
         }
@@ -12589,20 +12589,91 @@ async function loadSourceImages(sheetIndex) {
             return out;
         }
 
+        function findRowsWithoutMappedData(xmlDoc, useMap, startRow, prevImages) {
+            const out = new Set();
+            if (!xmlDoc) return out;
+
+            const mapperApi = window.RABClickMapper;
+            const upMap = mapperApi && typeof mapperApi.normalizeMap === 'function'
+                ? mapperApi.normalizeMap(useMap)
+                : (() => {
+                    const m = {};
+                    for (const k of Object.keys(useMap || {})) m[k] = useMap[k] ? String(useMap[k]).toUpperCase().trim() : '';
+                    return m;
+                })();
+
+            const mapCols = {};
+            for (const k of Object.keys(upMap || {})) {
+                if (mapperApi && typeof mapperApi.getFieldColumns === 'function') {
+                    mapCols[k] = mapperApi.getFieldColumns(upMap, k);
+                } else {
+                    const v = upMap[k] ? String(upMap[k]).toUpperCase().trim() : '';
+                    mapCols[k] = v ? [v] : [];
+                }
+            }
+
+            const mappedCols = new Set();
+            Object.keys(mapCols).forEach(k => (mapCols[k] || []).forEach(col => mappedCols.add(col)));
+            if (mappedCols.size === 0) return out;
+
+            const start = parseInt(startRow) || 2;
+            const xmlRows = xmlDoc.getElementsByTagName('row');
+            for (let i = 0; i < xmlRows.length; i++) {
+                const r = xmlRows[i];
+                const rn = parseInt(r.getAttribute('r'));
+                if (rn < start) continue;
+                if ((prevImages || {})[rn]) continue;
+
+                const cells = r.getElementsByTagName('c');
+                let hasMappedData = false;
+                for (let j = 0; j < cells.length; j++) {
+                    const c = cells[j];
+                    const ra = c.getAttribute('r');
+                    if (!ra) continue;
+                    const col = ra.replace(/[0-9]/g, '');
+                    if (!mappedCols.has(col)) continue;
+                    const val = String(getCellText(c, gyStrings) || '').trim();
+                    if (val) {
+                        hasMappedData = true;
+                        break;
+                    }
+                }
+                if (!hasMappedData) out.add(rn);
+            }
+
+            return out;
+        }
+
+        function mergeDeletedRows(baseDeletedRows, autoDeletedRows, restoredRows) {
+            const merged = baseDeletedRows instanceof Set ? new Set(baseDeletedRows) : new Set(baseDeletedRows || []);
+            const autoSet = autoDeletedRows instanceof Set ? autoDeletedRows : new Set(autoDeletedRows || []);
+            const restoredSet = restoredRows instanceof Set ? restoredRows : new Set(restoredRows || []);
+
+            restoredSet.forEach(r => merged.delete(r));
+            autoSet.forEach(r => {
+                if (!restoredSet.has(r)) merged.add(r);
+            });
+            return merged;
+        }
+
         for (const sheet of gyAllSheets) {
             const prevState = gyPerTabState[sheet.index];
             const prevImages = prevState ? (prevState.imagesByRow || {}) : {};
             const prevDeletedRows = prevState && prevState.deletedRows ? prevState.deletedRows : new Set();
+            const prevRestoredRows = prevState && prevState.restoredRows ? prevState.restoredRows : new Set();
             // Top-level mapping (wizard step 1 dropdowns) WINS when set. Otherwise fall back
             // to whatever the user previously saved for this tab.
             const useMap = hasMap(defaultColMap)
                 ? defaultColMap
                 : (hasMap(prevState && prevState.colMap) ? prevState.colMap : defaultColMap);
             const startRow = parseInt((prevState && prevState.dataStartRow) || defaultDataStartRow) || defaultDataStartRow;
-            const fullData = extractTabFromXML(sheet.doc, useMap, startRow, prevImages, prevDeletedRows);
+            const autoDeletedRows = findRowsWithoutMappedData(sheet.doc, useMap, startRow, prevImages);
+            const effectiveDeletedRows = mergeDeletedRows(prevDeletedRows, autoDeletedRows, prevRestoredRows);
+            const fullData = extractTabFromXML(sheet.doc, useMap, startRow, prevImages, effectiveDeletedRows);
             gyPerTabState[sheet.index] = {
                 colMap: { ...useMap }, fullData, imagesByRow: prevImages,
-                deletedRows: prevDeletedRows,
+                deletedRows: effectiveDeletedRows,
+                restoredRows: prevRestoredRows,
                 deletedItems: prevState ? prevState.deletedItems : [],
                 headerRow: (prevState && prevState.headerRow) || defaultHeaderRow,
                 dataStartRow: String(startRow),
@@ -12637,6 +12708,158 @@ async function loadSourceImages(sheetIndex) {
         const SEV_KEYS = Object.keys(SEVERITY_SCALE);
         const LIK_KEYS = Object.keys(LIKELIHOOD_SCALE);
         const CM_LADDER = ["Level 1 - Individual Target","Level 2 - Administrative Controls","Level 3 - Visual Controls","Level 4 - Engineering Controls","Level 5 - Substitution","Level 6 - Elimination"];
+
+        const SUPPORTED_TEXT_LANGS = {
+            en: 'English',
+            fr: 'French',
+            de: 'German',
+            es: 'Spanish',
+            it: 'Italian',
+            pt: 'Portuguese',
+            nl: 'Dutch',
+            pl: 'Polish'
+        };
+
+        function normalizeLangCode(lang) {
+            const v = String(lang || '').toLowerCase().trim();
+            return SUPPORTED_TEXT_LANGS[v] ? v : '';
+        }
+
+        function hasUserRatings(item) {
+            if (!item) return false;
+            return [item.userFrequency, item.userSeverity, item.userLikelihood]
+                .some(v => String(v ?? '').trim() !== '');
+        }
+
+        function detectTemplateLanguageForTab(tab) {
+            const samples = [];
+            (tab && tab.state && tab.state.fullData ? tab.state.fullData : []).slice(0, 40).forEach(item => {
+                [item.step, item.desc, item.hazards, item.controls].forEach(v => {
+                    const txt = String(v || '').trim();
+                    if (txt) samples.push(txt);
+                });
+            });
+
+            const joined = samples.join(' ').trim();
+            if (!joined) {
+                return normalizeLangCode(localStorage.getItem('appLanguage')) || 'en';
+            }
+
+            if (typeof window.detectLanguageFromContent === 'function') {
+                const detected = normalizeLangCode(window.detectLanguageFromContent(joined));
+                if (detected) return detected;
+            }
+
+            const lower = joined.toLowerCase();
+            const frHits = (lower.match(/\b(le|la|les|des|dans|avec|pour|et|risque|danger|source|controle|contr\u00f4le|frequence|fr\u00e9quence|gravite|gravit\u00e9|probabilite|probabilit\u00e9)\b/g) || []).length;
+            const deHits = (lower.match(/\b(der|die|das|und|mit|f\u00fcr|gefahr|quelle|kontrolle|haeufigkeit|h\u00e4ufigkeit|schwere|wahrscheinlichkeit)\b/g) || []).length;
+
+            if (frHits > deHits && frHits >= 2) return 'fr';
+            if (deHits > frHits && deHits >= 2) return 'de';
+
+            return normalizeLangCode(localStorage.getItem('appLanguage')) || 'en';
+        }
+
+        function getTabPromptLanguage(tab) {
+            const detected = normalizeLangCode(tab && tab.aiLanguage) || detectTemplateLanguageForTab(tab);
+            if (tab) tab.aiLanguage = detected;
+            return detected || 'en';
+        }
+
+        function splitUserHazards(rawHazards) {
+            const raw = String(rawHazards || '')
+                .replace(/\r/g, '\n')
+                .replace(/\bsource\s*:/gi, '')
+                .replace(/\brisk\s*:/gi, '')
+                .replace(/\s+/g, ' ')
+                .trim();
+            if (!raw) return [];
+
+            const parts = raw
+                .split(/\n|;|\||\/|,|\b(?: and | et | und )\b/gi)
+                .map(x => x.trim())
+                .filter(Boolean)
+                .map(x => x.replace(/^[-:\s]+/, '').replace(/[-:\s]+$/, ''))
+                .filter(x => x.length >= 3);
+
+            const uniq = Array.from(new Set(parts.map(x => x.toLowerCase())));
+            uniq.sort((a, b) => b.length - a.length);
+            return uniq;
+        }
+
+        function rowOriginHint(row) {
+            const raw = String(row && (row.__rowOrigin || row.rowOrigin || row.origin) || '').toLowerCase().trim();
+            if (!raw) return '';
+            if (raw.includes('user')) return 'user';
+            if (raw.includes('ai')) return 'ai';
+            return raw;
+        }
+
+        function rowLooksUserProvided(row, sourceItem, rowsForImage) {
+            const hint = rowOriginHint(row);
+            if (hint === 'user') return true;
+            if (hint === 'ai') return false;
+
+            const userHazards = splitUserHazards(sourceItem && sourceItem.hazards);
+            if (userHazards.length > 0) {
+                const hay = `${String(row && row['Hazard Source'] || '')} ${String(row && row['Hazard List'] || '')}`.toLowerCase();
+                if (userHazards.some(h => hay.includes(h))) return true;
+            }
+
+            if ((rowsForImage || 0) === 1 && hasUserRatings(sourceItem)) {
+                return true;
+            }
+            return false;
+        }
+
+        function lockUserRatings(row, sourceItem) {
+            if (!row || !sourceItem) return;
+
+            const freq = String(sourceItem.userFrequency ?? '').trim();
+            const sev = String(sourceItem.userSeverity ?? '').trim();
+            const lik = String(sourceItem.userLikelihood ?? '').trim();
+
+            if (freq) row.Frequency = freq;
+            if (sev) row.Severity = sev;
+            if (lik) row.Likelihood = lik;
+
+            row.__ratingLocked = true;
+            row.__rowOrigin = 'user';
+        }
+
+        async function translateRowsForExport(rows, targetLang, cacheMap) {
+            const lang = normalizeLangCode(targetLang);
+            if (!lang) return rows;
+            if (typeof window.translateText !== 'function') return rows;
+
+            const cache = cacheMap instanceof Map ? cacheMap : new Map();
+            const out = [];
+
+            for (const row of (rows || [])) {
+                const cloned = { ...row };
+                for (const field of ['Steps', 'Hazard Source']) {
+                    const raw = String(cloned[field] || '').trim();
+                    if (!raw) continue;
+                    const key = `${lang}::${raw}`;
+                    if (cache.has(key)) {
+                        cloned[field] = cache.get(key);
+                        continue;
+                    }
+                    try {
+                        const translated = await window.translateText(raw, lang);
+                        const finalText = String(translated || raw).trim() || raw;
+                        cache.set(key, finalText);
+                        cloned[field] = finalText;
+                    } catch (_) {
+                        cache.set(key, raw);
+                        cloned[field] = raw;
+                    }
+                }
+                out.push(cloned);
+            }
+
+            return out;
+        }
 
         function levenshtein(a, b) {
             a = String(a||'').toLowerCase(); b = String(b||'').toLowerCase();
@@ -12702,11 +12925,13 @@ async function loadSourceImages(sheetIndex) {
                 status: c.state.processStatus || 'pending',
                 processedAt: c.state.processedAt || '',
                 downloadedAt: c.state.downloadedAt || '',
-                errorMsg: ''
+                errorMsg: '',
+                aiLanguage: ''
             })),
             activeIdx: 0,
             search: '',
-            searchSelectedOnly: false
+            searchSelectedOnly: false,
+            exportTextLang: 'default'
         };
 
         function persistTabMeta(tab) {
@@ -12795,9 +13020,17 @@ async function loadSourceImages(sheetIndex) {
             return new Set();
         }
 
+        function getRestoredSet(tab) {
+            const raw = tab && tab.state ? tab.state.restoredRows : null;
+            if (raw instanceof Set) return new Set(raw);
+            if (Array.isArray(raw)) return new Set(raw);
+            return new Set();
+        }
+
         function applyMapToTab(tab, mapInput, startRowInput, headerRowInput, opts = {}) {
             const resetAi = opts.resetAi !== false;
             const keepDeletedSet = opts.deletedSet instanceof Set ? new Set(opts.deletedSet) : getDeletedSet(tab);
+            const keepRestoredSet = opts.restoredSet instanceof Set ? new Set(opts.restoredSet) : getRestoredSet(tab);
             const m = normalizeMap(mapInput);
             const startRow = parseInt(startRowInput) || 2;
             const headerRow = parseInt(headerRowInput) || 1;
@@ -12806,13 +13039,16 @@ async function loadSourceImages(sheetIndex) {
             const xmlDoc = tab && tab.sheet ? tab.sheet.doc : null;
             if (!xmlDoc) return { ok: false, error: 'No source XML for this tab.' };
 
-            const newRows = extractTabFromXML(xmlDoc, m, startRow, tab.state.imagesByRow || {}, keepDeletedSet);
+            const autoDeletedSet = findRowsWithoutMappedData(xmlDoc, m, startRow, tab.state.imagesByRow || {});
+            const effectiveDeletedSet = mergeDeletedRows(keepDeletedSet, autoDeletedSet, keepRestoredSet);
+            const newRows = extractTabFromXML(xmlDoc, m, startRow, tab.state.imagesByRow || {}, effectiveDeletedSet);
 
             tab.state.colMap = { ...m };
             tab.state.dataStartRow = String(startRow);
             tab.state.headerRow = String(headerRow);
             tab.state.fullData = newRows;
-            tab.state.deletedRows = [...keepDeletedSet];
+            tab.state.deletedRows = [...effectiveDeletedSet];
+            tab.state.restoredRows = [...keepRestoredSet];
 
             if (resetAi) {
                 tab.aiRows = [];
@@ -12820,6 +13056,7 @@ async function loadSourceImages(sheetIndex) {
                 tab.processedAt = '';
                 tab.downloadedAt = '';
                 tab.errorMsg = '';
+                tab.aiLanguage = '';
             }
 
             if (gyPerTabState[tab.sheet.index]) {
@@ -12827,11 +13064,12 @@ async function loadSourceImages(sheetIndex) {
                 gyPerTabState[tab.sheet.index].dataStartRow = String(startRow);
                 gyPerTabState[tab.sheet.index].headerRow = String(headerRow);
                 gyPerTabState[tab.sheet.index].fullData = JSON.parse(JSON.stringify(newRows));
-                gyPerTabState[tab.sheet.index].deletedRows = keepDeletedSet;
+                gyPerTabState[tab.sheet.index].deletedRows = effectiveDeletedSet;
+                gyPerTabState[tab.sheet.index].restoredRows = keepRestoredSet;
             }
 
             persistTabMeta(tab);
-            return { ok: true, rowCount: newRows.length, map: m, startRow, headerRow };
+            return { ok: true, rowCount: newRows.length, autoDeletedCount: autoDeletedSet.size, map: m, startRow, headerRow };
         }
 
         // ===== Overlay shell =====
@@ -13338,12 +13576,14 @@ async function loadSourceImages(sheetIndex) {
                                                     const newMap = mapOverride ? normalizeMap(mapOverride) : readMap();
                                                     const rowSettings = getRowSettings();
                                                     const delSet = getDeletedSet(tab);
-                                                    const res = applyMapToTab(tab, newMap, rowSettings.startRow, rowSettings.headerRow, { resetAi: true, deletedSet: delSet });
+                                                    const restoredSet = getRestoredSet(tab);
+                                                    const res = applyMapToTab(tab, newMap, rowSettings.startRow, rowSettings.headerRow, { resetAi: true, deletedSet: delSet, restoredSet });
                                                     if (!res.ok) {
                                                         setMsg(res.error || 'Mapping apply failed.', '#dc2626');
                                                         return false;
                                                     }
-                                                    const okMsg = msg || `Applied mapping · ${res.rowCount} row(s) extracted`;
+                                                    const autoTxt = res.autoDeletedCount ? ` · ${res.autoDeletedCount} empty row(s) kept deleted` : '';
+                                                    const okMsg = msg || `Applied mapping · ${res.rowCount} row(s) extracted${autoTxt}`;
                                                     const okColor = msgColor || '#16a34a';
                                                     if (rerenderDrawer) {
                                                         const viewState = captureDrawerViewState();
@@ -13387,14 +13627,21 @@ async function loadSourceImages(sheetIndex) {
                                                         btn.addEventListener('click', () => {
                                                                 const rowNum = parseInt(btn.dataset.row);
                                                                 const delSet = getDeletedSet(tab);
-                                                                if (delSet.has(rowNum)) delSet.delete(rowNum); else delSet.add(rowNum);
+                                                        const restoredSet = getRestoredSet(tab);
+                                                        if (delSet.has(rowNum)) {
+                                                            delSet.delete(rowNum);
+                                                            restoredSet.add(rowNum);
+                                                        } else {
+                                                            delSet.add(rowNum);
+                                                            restoredSet.delete(rowNum);
+                                                        }
                                                         const rowSettings = getRowSettings();
                                                                 const res = applyMapToTab(
                                                                         tab,
                                                                         readMap(),
                                                             rowSettings.startRow,
                                                             rowSettings.headerRow,
-                                                                        { resetAi: true, deletedSet: delSet }
+                                                            { resetAi: true, deletedSet: delSet, restoredSet }
                                                                 );
                                                                 if (!res.ok) {
                                                                         setMsg(res.error || 'Failed to update deleted rows.', '#dc2626');
@@ -13407,12 +13654,14 @@ async function loadSourceImages(sheetIndex) {
 
                                                 drawer.querySelector('#mtPrRestore')?.addEventListener('click', () => {
                                                     const rowSettings = getRowSettings();
+                                                    const restoredSet = getRestoredSet(tab);
+                                                    getDeletedSet(tab).forEach(rn => restoredSet.add(rn));
                                                         const res = applyMapToTab(
                                                                 tab,
                                                                 readMap(),
                                                         rowSettings.startRow,
                                                         rowSettings.headerRow,
-                                                                { resetAi: true, deletedSet: new Set() }
+                                                        { resetAi: true, deletedSet: new Set(), restoredSet }
                                                         );
                                                         if (!res.ok) {
                                                                 setMsg(res.error || 'Restore failed.', '#dc2626');
@@ -13430,9 +13679,11 @@ async function loadSourceImages(sheetIndex) {
                                                         mtMappingClipboard = {
                                                                 map: readMap(),
                                                                 headerRow: parseInt(drawer.querySelector('[data-pr-header]')?.value) || 1,
-                                                                startRow: parseInt(drawer.querySelector('[data-pr-start]')?.value) || 2
+                                                        startRow: parseInt(drawer.querySelector('[data-pr-start]')?.value) || 2,
+                                                        deletedRows: [...getDeletedSet(tab)],
+                                                        restoredRows: [...getRestoredSet(tab)]
                                                         };
-                                                        setMsg('Header mapping copied. You can paste it to another sheet or apply to selected sheets.', '#16a34a');
+                                                    setMsg('Header mapping + row cleanup status copied. You can paste it or apply to selected sheets.', '#16a34a');
                                                 });
 
                                                 drawer.querySelector('#mtPrPasteMap')?.addEventListener('click', () => {
@@ -13445,7 +13696,11 @@ async function loadSourceImages(sheetIndex) {
                                                         mtMappingClipboard.map,
                                                         mtMappingClipboard.startRow,
                                                         mtMappingClipboard.headerRow,
-                                                        { resetAi: true, deletedSet: getDeletedSet(tab) }
+                                                        {
+                                                            resetAi: true,
+                                                            deletedSet: new Set(mtMappingClipboard.deletedRows || []),
+                                                            restoredSet: new Set(mtMappingClipboard.restoredRows || [])
+                                                        }
                                                     );
                                                     if (!res.ok) {
                                                         setMsg(res.error || 'Paste mapping failed.', '#dc2626');
@@ -13469,11 +13724,15 @@ async function loadSourceImages(sheetIndex) {
                                                                         mtMappingClipboard.map,
                                                                         mtMappingClipboard.startRow,
                                                                         mtMappingClipboard.headerRow,
-                                                                        { resetAi: true, deletedSet: getDeletedSet(t) }
+                                                                {
+                                                                    resetAi: true,
+                                                                    deletedSet: new Set(mtMappingClipboard.deletedRows || []),
+                                                                    restoredSet: new Set(mtMappingClipboard.restoredRows || [])
+                                                                }
                                                                 );
                                                                 if (res.ok) { ok++; rows += res.rowCount; }
                                                         });
-                                                            const summaryMsg = `Applied copied mapping to ${ok}/${selectedTabs.length} selected sheet(s) · ${rows} row(s) extracted`;
+                                                            const summaryMsg = `Applied copied mapping + row cleanup to ${ok}/${selectedTabs.length} selected sheet(s) · ${rows} row(s) extracted`;
                                                             setMsg(summaryMsg, '#16a34a');
                                                             const viewState = captureDrawerViewState();
                                                         renderStep1();
@@ -13655,15 +13914,22 @@ async function loadSourceImages(sheetIndex) {
                             if (newWrap) newWrap.scrollLeft = wrapScrollLeft;
                         };
 
-                        const applyAndRerender = (mapOverride, msg, msgColor, rowOverride) => {
+                        const applyAndRerender = (mapOverride, msg, msgColor, rowOverride, stateOverride) => {
                             const m = mapOverride ? normalizeMap(mapOverride) : readMap();
                             const rowSettings = rowOverride || getRowSettings();
-                            const res = applyMapToTab(tab, m, rowSettings.startRow, rowSettings.headerRow, { resetAi: true, deletedSet: getDeletedSet(tab) });
+                            const deletedSet = stateOverride && stateOverride.deletedSet instanceof Set
+                                ? new Set(stateOverride.deletedSet)
+                                : getDeletedSet(tab);
+                            const restoredSet = stateOverride && stateOverride.restoredSet instanceof Set
+                                ? new Set(stateOverride.restoredSet)
+                                : getRestoredSet(tab);
+                            const res = applyMapToTab(tab, m, rowSettings.startRow, rowSettings.headerRow, { resetAi: true, deletedSet, restoredSet });
                             if (!res.ok) {
                                 setMsg(res.error || 'Mapping apply failed', '#dc2626');
                                 return false;
                             }
-                            setMsg(msg || `Applied mapping. Extracted ${res.rowCount} row(s).`, msgColor || '#16a34a');
+                            const autoTxt = res.autoDeletedCount ? ` Empty auto-deleted rows: ${res.autoDeletedCount}.` : '';
+                            setMsg(msg || `Applied mapping. Extracted ${res.rowCount} row(s).${autoTxt}`, msgColor || '#16a34a');
                             rerenderPreviewHost();
                             return true;
                         };
@@ -13718,9 +13984,11 @@ async function loadSourceImages(sheetIndex) {
                             mtMappingClipboard = {
                                 map: readMap(),
                                 headerRow: rowSettings.headerRow,
-                                startRow: rowSettings.startRow
+                                startRow: rowSettings.startRow,
+                                deletedRows: [...getDeletedSet(tab)],
+                                restoredRows: [...getRestoredSet(tab)]
                             };
-                            setMsg('Header mapping copied.', '#16a34a');
+                            setMsg('Header mapping + row cleanup status copied.', '#16a34a');
                         });
                         root.querySelector('#mtS1Paste')?.addEventListener('click', () => {
                             if (!mtMappingClipboard) {
@@ -13734,6 +14002,10 @@ async function loadSourceImages(sheetIndex) {
                                 {
                                     startRow: parseInt(mtMappingClipboard.startRow) || 2,
                                     headerRow: parseInt(mtMappingClipboard.headerRow) || 1
+                                },
+                                {
+                                    deletedSet: new Set(mtMappingClipboard.deletedRows || []),
+                                    restoredSet: new Set(mtMappingClipboard.restoredRows || [])
                                 }
                             );
                         });
@@ -13751,11 +14023,15 @@ async function loadSourceImages(sheetIndex) {
                                     mtMappingClipboard.map,
                                     mtMappingClipboard.startRow,
                                     mtMappingClipboard.headerRow,
-                                    { resetAi: true, deletedSet: getDeletedSet(t) }
+                                    {
+                                        resetAi: true,
+                                        deletedSet: new Set(mtMappingClipboard.deletedRows || []),
+                                        restoredSet: new Set(mtMappingClipboard.restoredRows || [])
+                                    }
                                 );
                                 if (res.ok) { ok++; rows += res.rowCount; }
                             });
-                            setMsg(`Applied copied mapping to ${ok}/${selectedTabs.length} selected sheet(s) · ${rows} row(s).`, '#16a34a');
+                            setMsg(`Applied copied mapping + row cleanup to ${ok}/${selectedTabs.length} selected sheet(s) · ${rows} row(s).`, '#16a34a');
                             renderStep1();
                         });
                 }
@@ -14122,6 +14398,7 @@ async function loadSourceImages(sheetIndex) {
                 const ladder = (typeof suggestCountermeasureLadder === 'function')
                     ? suggestCountermeasureLadder([item.step, item.desc, item.controls].filter(Boolean).join(' '))
                     : '';
+                const hasRatings = hasUserRatings(item);
                 return {
                     'Steps': item.step || item.desc || '',
                     'Hazard List': 'Needs review',
@@ -14134,7 +14411,9 @@ async function loadSourceImages(sheetIndex) {
                     'Severity': item.userSeverity || '5',
                     'Likelihood': item.userLikelihood || '3',
                     'imageId': item.id,
-                    '__fallback': true
+                    '__fallback': true,
+                    '__ratingLocked': !!hasRatings,
+                    '__rowOrigin': hasRatings ? 'user' : 'ai'
                 };
             });
         }
@@ -14152,7 +14431,9 @@ async function loadSourceImages(sheetIndex) {
         const REG_LIK = JSON.stringify(LIKELIHOOD_SCALE);
         const REG_LADDER = JSON.stringify(CM_LADDER);
 
-        function buildPrompt(batchItems) {
+        function buildPrompt(batchItems, promptLang) {
+            const normalizedLang = normalizeLangCode(promptLang) || 'en';
+            const outputLanguageName = SUPPORTED_TEXT_LANGS[normalizedLang] || 'English';
             let body = '';
             batchItems.forEach(item => {
                 body += `--- ENTRY ---\n(ImageID: ${item.id})\nSTEP/DESCRIPTION: ${item.step?item.step+' - ':''}${item.desc||''}\n`;
@@ -14172,6 +14453,7 @@ async function loadSourceImages(sheetIndex) {
             // and user-hazard-preservation logic, in parallel channels per tab.
             return `Process each --- ENTRY --- block separately and generate JSON objects only for that entry before moving to the next.
 You are a world-class safety and risk assessment expert. Analyze this batch of work entries and break each one down into a structured JSON array for a risk assessment table. You must be thorough.
+OUTPUT LANGUAGE FOR FREE-TEXT FIELDS (Steps, Hazard Source, Current Control): ${outputLanguageName}
 **Your Knowledge Base (Use these exact values for matching):**
 - Hazard List Registry: ${REG_HAZ}
 - Consequence Registry: ${REG_CONS}
@@ -14184,7 +14466,7 @@ ${body}
 **Your Instructions (Critical: Follow these for EACH ENTRY):**
 - For all JSON objects generated from a single --- ENTRY ---, use the exact ImageID from that ENTRY's (ImageID: xxx) in the "imageId" key.
 - IMPORTANT: If the text after "STEP/DESCRIPTION:" contains a long paragraph describing multiple actions, operations, or phases, you MUST split it into multiple concise sub-tasks. Each sub-task should describe ONE discrete action (typically 5-15 words). A long description should yield 3-8 sub-tasks. For short, single-action descriptions, use the text as-is.
-1. **Rephrase & Clean Up:** For every text field you output (Steps, Hazard Source, Current Control), rephrase the user's original wording into clear, professional English. Fix all typos, spelling errors, and grammatical mistakes. Keep the original meaning and technical detail intact — do NOT add information the user did not provide.
+1. **Rephrase & Clean Up:** For every text field you output (Steps, Hazard Source, Current Control), rephrase the user's original wording into clear, professional ${outputLanguageName}. Fix all typos, spelling errors, and grammatical mistakes. Keep the original meaning and technical detail intact — do NOT add information the user did not provide.
 2. **Identify Steps:** Break the description into discrete sub-tasks. State each sub-task in the "Steps" field.
 3. **User-Provided Hazards are MANDATORY (HIGHEST PRIORITY — NEVER SKIP):**
    * The HAZARDS line in each ENTRY contains hazards explicitly identified by the user from their real-world observation. These are NON-NEGOTIABLE.
@@ -14194,20 +14476,21 @@ ${body}
    * Reflect the user's hazard text in the "Hazard Source" field to preserve their original observation.
 4. **User Pre-Rated Hazards (PRIORITY):** If the ENTRY contains USER RATINGS (Frequency, Severity, Likelihood), you MUST preserve those exact numeric values in JSON objects for hazards they identified.
 5. **AI Additional Hazard Identification (Fill the Gaps):** After capturing all user hazards, identify ANY ADDITIONAL plausible direct, indirect, and hidden hazards the user may have missed. For EACH, create a separate JSON object. The same "Steps" value will appear in multiple objects when a step has multiple hazards.
-6. **Match Hazard:** Select the single most appropriate "Hazard List" item from the Registry (EXACT registry value).
-7. **Match Consequence:** Select the single most appropriate "Risk/Consequences" item from the Registry (EXACT registry value).
-8. **Infer Details:** Infer "Hazard Source", suggest "Current Control", and classify "Routine/Non-Routine/Emergency Situation" as one of: "Routine", "Non-Routine", "Emergency Situation".
-9. **Tag Each Control Measure:** In "Current Control", append a hierarchy tag to EACH control using: PPE/gloves/helmet = [PPE (L1)]; Training/SOP/certification/procedure = [Admin (L2)]; Signs/mirrors/markings/labels = [Visual (L3)]; Guards/barriers/interlocks/enclosures = [Engineering (L4)]; Safer material/tool replacement = [Substitution (L5)]; Hazard removed entirely = [Elimination (L6)]. Separate multiple controls with "; ". Example: "Crane operator certification [Admin (L2)]; Safety guard on hoist [Engineering (L4)]; Hard hat required [PPE (L1)]".
-10. **Countermeasure Ladder Classification:** Based on the "Current Control" you suggest, classify it into one or more Countermeasure Ladder levels using EXACT values: "Level 1 - Individual Target", "Level 2 - Administrative Controls", "Level 3 - Visual Controls", "Level 4 - Engineering Controls", "Level 5 - Substitution", "Level 6 - Elimination". Comma-separate if multiple apply.
-11. **Select F, S, L Values:** For user pre-rated hazards, use their values. For newly identified hazards, pick the most appropriate NUMERIC value from the scales. Frequency MUST be one of 1, 1.25, 1.5, 1.75, 2. Severity MUST be one of 1, 3, 5, 7, 9, 10. Likelihood MUST be one of 1, 3, 5, 8, 10.
-12. **Consider Past Incidents:** If the user's input mentions previous incidents, near misses, or accidents related to a step or hazard, you MUST increase the 'Likelihood' score for that specific hazard accordingly. Clearly state in "Hazard Source" if a past incident influenced the score.
-13. **Link Image ID:** EVERY JSON object MUST include "imageId" with the exact ID from its parent ENTRY's (ImageID: xxx). NEVER use null.
+6. **Row Origin Tag (required for rating retention):** Add "__rowOrigin":"user" for rows that represent user-provided hazards. Add "__rowOrigin":"ai" for rows created as additional AI hazards.
+7. **Match Hazard:** Select the single most appropriate "Hazard List" item from the Registry (EXACT registry value).
+8. **Match Consequence:** Select the single most appropriate "Risk/Consequences" item from the Registry (EXACT registry value).
+9. **Infer Details:** Infer "Hazard Source", suggest "Current Control", and classify "Routine/Non-Routine/Emergency Situation" as one of: "Routine", "Non-Routine", "Emergency Situation".
+10. **Tag Each Control Measure:** In "Current Control", append a hierarchy tag to EACH control using: PPE/gloves/helmet = [PPE (L1)]; Training/SOP/certification/procedure = [Admin (L2)]; Signs/mirrors/markings/labels = [Visual (L3)]; Guards/barriers/interlocks/enclosures = [Engineering (L4)]; Safer material/tool replacement = [Substitution (L5)]; Hazard removed entirely = [Elimination (L6)]. Separate multiple controls with "; ". Example: "Crane operator certification [Admin (L2)]; Safety guard on hoist [Engineering (L4)]; Hard hat required [PPE (L1)]".
+11. **Countermeasure Ladder Classification:** Based on the "Current Control" you suggest, classify it into one or more Countermeasure Ladder levels using EXACT values: "Level 1 - Individual Target", "Level 2 - Administrative Controls", "Level 3 - Visual Controls", "Level 4 - Engineering Controls", "Level 5 - Substitution", "Level 6 - Elimination". Comma-separate if multiple apply.
+12. **Select F, S, L Values:** For user pre-rated hazards, use their values exactly. For newly identified hazards, pick the most appropriate NUMERIC value from the scales. Frequency MUST be one of 1, 1.25, 1.5, 1.75, 2. Severity MUST be one of 1, 3, 5, 7, 9, 10. Likelihood MUST be one of 1, 3, 5, 8, 10.
+13. **Consider Past Incidents:** If the user's input mentions previous incidents, near misses, or accidents related to a step or hazard, you MUST increase the 'Likelihood' score for that specific hazard accordingly. Clearly state in "Hazard Source" if a past incident influenced the score.
+14. **Link Image ID:** EVERY JSON object MUST include "imageId" with the exact ID from its parent ENTRY's (ImageID: xxx). NEVER use null.
 **STRICT RULES — NEVER VIOLATE:**
 - NEVER output "N/A", "NA", "null", or empty strings for the "Steps" field. Every row must have a meaningful step name.
 - NEVER invent steps that weren't identified in instruction 2. Only reuse the sub-tasks you already identified for that ENTRY.
 - EVERY JSON object MUST include "imageId" with the exact ID from its parent ENTRY.
 - Process EVERY --- ENTRY --- block — do not skip any.
-**Final Output:** Your response MUST be ONLY a valid JSON array (no markdown, no prose). Each object MUST have these keys: "Steps", "Hazard List", "Risk/Consequences", "Hazard Source", "Current Control", "Countermeasure_Ladder", "Routine/Non-Routine/Emergency Situation", "Frequency", "Severity", "Likelihood", "imageId".`;
+**Final Output:** Your response MUST be ONLY a valid JSON array (no markdown, no prose). Each object MUST have these keys: "Steps", "Hazard List", "Risk/Consequences", "Hazard Source", "Current Control", "Countermeasure_Ladder", "Routine/Non-Routine/Emergency Situation", "Frequency", "Severity", "Likelihood", "imageId", "__rowOrigin".`;
         }
 
         async function callAI(prompt) {
@@ -14271,11 +14554,48 @@ ${body}
                     out.push(row);
                 }
             });
+
+            const perImageCounts = {};
+            const lockedByImage = {};
+            out.forEach(row => {
+                const id = String(row && row.imageId || '');
+                if (!id) return;
+                perImageCounts[id] = (perImageCounts[id] || 0) + 1;
+            });
+
+            out.forEach(row => {
+                const orig = itemById[row.imageId];
+                if (!orig || !hasUserRatings(orig)) {
+                    row.__ratingLocked = false;
+                    row.__rowOrigin = rowOriginHint(row) === 'user' ? 'user' : 'ai';
+                    return;
+                }
+
+                const isUserHazardRow = rowLooksUserProvided(row, orig, perImageCounts[row.imageId] || 0);
+                if (isUserHazardRow) {
+                    lockUserRatings(row, orig);
+                    lockedByImage[row.imageId] = (lockedByImage[row.imageId] || 0) + 1;
+                } else {
+                    row.__ratingLocked = false;
+                    row.__rowOrigin = 'ai';
+                }
+            });
+
+            batchItems.forEach(item => {
+                if (!hasUserRatings(item)) return;
+                if ((lockedByImage[item.id] || 0) > 0) return;
+                const firstRow = out.find(r => String(r.imageId || '') === String(item.id));
+                if (!firstRow) return;
+                lockUserRatings(firstRow, item);
+                lockedByImage[item.id] = 1;
+            });
+
             return out;
         }
 
         async function processOneTab(tab) {
             const items = tab.state.fullData;
+            const promptLang = getTabPromptLanguage(tab);
             const batches = [];
             for (let i = 0; i < items.length; i += BATCH_SIZE) batches.push(items.slice(i, i + BATCH_SIZE));
             if (batches.length === 0) return buildFallback(items);
@@ -14288,7 +14608,7 @@ ${body}
                     const myIdx = nextBatch++;
                     if (myIdx >= batches.length) return;
                     try {
-                        const content = await callAI(buildPrompt(batches[myIdx]));
+                        const content = await callAI(buildPrompt(batches[myIdx], promptLang));
                         if (aiCancelled) return;
                         results[myIdx] = parseAndExpand(content, batches[myIdx]);
                         if (!Array.isArray(results[myIdx]) || results[myIdx].length === 0) {
@@ -14322,6 +14642,7 @@ ${body}
 
             const totalMM = selected.reduce((s, t) => s + countMismatches(t.aiRows), 0);
             const totalRows = selected.reduce((s, t) => s + t.aiRows.length, 0);
+                        const exportTextLang = wiz.exportTextLang || 'default';
 
             bodyEl.innerHTML = `
 <div class="p-7">
@@ -14331,6 +14652,20 @@ ${body}
       <p class="text-sm text-slate-500">Expand each tab to review. <span class="text-rose-600 font-semibold">Red-outlined dropdowns</span> are mismatches — fix manually or click <b>AI Fix</b>.</p>
     </div>
     <div class="flex gap-2 items-center flex-wrap">
+            <label class="text-[11px] text-slate-600 font-semibold flex items-center gap-2 px-2 py-1 rounded-md border border-slate-200 bg-white">
+                Export text:
+                <select id="mtExportLang" class="border border-slate-200 rounded px-2 py-1 text-[11px] bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-300">
+                    <option value="default" ${exportTextLang === 'default' ? 'selected' : ''}>Template default</option>
+                    <option value="en" ${exportTextLang === 'en' ? 'selected' : ''}>English</option>
+                    <option value="fr" ${exportTextLang === 'fr' ? 'selected' : ''}>French</option>
+                    <option value="de" ${exportTextLang === 'de' ? 'selected' : ''}>German</option>
+                    <option value="es" ${exportTextLang === 'es' ? 'selected' : ''}>Spanish</option>
+                    <option value="it" ${exportTextLang === 'it' ? 'selected' : ''}>Italian</option>
+                    <option value="pt" ${exportTextLang === 'pt' ? 'selected' : ''}>Portuguese</option>
+                    <option value="nl" ${exportTextLang === 'nl' ? 'selected' : ''}>Dutch</option>
+                    <option value="pl" ${exportTextLang === 'pl' ? 'selected' : ''}>Polish</option>
+                </select>
+            </label>
       <span class="text-xs text-slate-500">${selected.length} tab(s) · ${totalRows} row(s) · <span class="${totalMM>0?'text-rose-600':'text-emerald-600'} font-bold">${totalMM} review item${totalMM===1?'':'s'}</span></span>
       <button id="mtFixAll" class="rab-btn rab-c-amber" ${totalMM===0?'disabled':''}>🔧 AI Fix All Tabs</button>
       <button id="mtExpAll" class="rab-btn rab-c-slate">Expand all</button>
@@ -14342,6 +14677,9 @@ ${body}
             document.getElementById('mtExpAll').onclick = () => { selected.forEach((_,i) => openTabs.add(i)); renderAccordion(); };
             document.getElementById('mtColAll').onclick = () => { openTabs.clear(); renderAccordion(); };
             document.getElementById('mtFixAll').onclick = aiFixAll;
+            document.getElementById('mtExportLang')?.addEventListener('change', (e) => {
+                wiz.exportTextLang = String(e.target.value || 'default');
+            });
             renderAccordion();
 
             footerInfoEl.textContent = totalMM === 0 ? `✓ All ${totalRows} rows validated — ready for export` : `${totalMM} mismatch item(s) need review · you can still export now`;
@@ -14720,11 +15058,11 @@ ${remapPanel}
                     }
                     const xmlDoc = tab.sheet && tab.sheet.doc;
                     if (!xmlDoc) { setMsg('⚠ No source XML for this tab', '#dc2626'); return null; }
-                    const newRows = extractTabFromXML(xmlDoc, newMap, startRow, tab.state.imagesByRow || {}, tab.state.deletedRows);
-                    tab.state.colMap = { ...newMap };
-                    tab.state.dataStartRow = String(startRow);
-                    tab.state.headerRow = String(headerRow);
-                    tab.state.fullData = newRows;
+                    const deletedSet = getDeletedSet(tab);
+                    const restoredSet = getRestoredSet(tab);
+                    const res = applyMapToTab(tab, newMap, startRow, headerRow, { resetAi: true, deletedSet, restoredSet });
+                    if (!res.ok) { setMsg(res.error || 'Remap failed', '#dc2626'); return null; }
+                    const newRows = tab.state.fullData || [];
                     // Reset AI rows so the table immediately reflects the new source data.
                     // Even if AI hasn't been re-run yet, the user can SEE what was extracted.
                     tab.aiRows = buildFallback(newRows);
@@ -14732,16 +15070,11 @@ ${remapPanel}
                     tab.processedAt = '';
                     tab.downloadedAt = '';
                     tab.errorMsg = '';
-                    // Persist back to the real per-tab state so a tab switch sees it
-                    if (gyPerTabState[tab.sheet.index]) {
-                        gyPerTabState[tab.sheet.index].colMap = { ...newMap };
-                        gyPerTabState[tab.sheet.index].dataStartRow = String(startRow);
-                        gyPerTabState[tab.sheet.index].headerRow = String(headerRow);
-                        gyPerTabState[tab.sheet.index].fullData = JSON.parse(JSON.stringify(newRows));
-                    }
+                    tab.aiLanguage = '';
                     persistTabMeta(tab);
                     setStatus(`· ${newRows.length} source row(s) extracted`);
-                    setMsg(`✓ Extracted ${newRows.length} row(s) — click Re-run AI to regenerate`, '#16a34a');
+                    const autoTxt = res.autoDeletedCount ? ` · ${res.autoDeletedCount} empty row(s) kept deleted` : '';
+                    setMsg(`✓ Extracted ${newRows.length} row(s)${autoTxt} — click Re-run AI to regenerate`, '#16a34a');
                     if (!silent) rerenderCard();
                     return newRows;
                 };
@@ -14880,6 +15213,7 @@ ${remapPanel}
             // PASS 1: local fuzzy fix
             const unresolved = [];
             rows.forEach((r, idx) => {
+                const ratingLocked = !!r.__ratingLocked;
                 if (isMismatch('hazard', r['Hazard List'])) {
                     const snap = snapToList(r['Hazard List'], HAZ_KEYS);
                     const dist = levenshtein(String(r['Hazard List']||''), snap);
@@ -14898,9 +15232,11 @@ ${remapPanel}
                         unresolved.push({ idx, field: 'Risk/Consequences', value: r['Risk/Consequences'] });
                     }
                 }
-                if (isMismatch('freq', r.Frequency)) r.Frequency = snapToNumKey(r.Frequency, FREQ_KEYS);
-                if (isMismatch('sev', r.Severity)) r.Severity = snapToNumKey(r.Severity, SEV_KEYS);
-                if (isMismatch('lik', r.Likelihood)) r.Likelihood = snapToNumKey(r.Likelihood, LIK_KEYS);
+                if (!ratingLocked) {
+                    if (isMismatch('freq', r.Frequency)) r.Frequency = snapToNumKey(r.Frequency, FREQ_KEYS);
+                    if (isMismatch('sev', r.Severity)) r.Severity = snapToNumKey(r.Severity, SEV_KEYS);
+                    if (isMismatch('lik', r.Likelihood)) r.Likelihood = snapToNumKey(r.Likelihood, LIK_KEYS);
+                }
             });
 
             // PASS 2: AI remap for stubborn mismatches
@@ -14938,8 +15274,14 @@ ${JSON.stringify(payload, null, 2)}`;
             try {
                 const zip = new JSZip();
                 const selected = wiz.tabs.filter(t => t.selected);
+                const requestedExportLang = normalizeLangCode(wiz.exportTextLang);
+                const shouldTranslateText = !!requestedExportLang;
+                const translationCache = new Map();
                 for (let t = 0; t < selected.length; t++) {
                     const tab = selected[t];
+                    btn.textContent = shouldTranslateText
+                        ? `⏳ Translating & building ZIP… (${t + 1}/${selected.length})`
+                        : `⏳ Building ZIP… (${t + 1}/${selected.length})`;
                     const sheetName = tab.sheet.name.replace(/[^a-zA-Z0-9_\- ]/g, '_');
                     const folder = zip.folder(`${String(t+1).padStart(2,'0')}_${sheetName}`);
                     const sourceRows = tab.aiRows.length > 0 ? tab.aiRows : buildFallback(tab.state.fullData);
@@ -14967,6 +15309,10 @@ ${JSON.stringify(payload, null, 2)}`;
                         };
                     });
 
+                    const exportRows = shouldTranslateText
+                        ? await translateRowsForExport(tableRows, requestedExportLang, translationCache)
+                        : tableRows;
+
                     const projectJSON = {
                         version: '1.0',
                         batchExport: true,
@@ -14976,7 +15322,7 @@ ${JSON.stringify(payload, null, 2)}`;
                         riskData: steps.map(i => [i.id, { step: i.step, description: i.desc, hazards: i.hazards || 'Nil', controls: i.controls || '' }]),
                         tableData: {
                             headers: ['Picture','AI','Steps','Hazard Group','Hazard List','Risk/Consequences','Frequency','Severity','Likelihood','Risk Score','Risk Category','Hazard Source','Current Control','Routine/Non-Routine/Emergency Situation','Actions','Delete'],
-                            rows: tableRows, deletedRows: [], counterMeasures: {}
+                            rows: exportRows, deletedRows: [], counterMeasures: {}
                         }
                     };
                     folder.file(`Project_${sheetName}.json`, JSON.stringify(projectJSON, null, 2));
@@ -14984,12 +15330,12 @@ ${JSON.stringify(payload, null, 2)}`;
                     const csvHeaders = ['Steps','Hazard List','Risk/Consequences','Hazard Source','Current Control','Frequency','Severity','Likelihood','Risk Score','Risk Category'];
                     const csvEsc = (v) => { const s = String(v||''); return s.includes(',')||s.includes('"')||s.includes('\n') ? '"'+s.replace(/"/g,'""')+'"' : s; };
                     let csv = '\uFEFF' + csvHeaders.join(',') + '\n';
-                    tableRows.forEach(r => { csv += csvHeaders.map(h => csvEsc(r[h])).join(',') + '\n'; });
+                    exportRows.forEach(r => { csv += csvHeaders.map(h => csvEsc(r[h])).join(',') + '\n'; });
                     folder.file(`Risk_Assessment_${sheetName}.csv`, csv);
 
                     if (typeof XLSX !== 'undefined') {
                         const wb = XLSX.utils.book_new();
-                        const wsData = [csvHeaders, ...tableRows.map(r => csvHeaders.map(h => r[h] || ''))];
+                        const wsData = [csvHeaders, ...exportRows.map(r => csvHeaders.map(h => r[h] || ''))];
                         const ws = XLSX.utils.aoa_to_sheet(wsData);
                         XLSX.utils.book_append_sheet(wb, ws, 'Risk Assessment');
                         const buf = XLSX.write(wb, { type: 'array', bookType: 'xlsx' });
