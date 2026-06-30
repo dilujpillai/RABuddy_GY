@@ -72,6 +72,24 @@ function validateFileUpload(file, options = {}) {
 // Store for direct GOEHS upload data
 let directGoehsData = null;
 
+const GOEHS_WORKFLOW_SOURCES = Object.freeze({
+    RA2025_SINGLE: 'RA2025_SINGLE',
+    LEGACY_AI: 'LEGACY_AI'
+});
+
+function setGoehsWorkflowContext(source, metadata = {}) {
+    const context = {
+        source: source || '',
+        setAt: new Date().toISOString(),
+        metadata: metadata || {}
+    };
+    window.goehsWorkflowContext = context;
+    return context;
+}
+
+window.GOEHS_WORKFLOW_SOURCES = GOEHS_WORKFLOW_SOURCES;
+window.setGoehsWorkflowContext = setGoehsWorkflowContext;
+
 // Helper to show alerts (works across script scopes)
 function showDirectGoehsAlert(message, type = 'info') {
     if (window.showCustomAlert) {
@@ -174,6 +192,16 @@ async function handleDirectGoehsUpload(event) {
         
         // Store context for GOEHS modal to use later
         window.directGoehsContext = data.process_context;
+        setGoehsWorkflowContext(GOEHS_WORKFLOW_SOURCES.RA2025_SINGLE, {
+            workflow: 'ra2025_single_upload',
+            sourceFile: file.name,
+            selectedSheetIndex: singleSheetIdx,
+            selectedSheetCount: 1,
+            sheetName: data.sheet_name || null,
+            detectedLanguage: data.detectedLang || null,
+            riskItemCount: Array.isArray(data.risk_items) ? data.risk_items.length : 0,
+            processContext: data.process_context || null
+        });
         
         // Store the file and raw data for potential remapping
         window.ra2025LoadedFile = file;
@@ -346,6 +374,17 @@ async function processSelectedSheetsRA2025(file, sheetIndices) {
 
     // Store context
     window.directGoehsContext = lastContext;
+    setGoehsWorkflowContext(GOEHS_WORKFLOW_SOURCES.RA2025_SINGLE, {
+        workflow: 'ra2025_single_upload_multisheet',
+        sourceFile: file.name,
+        selectedSheetIndices: sheetIndices,
+        selectedSheetCount: sheetIndices.length,
+        sheetMode: sheetIndices.length > 1 ? 'multi' : 'single',
+        detectedLanguage: lastDetectedLang || null,
+        riskItemCount: allRiskItems.length,
+        processContext: lastContext || null,
+        partialErrorCount: errors.length
+    });
     window.ra2025LoadedFile = file;
     window.ra2025RawRiskItems = allRiskItems;
     window.ra2025SelectedSheetIndex = sheetIndices[0] || null;
@@ -1225,18 +1264,475 @@ const JOB_TITLES = [
 
 // Returns the translated display label for a GOEHS dropdown value.
 // value attribute stays English; only visible text is translated.
+function normalizeGoehsTranslationKey(value) {
+    return String(value || '')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .replace(/&/g, ' and ')
+        .replace(/[^a-z0-9]+/g, ' ')
+        .trim()
+        .split(' ')
+        .filter(Boolean)
+        .map(token => (token.length > 3 && token.endsWith('s') ? token.slice(0, -1) : token))
+        .join(' ');
+}
+
 function goehsUiLabel(val) {
     if (!val) return val;
     const lang = localStorage.getItem('appLanguage') || 'en';
     if (lang === 'en') return val;
     if (GOEHS_LADDER_TRANSLATIONS[lang]?.[val]) return GOEHS_LADDER_TRANSLATIONS[lang][val];
-    return window.TRANSLATIONS?.[lang]?.[val] || val;
+
+    const langMap = window.TRANSLATIONS?.[lang];
+    if (!langMap) return val;
+
+    if (langMap[val]) return langMap[val];
+
+    // Fallback 1: case-insensitive key lookup
+    const valueLower = String(val).toLowerCase();
+    for (const [key, translated] of Object.entries(langMap)) {
+        if (key.toLowerCase() === valueLower) return translated;
+    }
+
+    // Fallback 2: normalized lookup (handles punctuation/plural/casing drift)
+    const normalizedValue = normalizeGoehsTranslationKey(val);
+    for (const [key, translated] of Object.entries(langMap)) {
+        if (normalizeGoehsTranslationKey(key) === normalizedValue) return translated;
+    }
+
+    return val;
+}
+
+const GOEHS_CONDITION_MODES = ['Routine', 'Non-Routine', 'Emergency Situation'];
+
+function parseGoehsConditionMode(rawValue) {
+    const value = (rawValue || '').toString().trim();
+    if (!value) return 'Routine';
+    const lower = value.toLowerCase();
+    if (lower.includes('emergency')) return 'Emergency Situation';
+    if (lower.includes('non-routine') || lower.includes('non routine')) return 'Non-Routine';
+    if (lower.includes('routine')) return 'Routine';
+    return 'Routine';
+}
+
+function formatDateForGoehsExport(inputValue) {
+    const value = (inputValue || '').toString().trim();
+    if (!value) return '';
+
+    // If already in DD-MMM-YYYY, keep as-is.
+    if (/^\d{2}-[A-Za-z]{3}-\d{4}$/.test(value)) return value;
+
+    // Date input format from browser is YYYY-MM-DD.
+    if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+        const [year, month, day] = value.split('-').map(Number);
+        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        if (month >= 1 && month <= 12) {
+            return `${String(day).padStart(2, '0')}-${months[month - 1]}-${year}`;
+        }
+    }
+
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return value;
+    return formatGoehsDate(parsed);
+}
+
+function getGoehsTypeValue() {
+    return document.getElementById('goehsType')?.value || 'Safety';
+}
+
+function buildGoehsTaskLookup() {
+    const taskLookup = {};
+
+    const addTask = (taskName, values = {}) => {
+        const name = (taskName || '').toString().trim();
+        if (!name) return;
+
+        const existing = taskLookup[name] || {
+            taskName: name,
+            taskDescription: '',
+            conditionMode: 'Routine',
+            coreActivity: '',
+            jobTitle: ''
+        };
+
+        if (!existing.taskDescription && values.taskDescription) existing.taskDescription = values.taskDescription;
+        if ((!existing.conditionMode || existing.conditionMode === 'Routine') && values.conditionMode) {
+            existing.conditionMode = values.conditionMode;
+        }
+        if (!existing.coreActivity && values.coreActivity) existing.coreActivity = values.coreActivity;
+        if (!existing.jobTitle && values.jobTitle) existing.jobTitle = values.jobTitle;
+
+        taskLookup[name] = existing;
+    };
+
+    if (window.goehsTableData && Array.isArray(window.goehsTableData.tasks)) {
+        window.goehsTableData.tasks.forEach(task => {
+            addTask(task?.name, {
+                taskDescription: task?.description || task?.name || ''
+            });
+        });
+    }
+
+    if (window.goehsTableData && Array.isArray(window.goehsTableData.hazards)) {
+        window.goehsTableData.hazards.forEach(hazard => {
+            addTask(hazard?.stepName, {
+                conditionMode: parseGoehsConditionMode(hazard?.routineType)
+            });
+        });
+    }
+
+    return taskLookup;
+}
+
+function getTaskMetaForName(taskName) {
+    const taskLookup = buildGoehsTaskLookup();
+    const name = (taskName || '').toString().trim();
+    return taskLookup[name] || {
+        taskName: name,
+        taskDescription: name,
+        conditionMode: 'Routine',
+        coreActivity: '',
+        jobTitle: ''
+    };
 }
 // State Management
 let goehsTasks = [];
 let goehsHazards = [];
 let taskIdCounter = 0;
 let hazardIdCounter = 0;
+const GOEHS_FINAL_REVIEW_STATE = {
+    issueObserver: null,
+    issueHooksBound: false,
+    issueRefreshScheduled: false
+};
+
+const GOEHS_MODE_OPTIONS = ['Routine', 'Non-Routine', 'Emergency Situation'];
+
+function normalizeGoehsConditionMode(mode) {
+    const raw = (mode || '').toString().trim().toLowerCase();
+    if (!raw) return 'Routine';
+    if (raw.includes('non')) return 'Non-Routine';
+    if (raw.includes('emerg')) return 'Emergency Situation';
+    if (raw.includes('routine')) return 'Routine';
+    return 'Routine';
+}
+
+function getGoehsOutcomeRegistry() {
+    if (Array.isArray(window.CONSEQUENCE_REGISTRY) && window.CONSEQUENCE_REGISTRY.length > 0) {
+        return window.CONSEQUENCE_REGISTRY;
+    }
+    return ['Laceration, Cut, Open wound'];
+}
+
+function renderGoehsOutcomeOptions(selectedOutcome = '') {
+    const selected = window.reverseTranslate ? (window.reverseTranslate(selectedOutcome) || selectedOutcome) : selectedOutcome;
+    return getGoehsOutcomeRegistry().map(outcome =>
+        `<option value="${escapeHtml(outcome)}" ${outcome === selected ? 'selected' : ''}>${escapeHtml(goehsUiLabel(outcome))}</option>`
+    ).join('');
+}
+
+function renderGoehsModeOptions(selectedMode = 'Routine') {
+    const normalized = normalizeGoehsConditionMode(selectedMode);
+    return GOEHS_MODE_OPTIONS.map(mode =>
+        `<option value="${mode}" ${mode === normalized ? 'selected' : ''}>${goehsUiLabel(mode)}</option>`
+    ).join('');
+}
+
+function toGoehsDateString(value) {
+    const raw = (value || '').toString().trim();
+    if (!raw) return '';
+    if (/^\d{2}-[A-Za-z]{3}-\d{4}$/.test(raw)) return raw;
+    if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+        const [year, month, day] = raw.split('-').map(Number);
+        return formatGoehsDate(new Date(year, month - 1, day));
+    }
+    const parsed = new Date(raw);
+    if (!Number.isNaN(parsed.getTime())) {
+        return formatGoehsDate(parsed);
+    }
+    return raw;
+}
+
+function formatDateForInput(date) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+}
+
+function isHazardTableRowDeleted(row) {
+    return !!row && row.dataset.deleted === 'true';
+}
+
+function getActiveHazardTableRows() {
+    return Array.from(document.querySelectorAll('.hazard-table-row')).filter(row => !isHazardTableRowDeleted(row));
+}
+
+function getGoehsFinalReviewIssueStats() {
+    const scope = document.getElementById('goehs-tool3');
+    if (!scope) {
+        return {
+            total: 0,
+            mismatch: 0,
+            emptyRequired: 0
+        };
+    }
+
+    const mismatchElements = new Set();
+    const emptyRequiredElements = new Set();
+
+    scope.querySelectorAll('.goehs-mismatch').forEach(el => {
+        const row = el.closest('tr');
+        if (row && row.dataset.deleted === 'true') return;
+        mismatchElements.add(el);
+    });
+
+    scope.querySelectorAll('.goehs-empty-required').forEach(el => {
+        const row = el.closest('tr');
+        if (row && row.dataset.deleted === 'true') return;
+        emptyRequiredElements.add(el);
+    });
+
+    const uniqueIssues = new Set([
+        ...mismatchElements,
+        ...emptyRequiredElements
+    ]);
+
+    return {
+        total: uniqueIssues.size,
+        mismatch: mismatchElements.size,
+        emptyRequired: emptyRequiredElements.size
+    };
+}
+
+function countGoehsFinalReviewIssues() {
+    return getGoehsFinalReviewIssueStats().total;
+}
+
+function scheduleGoehsIssueCounterRefresh() {
+    if (GOEHS_FINAL_REVIEW_STATE.issueRefreshScheduled) return;
+    GOEHS_FINAL_REVIEW_STATE.issueRefreshScheduled = true;
+
+    const flush = () => {
+        GOEHS_FINAL_REVIEW_STATE.issueRefreshScheduled = false;
+        updateGoehsIssueCounter();
+    };
+
+    if (typeof requestAnimationFrame === 'function') {
+        requestAnimationFrame(flush);
+    } else {
+        setTimeout(flush, 0);
+    }
+}
+
+function updateGoehsIssueCounter() {
+    const counterEl = document.getElementById('goehsIssueCounter');
+    if (!counterEl) return;
+
+    const issueStats = getGoehsFinalReviewIssueStats();
+    counterEl.textContent = `Issues: ${issueStats.total}`;
+    counterEl.classList.toggle('has-issues', issueStats.total > 0);
+
+    if (issueStats.total > 0) {
+        counterEl.title = `Final Review unresolved issues\nMissing required fields: ${issueStats.emptyRequired}\nValidation mismatches: ${issueStats.mismatch}\nDeleted rows are excluded.`;
+        counterEl.setAttribute('aria-label', `Issues ${issueStats.total}. Missing required fields ${issueStats.emptyRequired}. Validation mismatches ${issueStats.mismatch}.`);
+    } else {
+        counterEl.title = 'No unresolved issues in Final Review. Deleted rows are excluded.';
+        counterEl.setAttribute('aria-label', 'No unresolved issues in Final Review.');
+    }
+}
+
+function initGoehsIssueCounterHooks() {
+    const scope = document.getElementById('goehs-tool3');
+    if (!scope) return;
+
+    if (!GOEHS_FINAL_REVIEW_STATE.issueHooksBound) {
+        const refreshCounter = () => scheduleGoehsIssueCounterRefresh();
+        scope.addEventListener('input', refreshCounter, true);
+        scope.addEventListener('change', refreshCounter, true);
+        scope.addEventListener('click', () => setTimeout(refreshCounter, 0), true);
+        GOEHS_FINAL_REVIEW_STATE.issueHooksBound = true;
+    }
+
+    if (GOEHS_FINAL_REVIEW_STATE.issueObserver) {
+        GOEHS_FINAL_REVIEW_STATE.issueObserver.disconnect();
+    }
+
+    GOEHS_FINAL_REVIEW_STATE.issueObserver = new MutationObserver(() => scheduleGoehsIssueCounterRefresh());
+    GOEHS_FINAL_REVIEW_STATE.issueObserver.observe(scope, {
+        subtree: true,
+        childList: true,
+        attributes: true,
+        attributeFilter: ['class', 'data-deleted']
+    });
+
+    scheduleGoehsIssueCounterRefresh();
+}
+
+function setMainTableRowDeletedState(sourceRowIndex, isDeleted) {
+    const row = document.querySelector(`#table-container tr[data-row-index="${sourceRowIndex}"]`);
+    if (!row) return;
+
+    row.classList.toggle('deleted-row', !!isDeleted);
+    row.dataset.deleted = isDeleted ? 'true' : 'false';
+
+    const deleteBtn = row.querySelector('button[onclick*="toggleRowDelete"]');
+    if (deleteBtn) {
+        if (typeof window.applyTaskDeleteRestoreButtonState === 'function') {
+            window.applyTaskDeleteRestoreButtonState(deleteBtn, !!isDeleted, { modal: false });
+        } else {
+            deleteBtn.textContent = isDeleted ? 'Restore' : '🗑';
+            deleteBtn.className = isDeleted ? 'restore-btn' : 'delete-btn';
+            deleteBtn.title = isDeleted ? 'Restore row' : 'Delete row';
+        }
+    }
+
+    row.querySelectorAll('select, input, textarea, button').forEach(control => {
+        if (control === deleteBtn) return;
+        control.disabled = !!isDeleted;
+        control.style.opacity = isDeleted ? '0.6' : '';
+        control.style.pointerEvents = isDeleted ? 'none' : '';
+    });
+}
+
+function syncMainTableRowStateToGoehs(sourceRowIndex, isDeleted) {
+    if (sourceRowIndex === null || sourceRowIndex === undefined || Number.isNaN(Number(sourceRowIndex))) return;
+
+    const selector = `#hazardTableBody tr[data-source-row-index="${sourceRowIndex}"]`;
+    const matchedRows = document.querySelectorAll(selector);
+    matchedRows.forEach(row => setHazardTableRowDeletedState(row, !!isDeleted));
+
+    updateHazardCount();
+    updateGoehsIssueCounter();
+}
+
+window.syncMainTableRowStateToGoehs = syncMainTableRowStateToGoehs;
+
+function renderHazardTableRowActionIcon(isDeleted) {
+    if (isDeleted) {
+        return '<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>';
+    }
+    return '<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>';
+}
+
+function setHazardTableRowDeletedState(row, isDeleted, options = {}) {
+    if (!row) return;
+
+    row.dataset.deleted = isDeleted ? 'true' : 'false';
+    row.classList.toggle('goehs-row-deleted', isDeleted);
+    row.classList.toggle('hover:bg-slate-50', !isDeleted);
+
+    const actionButton = row.querySelector('.goehs-row-delete-btn');
+
+    if (actionButton) {
+        actionButton.classList.toggle('goehs-btn-icon-danger', !isDeleted);
+        actionButton.classList.toggle('goehs-btn-icon-restore', isDeleted);
+        actionButton.title = isDeleted ? 'Restore row' : 'Delete row';
+        actionButton.setAttribute('aria-label', isDeleted ? 'Restore row' : 'Delete row');
+        actionButton.innerHTML = renderHazardTableRowActionIcon(isDeleted);
+    }
+
+    row.querySelectorAll('input, select, textarea, button').forEach(el => {
+        if (el === actionButton) return;
+        el.disabled = !!isDeleted;
+    });
+
+    if (!options.suppressCounterRefresh) {
+        scheduleGoehsIssueCounterRefresh();
+    }
+}
+
+function getTaskNamesForHazardDropdown() {
+    const names = new Set();
+
+    collectTaskData().forEach(task => {
+        if ((task.taskName || '').trim()) names.add(task.taskName.trim());
+    });
+
+    if (names.size === 0 && window.goehsTableData && Array.isArray(window.goehsTableData.tasks)) {
+        window.goehsTableData.tasks.forEach(task => {
+            if ((task.name || '').trim()) names.add(task.name.trim());
+        });
+    }
+
+    if (names.size === 0) {
+        getActiveHazardTableRows().forEach(row => {
+            const select = row.querySelector('.hazard-task');
+            if (!select) return;
+            if ((select.value || '').trim()) names.add(select.value.trim());
+        });
+    }
+
+    return Array.from(names);
+}
+
+function getGoehsTaskMetadataMap(hazards = []) {
+    const taskMap = {};
+
+    // Read Task-section rows directly to avoid recursion with collectTaskData fallback.
+    document.querySelectorAll('.task-row').forEach(row => {
+        const key = (row.querySelector('.task-name')?.value || '').trim();
+        if (!key) return;
+        taskMap[key] = {
+            taskDescription: (row.querySelector('.task-description')?.value || key).trim(),
+            conditionMode: normalizeGoehsConditionMode(row.querySelector('.task-condition')?.value || 'Routine'),
+            coreActivity: (row.querySelector('.task-activity')?.value || suggestCoreActivity(key) || '').trim(),
+            jobTitle: (row.querySelector('.task-jobtitle')?.value || suggestJobTitle(key) || '').trim()
+        };
+    });
+
+    if (Object.keys(taskMap).length === 0) {
+        const tableData = window.goehsTableData || extractRiskTableData();
+
+        if (tableData && Array.isArray(tableData.tasks)) {
+            tableData.tasks.forEach(task => {
+                const key = (task.name || '').trim();
+                if (!key) return;
+                taskMap[key] = {
+                    taskDescription: task.description || key,
+                    conditionMode: 'Routine',
+                    coreActivity: suggestCoreActivity(key) || '',
+                    jobTitle: suggestJobTitle(key) || ''
+                };
+            });
+        }
+
+        if (tableData && Array.isArray(tableData.hazards)) {
+            tableData.hazards.forEach(hazard => {
+                const key = (hazard.stepName || '').trim();
+                if (!key) return;
+                if (!taskMap[key]) {
+                    taskMap[key] = {
+                        taskDescription: key,
+                        conditionMode: 'Routine',
+                        coreActivity: suggestCoreActivity(key) || '',
+                        jobTitle: suggestJobTitle(key) || ''
+                    };
+                }
+                taskMap[key].conditionMode = normalizeGoehsConditionMode(hazard.routineType || taskMap[key].conditionMode);
+            });
+        }
+    }
+
+    if (Array.isArray(hazards)) {
+        hazards.forEach(hazard => {
+            const key = (hazard.taskName || '').trim();
+            if (!key) return;
+            if (!taskMap[key]) {
+                taskMap[key] = {
+                    taskDescription: key,
+                    conditionMode: 'Routine',
+                    coreActivity: suggestCoreActivity(key) || '',
+                    jobTitle: suggestJobTitle(key) || ''
+                };
+            }
+            taskMap[key].conditionMode = normalizeGoehsConditionMode(hazard.mode || taskMap[key].conditionMode);
+        });
+    }
+
+    return taskMap;
+}
 
 // ============ RISK TABLE EXTRACTION FUNCTIONS ============
 
@@ -1262,7 +1758,6 @@ function extractRiskTableData() {
         const cells = row.querySelectorAll('td');
         // Lower the minimum cell requirement to catch more rows
         if (cells.length < 10) {
-            console.log(`� ️ Skipping row ${index} - only ${cells.length} cells`);
             return;
         }
         
@@ -1289,11 +1784,10 @@ function extractRiskTableData() {
         const hazardSource = cells[11]?.querySelector('input')?.value || cells[11]?.textContent?.trim() || '';
         const currentControl = cells[12]?.querySelector('input')?.value || cells[12]?.textContent?.trim() || '';
         const routineType = cells[13]?.querySelector('input')?.value || cells[13]?.textContent?.trim() || '';
+        const sourceRowIndex = parseInt(row.dataset.rowIndex, 10);
         
         // Try to get Countermeasure_Ladder from stored data (if AI generated it)
         const rowData = row.dataset?.countermeasureLadder || '';
-        
-        console.log(`📝 Row ${index}: Step="${stepName}", Hazard="${hazardGroup}/${hazardList}"`);
         
         // Track unique tasks
         if (!uniqueTasks.has(stepName)) {
@@ -1309,6 +1803,7 @@ function extractRiskTableData() {
         // Add to hazards list - include countermeasure ladder from AI if available
         tableData.hazards.push({
             rowIndex: index,
+            sourceRowIndex: Number.isNaN(sourceRowIndex) ? index : sourceRowIndex,
             stepName: stepName,
             hazardGroup: hazardGroup,
             hazardList: hazardList,
@@ -1387,10 +1882,15 @@ function findMatchingGoehsCategory(parentCategory) {
         // Check if main words match (e.g., "mechanical" in both)
         const parentWords = parentLower.split(/[\s\/]+/);
         const goehsWords = goehsLower.split(/[\s\/]+/);
+        const ignoredWords = new Set([
+            'hazard', 'hazards', 'danger', 'dangers', 'risk', 'risks',
+            'group', 'groups', 'category', 'categories', 'and', 'the'
+        ]);
+        const meaningfulParentWords = parentWords.filter(pw => pw.length > 3 && !ignoredWords.has(pw));
         
         // If any significant word matches (excluding common words)
-        const significantMatch = parentWords.some(pw => 
-            pw.length > 3 && goehsWords.some(gw => gw.includes(pw) || pw.includes(gw))
+        const significantMatch = meaningfulParentWords.some(pw => 
+            goehsWords.some(gw => !ignoredWords.has(gw) && (gw.includes(pw) || pw.includes(gw)))
         );
         if (significantMatch) {
             return goehsCat;
@@ -1768,8 +2268,22 @@ function populateGoehsHazardsFromTable(tableData) {
         goehsHazards.push({ id: hazardId, data: hazard });
         
         // Map to GOEHS format with case-insensitive matching (GOEHS casing supersedes)
-        const goehsCategory = findMatchingGoehsCategory(hazard.hazardGroup) || '';
-        const goehsSubHazard = goehsCategory ? findMatchingGoehsSubHazard(goehsCategory, hazard.hazardList) : '';
+        const sourceCategory = (hazard.hazardGroup || '').toString().trim();
+        const sourceSubHazard = (hazard.hazardList || '').toString().trim();
+        const sourceOutcome = (hazard.consequence || '').toString().trim();
+
+        const goehsCategory = findMatchingGoehsCategory(sourceCategory) || '';
+        const goehsSubHazard = goehsCategory ? findMatchingGoehsSubHazard(goehsCategory, sourceSubHazard) : '';
+
+        const normalizedOutcome = window.reverseTranslate
+            ? (window.reverseTranslate(sourceOutcome) || sourceOutcome)
+            : sourceOutcome;
+        const outcomeRegistry = getGoehsOutcomeRegistry();
+
+        const categoryMismatch = !!sourceCategory && !goehsCategory;
+        const subHazardMismatch = !!sourceSubHazard && !goehsSubHazard;
+        const outcomeMismatch = !!normalizedOutcome && !outcomeRegistry.includes(normalizedOutcome);
+
         const goehsFreq = mapFrequencyToGOEHS(hazard.frequency);
         const goehsSev = mapSeverityToGOEHS(hazard.severity);
         const goehsLike = mapLikelihoodToGOEHS(hazard.likelihood);
@@ -1782,6 +2296,11 @@ function populateGoehsHazardsFromTable(tableData) {
         const taskOptions = tableData.tasks.length > 0 
             ? tableData.tasks.map(t => `<option value="${escapeHtml(t.name)}" ${t.name === hazard.stepName ? 'selected' : ''}>${escapeHtml(t.name)}</option>`).join('')
             : `<option value="${escapeHtml(hazard.stepName)}" selected>${escapeHtml(hazard.stepName)}</option>`;
+
+        const modeOptions = GOEHS_CONDITION_MODES.map(mode => {
+            const selected = mode === parseGoehsConditionMode(hazard.routineType);
+            return `<option value="${mode}" ${selected ? 'selected' : ''}>${goehsUiLabel(mode)}</option>`;
+        }).join('');
         
         // Generate hazard category options - with case-insensitive selection
         const categoryOptions = Object.keys(HAZARD_CATEGORIES).map(cat => 
@@ -1818,8 +2337,19 @@ function populateGoehsHazardsFromTable(tableData) {
         row.id = hazardId;
         row.className = 'hazard-table-row border-b border-slate-200 hover:bg-slate-50';
         row.dataset.hazardIndex = index;
+        row.dataset.deleted = 'false';
+        if (!Number.isNaN(Number(hazard.sourceRowIndex))) {
+            row.dataset.sourceRowIndex = String(hazard.sourceRowIndex);
+        }
         
         row.innerHTML = `
+            <td class="p-1 border-r border-slate-200 text-center bg-white">
+                <div class="goehs-row-delete-wrap">
+                    <button type="button" onclick="removeHazardTableRow('${hazardId}')" class="goehs-row-delete-btn goehs-btn goehs-btn-icon-danger" title="Delete row" aria-label="Delete row">
+                        ${renderHazardTableRowActionIcon(false)}
+                    </button>
+                </div>
+            </td>
             <td class="p-1 border-r border-slate-200 text-center font-medium text-slate-600">${index + 1}</td>
             <td class="p-1 border-r border-slate-200">
                 <select class="hazard-task w-full p-1 border border-slate-300 rounded text-xs bg-white">
@@ -1827,20 +2357,28 @@ function populateGoehsHazardsFromTable(tableData) {
                     ${taskOptions}
                 </select>
             </td>
+            <td class="p-1 border-r border-slate-200">
+                <select class="hazard-mode w-full p-1 border border-slate-300 rounded text-xs bg-white">
+                    ${modeOptions}
+                </select>
+            </td>
             <td class="p-1 border-r border-slate-200 bg-orange-50">
-                <select class="hazard-category w-full p-1 border border-slate-300 rounded text-xs bg-white" onchange="updateTableSubHazards(this, '${hazardId}')">
+                <select class="hazard-category w-full p-1 border border-slate-300 rounded text-xs bg-white${categoryMismatch ? ' goehs-mismatch' : ''}" onchange="this.classList.remove('goehs-mismatch');updateTableSubHazards(this, '${hazardId}')">
                     <option value="">--</option>
                     ${categoryOptions}
                 </select>
             </td>
             <td class="p-1 border-r border-slate-200 bg-orange-50">
-                <select class="hazard-sub w-full p-1 border border-slate-300 rounded text-xs bg-white">
+                <select class="hazard-sub w-full p-1 border border-slate-300 rounded text-xs bg-white${subHazardMismatch ? ' goehs-mismatch' : ''}" onchange="this.classList.remove('goehs-mismatch')">
                     <option value="">--</option>
                     ${subHazardOptions}
                 </select>
             </td>
             <td class="p-1 border-r border-slate-200">
-                <input type="text" class="hazard-outcome w-full p-1 border border-slate-300 rounded text-xs" value="${escapeHtml(goehsUiLabel(hazard.consequence))}" placeholder="Outcome">
+                <select class="hazard-outcome w-full p-1 border border-slate-300 rounded text-xs bg-white${outcomeMismatch ? ' goehs-mismatch' : ''}" onchange="this.classList.remove('goehs-mismatch')">
+                    <option value="">-- Select --</option>
+                    ${renderGoehsOutcomeOptions(hazard.consequence)}
+                </select>
             </td>
             <td class="p-1 border-r border-slate-200">
                 <input type="text" class="hazard-desc w-full p-1 border border-slate-300 rounded text-xs" value="${escapeHtml(goehsUiLabel(hazard.hazardSource || hazard.hazardList))}" placeholder="Description">
@@ -1895,44 +2433,9 @@ function populateGoehsHazardsFromTable(tableData) {
             <td class="p-1 border-r border-slate-200 bg-blue-50">
                 <input type="text" class="hazard-res-rating w-full p-1 border border-slate-300 rounded text-xs bg-slate-100 text-center" value="${initRating}" readonly>
             </td>
-            <td class="p-1 border-r border-slate-200 bg-green-50">
-                <input type="text" class="hazard-pred-desc w-full p-1 border border-slate-300 rounded text-xs" placeholder="Future controls">
-            </td>
-            <td class="p-1 border-r border-slate-200 bg-green-50">
-                <select class="hazard-pred-ladder w-full p-1 border border-slate-300 rounded text-xs bg-white" multiple size="4" style="min-height: 70px;" title="Hold Ctrl/Cmd to select multiple">
-                    ${ladderOptions}
-                </select>
-            </td>
-            <td class="p-1 border-r border-slate-200 bg-green-50">
-                <select class="hazard-pred-freq w-full p-1 border border-slate-300 rounded text-xs bg-white text-center" onchange="calcTablePredRisk('${hazardId}')">
-                    <option value="">--</option>
-                    ${freqOpts(freqValues, '')}
-                </select>
-            </td>
-            <td class="p-1 border-r border-slate-200 bg-green-50">
-                <select class="hazard-pred-sev w-full p-1 border border-slate-300 rounded text-xs bg-white text-center" onchange="calcTablePredRisk('${hazardId}')">
-                    <option value="">--</option>
-                    ${freqOpts(sevValues, '')}
-                </select>
-            </td>
-            <td class="p-1 border-r border-slate-200 bg-green-50">
-                <select class="hazard-pred-like w-full p-1 border border-slate-300 rounded text-xs bg-white text-center" onchange="calcTablePredRisk('${hazardId}')">
-                    <option value="">--</option>
-                    ${freqOpts(likeValues, '')}
-                </select>
-            </td>
-            <td class="p-1 border-r border-slate-200 bg-green-50">
-                <input type="text" class="hazard-pred-score w-full p-1 border border-slate-300 rounded text-xs bg-slate-100 text-center" value="" readonly placeholder="--">
-            </td>
-            <td class="p-1 border-r border-slate-200 bg-green-50">
-                <input type="text" class="hazard-pred-rating w-full p-1 border border-slate-300 rounded text-xs bg-slate-100 text-center" value="" readonly placeholder="--">
-            </td>
-            <td class="p-1 text-center">
-                <button type="button" onclick="removeHazardTableRow('${hazardId}')" class="text-red-500 hover:text-red-700 p-1">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
-                </button>
-            </td>
         `;
+
+        setHazardTableRowDeletedState(row, false, { suppressCounterRefresh: true });
         
         tbody.appendChild(row);
     });
@@ -1942,6 +2445,8 @@ function populateGoehsHazardsFromTable(tableData) {
     
     // Auto-apply countermeasure ladder suggestions based on control descriptions
     setTimeout(() => autoApplyCountermeasureSuggestions(), 100);
+
+    scheduleGoehsIssueCounterRefresh();
     
     console.log(`✅ Populated ${tableData.hazards.length} hazards in table format from risk table`);
 }
@@ -1949,7 +2454,7 @@ function populateGoehsHazardsFromTable(tableData) {
 // Auto-apply countermeasure ladder suggestions on data load
 // Only applies keyword-based suggestions if NO pre-tagged ladder was set from parent table
 function autoApplyCountermeasureSuggestions() {
-    const hazardRows = document.querySelectorAll('.hazard-table-row');
+    const hazardRows = getActiveHazardTableRows();
     let appliedCount = 0;
     let skippedPreTagged = 0;
     
@@ -1994,38 +2499,45 @@ function addHazardTableRow() {
     hazardIdCounter++;
     const hazardId = `hazard-${hazardIdCounter}`;
     goehsHazards.push({ id: hazardId, data: {} });
-    
+
     const tbody = document.getElementById('hazardTableBody');
     if (!tbody) return;
-    
+
     const index = goehsHazards.length;
-    
-    // Get task names for dropdown
-    const tasks = collectTaskData();
-    const taskOptions = tasks.length > 0 
-        ? tasks.map(t => `<option value="${escapeHtml(t.taskName)}">${escapeHtml(t.taskName)}</option>`).join('')
+
+    const tasks = getTaskNamesForHazardDropdown();
+    const taskOptions = tasks.length > 0
+        ? tasks.map(name => `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`).join('')
         : '';
-    
-    // Generate hazard category options
-    const categoryOptions = Object.keys(HAZARD_CATEGORIES).map(cat => 
+
+    const modeOptions = GOEHS_CONDITION_MODES.map(mode =>
+        `<option value="${mode}" ${mode === 'Routine' ? 'selected' : ''}>${goehsUiLabel(mode)}</option>`
+    ).join('');
+
+    const categoryOptions = Object.keys(HAZARD_CATEGORIES).map(cat =>
         `<option value="${cat}">${goehsUiLabel(cat)}</option>`
     ).join('');
-    
-    // Generate frequency/severity/likelihood options
+
     const freqOpts = (vals) => vals.map(v => `<option value="${v}">${v}</option>`).join('');
     const freqValues = ['1', '1.25', '1.5', '1.75', '2'];
     const sevValues = ['1', '3', '5', '7', '9', '10'];
     const likeValues = ['1', '3', '5', '8', '10'];
-    
-    // Countermeasure ladder options
     const ladderOptions = ['', ...COUNTERMEASURE_LADDER].map(l => `<option value="${l}">${l ? goehsUiLabel(l) : '--'}</option>`).join('');
-    
+
     const row = document.createElement('tr');
     row.id = hazardId;
     row.className = 'hazard-table-row border-b border-slate-200 hover:bg-slate-50';
     row.dataset.hazardIndex = index - 1;
-    
+    row.dataset.deleted = 'false';
+
     row.innerHTML = `
+        <td class="p-1 border-r border-slate-200 text-center bg-white">
+            <div class="goehs-row-delete-wrap">
+                <button type="button" onclick="removeHazardTableRow('${hazardId}')" class="goehs-row-delete-btn goehs-btn goehs-btn-icon-danger" title="Delete row" aria-label="Delete row">
+                    ${renderHazardTableRowActionIcon(false)}
+                </button>
+            </div>
+        </td>
         <td class="p-1 border-r border-slate-200 text-center font-medium text-slate-600">${index}</td>
         <td class="p-1 border-r border-slate-200">
             <select class="hazard-task w-full p-1 border border-slate-300 rounded text-xs bg-white">
@@ -2033,19 +2545,27 @@ function addHazardTableRow() {
                 ${taskOptions}
             </select>
         </td>
+        <td class="p-1 border-r border-slate-200">
+            <select class="hazard-mode w-full p-1 border border-slate-300 rounded text-xs bg-white">
+                ${modeOptions}
+            </select>
+        </td>
         <td class="p-1 border-r border-slate-200 bg-orange-50">
-            <select class="hazard-category w-full p-1 border border-slate-300 rounded text-xs bg-white" onchange="updateTableSubHazards(this, '${hazardId}')">
+            <select class="hazard-category w-full p-1 border border-slate-300 rounded text-xs bg-white" onchange="this.classList.remove('goehs-mismatch');updateTableSubHazards(this, '${hazardId}')">
                 <option value="">--</option>
                 ${categoryOptions}
             </select>
         </td>
         <td class="p-1 border-r border-slate-200 bg-orange-50">
-            <select class="hazard-sub w-full p-1 border border-slate-300 rounded text-xs bg-white">
+            <select class="hazard-sub w-full p-1 border border-slate-300 rounded text-xs bg-white" onchange="this.classList.remove('goehs-mismatch')">
                 <option value="">--</option>
             </select>
         </td>
         <td class="p-1 border-r border-slate-200">
-            <input type="text" class="hazard-outcome w-full p-1 border border-slate-300 rounded text-xs" placeholder="Outcome">
+            <select class="hazard-outcome w-full p-1 border border-slate-300 rounded text-xs bg-white" onchange="this.classList.remove('goehs-mismatch')">
+                <option value="">-- Select --</option>
+                ${renderGoehsOutcomeOptions('')}
+            </select>
         </td>
         <td class="p-1 border-r border-slate-200">
             <input type="text" class="hazard-desc w-full p-1 border border-slate-300 rounded text-xs" placeholder="Description">
@@ -2103,65 +2623,31 @@ function addHazardTableRow() {
         <td class="p-1 border-r border-slate-200 bg-blue-50">
             <input type="text" class="hazard-res-rating w-full p-1 border border-slate-300 rounded text-xs bg-slate-100 text-center" value="" readonly placeholder="--">
         </td>
-        <td class="p-1 border-r border-slate-200 bg-green-50">
-            <input type="text" class="hazard-pred-desc w-full p-1 border border-slate-300 rounded text-xs" placeholder="Future controls">
-        </td>
-        <td class="p-1 border-r border-slate-200 bg-green-50">
-            <select class="hazard-pred-ladder w-full p-1 border border-slate-300 rounded text-xs bg-white" multiple size="4" style="min-height: 70px;" title="Hold Ctrl/Cmd to select multiple">
-                ${ladderOptions}
-            </select>
-        </td>
-        <td class="p-1 border-r border-slate-200 bg-green-50">
-            <select class="hazard-pred-freq w-full p-1 border border-slate-300 rounded text-xs bg-white text-center" onchange="calcTablePredRisk('${hazardId}')">
-                <option value="">--</option>
-                ${freqOpts(freqValues)}
-            </select>
-        </td>
-        <td class="p-1 border-r border-slate-200 bg-green-50">
-            <select class="hazard-pred-sev w-full p-1 border border-slate-300 rounded text-xs bg-white text-center" onchange="calcTablePredRisk('${hazardId}')">
-                <option value="">--</option>
-                ${freqOpts(sevValues)}
-            </select>
-        </td>
-        <td class="p-1 border-r border-slate-200 bg-green-50">
-            <select class="hazard-pred-like w-full p-1 border border-slate-300 rounded text-xs bg-white text-center" onchange="calcTablePredRisk('${hazardId}')">
-                <option value="">--</option>
-                ${freqOpts(likeValues)}
-            </select>
-        </td>
-        <td class="p-1 border-r border-slate-200 bg-green-50">
-            <input type="text" class="hazard-pred-score w-full p-1 border border-slate-300 rounded text-xs bg-slate-100 text-center" value="" readonly placeholder="--">
-        </td>
-        <td class="p-1 border-r border-slate-200 bg-green-50">
-            <input type="text" class="hazard-pred-rating w-full p-1 border border-slate-300 rounded text-xs bg-slate-100 text-center" value="" readonly placeholder="--">
-        </td>
-        <td class="p-1 text-center">
-            <button type="button" onclick="removeHazardTableRow('${hazardId}')" class="text-red-500 hover:text-red-700 p-1">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
-            </button>
-        </td>
     `;
-    
+
+    setHazardTableRowDeletedState(row, false);
     tbody.appendChild(row);
     updateHazardCount();
 }
 
 // Remove hazard table row
 function removeHazardTableRow(hazardId) {
-    if (goehsHazards.length <= 1) {
-        showGoehsAlert('You must have at least one hazard.', 'warning');
-        return;
+    const row = document.getElementById(hazardId);
+    if (!row) return;
+
+    setHazardTableRowDeletedState(row, !isHazardTableRowDeleted(row));
+    const sourceRowIndex = parseInt(row.dataset.sourceRowIndex, 10);
+    if (!Number.isNaN(sourceRowIndex)) {
+        setMainTableRowDeletedState(sourceRowIndex, isHazardTableRowDeleted(row));
     }
-    goehsHazards = goehsHazards.filter(h => h.id !== hazardId);
-    document.getElementById(hazardId)?.remove();
-    renumberHazardTableRows();
     updateHazardCount();
 }
 
 // Renumber hazard table rows
 function renumberHazardTableRows() {
     document.querySelectorAll('.hazard-table-row').forEach((row, index) => {
-        row.querySelector('td:first-child').textContent = index + 1;
+        const numberCell = row.querySelector('td:nth-child(2)');
+        if (numberCell) numberCell.textContent = index + 1;
         row.dataset.hazardIndex = index;
     });
 }
@@ -2170,18 +2656,23 @@ function renumberHazardTableRows() {
 function updateHazardCount() {
     const countDisplay = document.getElementById('hazardCountDisplay');
     if (countDisplay) {
-        countDisplay.textContent = document.querySelectorAll('.hazard-table-row').length;
+        countDisplay.textContent = getActiveHazardTableRows().length;
     }
+    scheduleGoehsIssueCounterRefresh();
 }
 
 // Update sub-hazards dropdown in table format
 function updateTableSubHazards(selectElement, hazardId) {
     const hazardCategory = selectElement.value;
     const row = document.getElementById(hazardId);
+    if (!row) return;
+
     const subSelect = row.querySelector('.hazard-sub');
-    
+    if (!subSelect) return;
+
+    subSelect.classList.remove('goehs-mismatch');
     subSelect.innerHTML = '<option value="">--</option>';
-    
+
     if (hazardCategory && HAZARD_CATEGORIES[hazardCategory]) {
         HAZARD_CATEGORIES[hazardCategory].forEach(sub => {
             const opt = document.createElement('option');
@@ -2228,18 +2719,31 @@ function calcTableResRisk(hazardId) {
 // Calculate predictive risk in table format
 function calcTablePredRisk(hazardId) {
     const row = document.getElementById(hazardId);
-    const freq = row.querySelector('.hazard-pred-freq').value;
-    const sev = row.querySelector('.hazard-pred-sev').value;
-    const like = row.querySelector('.hazard-pred-like').value;
+    if (!row) return;
+
+    const freqEl = row.querySelector('.hazard-pred-freq');
+    const sevEl = row.querySelector('.hazard-pred-sev');
+    const likeEl = row.querySelector('.hazard-pred-like');
+    const scoreEl = row.querySelector('.hazard-pred-score');
+    const ratingEl = row.querySelector('.hazard-pred-rating');
+
+    // Predictive columns are removed in simplified review mode.
+    if (!freqEl || !sevEl || !likeEl || !scoreEl || !ratingEl) {
+        return;
+    }
+
+    const freq = freqEl.value;
+    const sev = sevEl.value;
+    const like = likeEl.value;
     
     if (freq && sev && like) {
         const score = (parseFloat(freq) * parseFloat(sev) * parseFloat(like)).toFixed(2);
         const rating = getRiskRating(parseFloat(score));
-        row.querySelector('.hazard-pred-score').value = score;
-        row.querySelector('.hazard-pred-rating').value = rating;
+        scoreEl.value = score;
+        ratingEl.value = rating;
     } else {
-        row.querySelector('.hazard-pred-score').value = '';
-        row.querySelector('.hazard-pred-rating').value = '';
+        scoreEl.value = '';
+        ratingEl.value = '';
     }
 }
 
@@ -2253,17 +2757,119 @@ function escapeHtml(str) {
 
 // ============ MODAL FUNCTIONS ============
 
+const GOEHS_REQUIRED_HEADER_FIELDS = [
+    { id: 'goehsOrgName', label: 'OrgName' },
+    { id: 'goehsLocation', label: 'Location' }
+];
+
+function getGoehsRequiredFieldElements() {
+    return GOEHS_REQUIRED_HEADER_FIELDS
+        .map(field => ({ ...field, element: document.getElementById(field.id) }))
+        .filter(field => !!field.element);
+}
+
+function bindGoehsRequiredFieldListeners() {
+    getGoehsRequiredFieldElements().forEach(({ element }) => {
+        if (element.dataset.goehsRequiredBound === '1') return;
+        const clearHighlight = () => {
+            if ((element.value || '').trim()) {
+                element.classList.remove('goehs-empty-required');
+            }
+        };
+        element.addEventListener('input', clearHighlight);
+        element.addEventListener('change', clearHighlight);
+        element.dataset.goehsRequiredBound = '1';
+    });
+}
+
+function validateGoehsRequiredHeaderFields(options = {}) {
+    const {
+        showAlert = true,
+        focusFirst = true
+    } = options;
+
+    const missing = [];
+    getGoehsRequiredFieldElements().forEach(({ label, element }) => {
+        const value = (element.value || '').trim();
+        if (!value) {
+            element.classList.add('goehs-empty-required');
+            missing.push({ label, element });
+        } else {
+            element.classList.remove('goehs-empty-required');
+        }
+    });
+
+    if (missing.length === 0) return true;
+
+    if (showAlert) {
+        const labels = missing.map(item => item.label).join(', ');
+        showGoehsAlert(`Please complete required header fields: ${labels}.`, 'error');
+    }
+
+    if (focusFirst && missing[0] && missing[0].element) {
+        missing[0].element.focus();
+        missing[0].element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+
+    return false;
+}
+
+function syncGoehsAssessmentTitleDisplays() {
+    const title = (document.getElementById('goehsAssessmentTitle')?.value || '').trim() || '-';
+    const tool3Title = document.getElementById('tool3AssessmentTitle');
+    if (tool3Title) tool3Title.textContent = title;
+}
+
+function isGoehsSingleScreenMode() {
+    return !!document.getElementById('goehsSingleScreenBanner');
+}
+
+function ensureGoehsSectionDataLoaded(toolNum) {
+    const taskContainer = document.getElementById('taskRowsContainer');
+    if (toolNum >= 2 && taskContainer && goehsTasks.length === 0) {
+        if (window.goehsTableData && window.goehsTableData.tasks.length > 0) {
+            populateGoehsTasksFromTable(window.goehsTableData);
+            setTimeout(() => {
+                aiPopulateTaskFields();
+            }, 300);
+        } else {
+            addTaskRow();
+        }
+    }
+
+    if (toolNum >= 3 && goehsHazards.length === 0) {
+        if (window.goehsTableData && window.goehsTableData.hazards.length > 0) {
+            populateGoehsHazardsFromTable(window.goehsTableData);
+            setTimeout(() => {
+                aiPopulateHazardFields();
+            }, 300);
+        } else {
+            if (document.getElementById('hazardTableBody')) {
+                addHazardTableRow();
+            } else {
+                addHazardRow();
+            }
+        }
+    }
+}
+
 function openGoehsModal() {
     const modal = document.getElementById('goehsModal');
     if (modal) {
         modal.style.display = 'flex';
         initializeGoehsForm();
+        bindGoehsRequiredFieldListeners();
         
         // Auto-extract and populate from risk table
         autoPopulateFromRiskTable();
-        
-        // Note: Intelligent Fill will be triggered when user navigates to Tool 2 (Task Batch)
-        // This prevents the "No tasks to populate" error on modal open
+        syncGoehsAssessmentTitleDisplays();
+
+        if (isGoehsSingleScreenMode()) {
+            ensureGoehsSectionDataLoaded(3);
+        }
+
+        initGoehsIssueCounterHooks();
+        scheduleGoehsIssueCounterRefresh();
     }
 }
 
@@ -2281,7 +2887,7 @@ function autoPopulateFromRiskTable() {
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-yellow-600 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
                     <div>
                         <h4 class="font-semibold text-yellow-800">No Risk Table Data Found</h4>
-                        <p class="text-yellow-700 text-sm mt-1">No risk assessment data was detected. Please generate a risk assessment first using the main app, or enter data manually in Tools 2 and 3.</p>
+                        <p class="text-yellow-700 text-sm mt-1">No risk assessment data was detected. Please generate a risk assessment first using the main app, or enter data manually in the final review pane.</p>
                     </div>
                 </div>
             `;
@@ -2301,8 +2907,8 @@ function autoPopulateFromRiskTable() {
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-green-600 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                 <div>
                     <h4 class="font-semibold text-green-800">✓ Risk Table Data Detected: ${taskCount} Task(s), ${count} Hazard(s)</h4>
-                    <p class="text-green-700 text-sm mt-1">Your risk assessment data will automatically populate Tools 2 and 3 when you navigate to them.</p>
-                    <p class="text-green-700 text-sm mt-2"><strong>Next:</strong> Complete the assessment header below, then click "Next: Task Batch →" to continue.</p>
+                    <p class="text-green-700 text-sm mt-1">Your risk assessment data will automatically populate the final review pane.</p>
+                    <p class="text-green-700 text-sm mt-2"><strong>Next:</strong> Complete the assessment header below, then review final rows and download GOEHS batch upload file.</p>
                 </div>
             </div>
         `;
@@ -2355,19 +2961,29 @@ function closeGoehsModal() {
     if (modal) {
         modal.style.display = 'none';
     }
+
+    if (GOEHS_FINAL_REVIEW_STATE.issueObserver) {
+        GOEHS_FINAL_REVIEW_STATE.issueObserver.disconnect();
+        GOEHS_FINAL_REVIEW_STATE.issueObserver = null;
+    }
+
+    GOEHS_FINAL_REVIEW_STATE.issueRefreshScheduled = false;
 }
 
 function goToTool(toolNum) {
-    // Validate before moving forward
-    if (toolNum > 1) {
-        const title = document.getElementById('goehsAssessmentTitle').value;
-        if (!title) {
-            showGoehsAlert('Please enter Assessment Title in Tool 1 first.', 'error');
-            return;
+    if (toolNum > 1 && !validateGoehsRequiredHeaderFields()) {
+        return;
+    }
+
+    syncGoehsAssessmentTitleDisplays();
+
+    if (isGoehsSingleScreenMode()) {
+        ensureGoehsSectionDataLoaded(toolNum);
+        const section = document.getElementById(`goehs-tool${toolNum}`);
+        if (section) {
+            section.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
-        // Update title displays
-        document.getElementById('tool2AssessmentTitle').textContent = title;
-        document.getElementById('tool3AssessmentTitle').textContent = title;
+        return;
     }
     
     // Hide all tabs
@@ -2391,32 +3007,7 @@ function goToTool(toolNum) {
         selectedBtn.querySelector('span span').classList.remove('bg-slate-400');
     }
     
-    // Auto-populate from risk table when navigating to Tool 2 or 3
-    if (toolNum === 2 && goehsTasks.length === 0) {
-        // Check if we have table data
-        if (window.goehsTableData && window.goehsTableData.tasks.length > 0) {
-            populateGoehsTasksFromTable(window.goehsTableData);
-            // Run Intelligent Fill for Task fields after populating
-            setTimeout(() => {
-                aiPopulateTaskFields();
-            }, 300);
-        } else {
-            addTaskRow();
-        }
-    }
-    
-    if (toolNum === 3 && goehsHazards.length === 0) {
-        // Check if we have table data
-        if (window.goehsTableData && window.goehsTableData.hazards.length > 0) {
-            populateGoehsHazardsFromTable(window.goehsTableData);
-            // Run Intelligent Fill for Hazard fields after populating
-            setTimeout(() => {
-                aiPopulateHazardFields();
-            }, 300);
-        } else {
-            addHazardRow();
-        }
-    }
+    ensureGoehsSectionDataLoaded(toolNum);
 }
 
 // ============ INITIALIZATION ============
@@ -2454,7 +3045,7 @@ function initializeGoehsForm() {
     // Pre-populate date
     const dateInput = document.getElementById('goehsAssessmentDate');
     if (dateInput && !dateInput.value) {
-        dateInput.value = formatGoehsDate(new Date());
+        dateInput.value = formatDateForInput(new Date());
     }
     
     // Pre-populate assessment title from project name if available
@@ -2540,15 +3131,9 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('goehsOrgName')?.addEventListener('change', function() {
         const selectedOrg = this.value;
         const locationSelect = document.getElementById('goehsLocation');
-        const deptSelect = document.getElementById('goehsDepartment');
-        const wsSelect = document.getElementById('goehsWorkstation');
         
         // Reset downstream
         locationSelect.innerHTML = '<option value="">-- Select Location --</option>';
-        deptSelect.innerHTML = '<option value="">-- Select Department --</option>';
-        wsSelect.innerHTML = '<option value="">-- Select Workstation --</option>';
-        deptSelect.disabled = true;
-        wsSelect.disabled = true;
         
         if (selectedOrg && VENDOR_LOCATIONS[selectedOrg]) {
             const locations = VENDOR_LOCATIONS[selectedOrg];
@@ -2568,45 +3153,14 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     
     // Location change handler
-    document.getElementById('goehsLocation')?.addEventListener('change', function() {
-        const selectedOrg = document.getElementById('goehsOrgName').value;
-        const selectedLoc = this.value;
-        const deptSelect = document.getElementById('goehsDepartment');
-        const wsSelect = document.getElementById('goehsWorkstation');
-        
-        // Reset downstream
-        deptSelect.innerHTML = '<option value="">-- Select Department --</option>';
-        wsSelect.innerHTML = '<option value="">-- Select Workstation --</option>';
-        
-        if (selectedOrg && selectedLoc && GOEHS_LOCATION_DATA[selectedOrg]) {
-            const locData = GOEHS_LOCATION_DATA[selectedOrg].locations[selectedLoc];
-            if (locData) {
-                locData.departments?.forEach(dept => {
-                    const opt = document.createElement('option');
-                    opt.value = dept;
-                    opt.textContent = dept;
-                    deptSelect.appendChild(opt);
-                });
-                deptSelect.disabled = false;
-                
-                locData.workstations?.forEach(ws => {
-                    const opt = document.createElement('option');
-                    opt.value = ws;
-                    opt.textContent = ws;
-                    wsSelect.appendChild(opt);
-                });
-                wsSelect.disabled = false;
-            }
-        }
-        
-        // Save to localStorage
-        saveGoehsAssessmentData();
-    });
+    document.getElementById('goehsLocation')?.addEventListener('change', saveGoehsAssessmentData);
     
     // Department change handler - save to localStorage
+    document.getElementById('goehsDepartment')?.addEventListener('input', saveGoehsAssessmentData);
     document.getElementById('goehsDepartment')?.addEventListener('change', saveGoehsAssessmentData);
     
     // Workstation change handler - save to localStorage
+    document.getElementById('goehsWorkstation')?.addEventListener('input', saveGoehsAssessmentData);
     document.getElementById('goehsWorkstation')?.addEventListener('change', saveGoehsAssessmentData);
     
     // Tab switching
@@ -2619,6 +3173,13 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // GOEHS Integration button
     document.getElementById('goehsIntegrationBtn')?.addEventListener('click', openGoehsModal);
+
+    // AI Assist button in Final Review header
+    const goehsAiAssistBtn = document.getElementById('goehsAiAssistBtn');
+    if (goehsAiAssistBtn && goehsAiAssistBtn.dataset.goehsBound !== '1') {
+        goehsAiAssistBtn.addEventListener('click', aiAssistHazardFields);
+        goehsAiAssistBtn.dataset.goehsBound = '1';
+    }
     
     // Remap Columns button - opens manual column mapper with existing file
     document.getElementById('remapColumnsBtn')?.addEventListener('click', function() {
@@ -2654,6 +3215,8 @@ function addTaskRow() {
     goehsTasks.push(taskData);
     
     const container = document.getElementById('taskRowsContainer');
+    if (!container) return;
+
     const row = document.createElement('div');
     row.id = taskId;
     row.className = 'task-row bg-slate-50 border border-slate-200 rounded-lg p-4';
@@ -2722,18 +3285,56 @@ function renumberTasks() {
 
 function collectTaskData() {
     const tasks = [];
+
     document.querySelectorAll('.task-row').forEach(row => {
-        const taskName = row.querySelector('.task-name').value;
-        const taskDescription = row.querySelector('.task-description').value;
+        const taskName = (row.querySelector('.task-name')?.value || '').trim();
+        if (!taskName) return;
+
         tasks.push({
-            taskName: taskName,
-            taskDescription: taskDescription,  // Use the actual task description field value
-            conditionMode: row.querySelector('.task-condition').value,
-            coreActivity: row.querySelector('.task-activity').value,
-            jobTitle: row.querySelector('.task-jobtitle').value
+            taskName,
+            taskDescription: (row.querySelector('.task-description')?.value || taskName).trim(),
+            conditionMode: normalizeGoehsConditionMode(row.querySelector('.task-condition')?.value || 'Routine'),
+            coreActivity: (row.querySelector('.task-activity')?.value || suggestCoreActivity(taskName) || '').trim(),
+            jobTitle: (row.querySelector('.task-jobtitle')?.value || suggestJobTitle(taskName) || '').trim()
         });
     });
-    return tasks;
+
+    if (tasks.length > 0) {
+        return tasks;
+    }
+
+    // In single-pane mode (no Task section), infer task metadata from the risk table and hazard rows.
+    const map = {};
+    const taskMetaFromTable = getGoehsTaskMetadataMap();
+    Object.keys(taskMetaFromTable).forEach(name => {
+        map[name] = {
+            taskName: name,
+            taskDescription: taskMetaFromTable[name].taskDescription || name,
+            conditionMode: normalizeGoehsConditionMode(taskMetaFromTable[name].conditionMode || 'Routine'),
+            coreActivity: taskMetaFromTable[name].coreActivity || suggestCoreActivity(name) || '',
+            jobTitle: taskMetaFromTable[name].jobTitle || suggestJobTitle(name) || ''
+        };
+    });
+
+    getActiveHazardTableRows().forEach(row => {
+        const taskName = (row.querySelector('.hazard-task')?.value || '').trim();
+        if (!taskName) return;
+
+        if (!map[taskName]) {
+            map[taskName] = {
+                taskName,
+                taskDescription: taskName,
+                conditionMode: 'Routine',
+                coreActivity: suggestCoreActivity(taskName) || '',
+                jobTitle: suggestJobTitle(taskName) || ''
+            };
+        }
+
+        const mode = normalizeGoehsConditionMode(row.querySelector('.hazard-mode')?.value || map[taskName].conditionMode);
+        map[taskName].conditionMode = mode;
+    });
+
+    return Object.values(map);
 }
 
 // ============ INTELLIGENT FILL FUNCTIONS ============
@@ -2742,7 +3343,7 @@ function collectTaskData() {
 async function aiPopulateTaskFields() {
     const taskRows = document.querySelectorAll('.task-row');
     if (taskRows.length === 0) {
-        showGoehsAlert('No tasks to populate. Add tasks first.', 'warning');
+        showGoehsAlert('Task section is disabled in single-pane mode. Task metadata is inferred from risk-table and row selections.', 'info');
         return;
     }
     
@@ -2813,7 +3414,7 @@ function highlightEmptyTaskFields() {
 
 // AI populate hazard fields (Countermeasure Ladder based on control description)
 async function aiPopulateHazardFields() {
-    const hazardRows = document.querySelectorAll('.hazard-table-row');
+    const hazardRows = getActiveHazardTableRows();
     if (hazardRows.length === 0) {
         showGoehsAlert('No hazards to populate. Add hazards first.', 'warning');
         return;
@@ -3255,73 +3856,168 @@ Return ONLY a valid JSON array with this exact structure (no explanation, no mar
     }
 }
 
-// AI Assist for Hazard Fields - calls external AI to suggest Countermeasure Ladder
+// AI Assist for Hazard Fields
+// - Preserves user-entered Current Control text
+// - Uses Current Control to suggest ladder levels
+// - Sends ONLY rows with missing/mismatch dropdowns to AI for correction
 async function aiAssistHazardFields() {
-    const hazardRows = document.querySelectorAll('.hazard-table-row');
+    const hazardRows = getActiveHazardTableRows();
     if (hazardRows.length === 0) {
         showGoehsAlert('No hazards to analyze. Add hazards first.', 'warning');
         return;
     }
-    
-    // Collect control descriptions for AI analysis
-    const controlData = [];
-    hazardRows.forEach((row, index) => {
-        const counterDesc = row.querySelector('.hazard-counter-desc')?.value || '';
-        const predDesc = row.querySelector('.hazard-pred-desc')?.value || '';
-        if (counterDesc.trim() || predDesc.trim()) {
-            controlData.push({
-                index,
-                counterDesc,
-                predDesc,
-                row,
-                counterLadderSelect: row.querySelector('.hazard-counter-ladder'),
-                predLadderSelect: row.querySelector('.hazard-pred-ladder')
-            });
-        }
-    });
-    
-    if (controlData.length === 0) {
-        showGoehsAlert('No control descriptions found. Enter control descriptions first.', 'warning');
-        return;
-    }
-    
+
     // Show loading state
-    const aiBtn = document.querySelector('button[onclick="aiAssistHazardFields()"]');
+    const aiBtn = document.getElementById('goehsAiAssistBtn') || document.querySelector('button[onclick="aiAssistHazardFields()"]');
     const originalText = aiBtn?.innerHTML;
     if (aiBtn) {
         aiBtn.innerHTML = '⏳ AI Processing...';
         aiBtn.disabled = true;
     }
-    
+
     try {
-        // Build prompt for AI
-        const prompt = `You are a workplace safety expert classifying control measures using the Hierarchy of Controls.
+        const toOptionValues = (selectEl) => {
+            if (!selectEl) return [];
+            return Array.from(selectEl.options)
+                .map(opt => (opt.value || '').trim())
+                .filter(value => value);
+        };
 
-COUNTERMEASURE LADDER LEVELS (from most to least effective):
-- "Level 6 - Elimination" - Completely removing the hazard (discontinue, get rid of, stop using)
-- "Level 5 - Substitution" - Replacing with something safer (alternative material, less hazardous)
-- "Level 4 - Engineering Controls" - Physical changes (guards, barriers, interlocks, ventilation, automation)
-- "Level 3 - Visual Controls" - Visual warnings (signs, labels, floor markings, mirrors, lights, beacons)
-- "Level 2 - Administrative Controls" - Procedures (training, SOPs, permits, inspections, schedules, supervision)
-- "Level 1 - Individual Target" - PPE (gloves, goggles, helmets, respirators, safety shoes, harnesses)
+        const matchSelectOption = (selectEl, rawValue) => {
+            if (!selectEl || !rawValue) return null;
+            const value = String(rawValue).trim();
+            if (!value) return null;
 
-CONTROL DESCRIPTIONS TO CLASSIFY:
-${controlData.map((c, i) => {
-    let text = `${i + 1}. `;
-    if (c.counterDesc) text += `Current Control: "${c.counterDesc}"`;
-    if (c.predDesc) text += ` | Predicted Control: "${c.predDesc}"`;
-    return text;   
-}).join('\n')}
+            const reversed = window.reverseTranslate ? (window.reverseTranslate(value) || value) : value;
+            const candidates = [value, reversed].map(v => v.toLowerCase());
 
-IMPORTANT RULES:
-1. A control can match MULTIPLE levels (e.g., "guard with warning sign" = Level 4 + Level 3)
-2. Use the exact level names from the list above
-3. Analyze keywords carefully - mirrors, reflectors = Visual Controls; guards, barriers = Engineering Controls
+            return Array.from(selectEl.options).find(opt => {
+                const optValue = (opt.value || '').trim().toLowerCase();
+                const optLabel = (opt.textContent || '').trim().toLowerCase();
+                return candidates.includes(optValue) || candidates.includes(optLabel);
+            }) || null;
+        };
 
-Return ONLY a valid JSON array with this exact structure (no explanation, no markdown):
+        // 1) Local ladder suggestion pass from user-entered Current Control.
+        let ladderUpdatedRows = 0;
+        const rowsNeedingDropdownAssist = [];
+
+        hazardRows.forEach(row => {
+            const taskName = row.querySelector('.hazard-task')?.value?.trim() || '';
+            const hazardSelect = row.querySelector('.hazard-category');
+            const subHazardSelect = row.querySelector('.hazard-sub');
+            const outcomeSelect = row.querySelector('.hazard-outcome');
+            const hazardSource = row.querySelector('.hazard-desc')?.value?.trim() || '';
+            const currentControl = row.querySelector('.hazard-counter-desc')?.value?.trim() || '';
+            const counterLadderSelect = row.querySelector('.hazard-counter-ladder');
+
+            // Preserve Current Control text; use it only for ladder classification.
+            if (currentControl && counterLadderSelect) {
+                const ladderLevels = suggestCountermeasureLadder(currentControl);
+                if (ladderLevels.length > 0) {
+                    Array.from(counterLadderSelect.options).forEach(opt => {
+                        opt.selected = false;
+                    });
+
+                    let selectedCount = 0;
+                    ladderLevels.forEach(level => {
+                        const normalizedLevel = String(level || '').trim().toLowerCase();
+                        if (!normalizedLevel) return;
+                        const matchingOpt = Array.from(counterLadderSelect.options).find(opt =>
+                            (opt.value || '').trim().toLowerCase() === normalizedLevel
+                        );
+                        if (matchingOpt) {
+                            matchingOpt.selected = true;
+                            selectedCount++;
+                        }
+                    });
+
+                    if (selectedCount > 0) {
+                        counterLadderSelect.classList.add('goehs-ai-prefilled');
+                        ladderUpdatedRows++;
+                    }
+                }
+            }
+
+            const hazardNeedsFix = !!hazardSelect && (!hazardSelect.value || hazardSelect.classList.contains('goehs-mismatch'));
+            const subHazardNeedsFix = !!subHazardSelect && (!subHazardSelect.value || subHazardSelect.classList.contains('goehs-mismatch'));
+            const outcomeNeedsFix = !!outcomeSelect && (!outcomeSelect.value || outcomeSelect.classList.contains('goehs-mismatch'));
+
+            if (!hazardNeedsFix && !subHazardNeedsFix && !outcomeNeedsFix) {
+                return;
+            }
+
+            rowsNeedingDropdownAssist.push({
+                row,
+                taskName,
+                hazardSource,
+                currentControl,
+                hazardSelect,
+                subHazardSelect,
+                outcomeSelect,
+                hazardNeedsFix,
+                subHazardNeedsFix,
+                outcomeNeedsFix,
+                currentHazard: hazardSelect?.value?.trim() || '',
+                currentSubHazard: subHazardSelect?.value?.trim() || '',
+                currentOutcome: outcomeSelect?.value?.trim() || '',
+                hazardOptions: toOptionValues(hazardSelect),
+                subHazardOptions: toOptionValues(subHazardSelect),
+                outcomeOptions: toOptionValues(outcomeSelect)
+            });
+        });
+
+        // Nothing to send to AI: only ladder updates were needed.
+        if (rowsNeedingDropdownAssist.length === 0) {
+            if (ladderUpdatedRows > 0) {
+                showGoehsAlert(`🤖 AI Assist: Updated ladder selections on ${ladderUpdatedRows} row(s). No dropdown corrections were needed.`, 'success');
+            } else {
+                showGoehsAlert('ℹ️ No dropdown mismatches/missing fields found and no ladder updates were needed.', 'info');
+            }
+            scheduleGoehsIssueCounterRefresh();
+            return;
+        }
+
+        // 2) AI pass only for rows with missing/mismatched dropdown fields.
+        const promptRows = rowsNeedingDropdownAssist.map((item, assistIndex) => ({
+            assistIndex,
+            taskName: item.taskName,
+            hazardSource: item.hazardSource,
+            currentControl: item.currentControl,
+            needsHazard: item.hazardNeedsFix,
+            needsSubHazard: item.subHazardNeedsFix,
+            needsOutcome: item.outcomeNeedsFix,
+            currentHazard: item.currentHazard,
+            currentSubHazard: item.currentSubHazard,
+            currentOutcome: item.currentOutcome,
+            allowedHazards: item.hazardOptions,
+            allowedSubHazards: item.subHazardOptions,
+            allowedOutcomes: item.outcomeOptions
+        }));
+
+        const prompt = `You are a workplace safety risk expert.
+
+Task:
+Fix ONLY missing or mismatched dropdown fields for the listed rows.
+Do NOT propose or rewrite control text.
+
+Rules:
+- Use each row's allowed options.
+- Return values exactly from allowed option lists.
+- Only fill fields flagged as needed.
+- If unsure, choose the best closest allowed option.
+
+ROWS:
+${JSON.stringify(promptRows, null, 2)}
+
+Return ONLY valid JSON array:
 [
-  {"index": 0, "currentLevels": ["Level X - Name", "Level Y - Name"], "predictedLevels": ["Level Z - Name"]},
-  ...
+  {
+    "assistIndex": 0,
+    "hazard": "exact allowed option or empty string",
+    "subHazard": "exact allowed option or empty string",
+    "outcome": "exact allowed option or empty string"
+  }
 ]`;
 
         // Call the API - use global endpoint constant
@@ -3357,68 +4053,72 @@ Return ONLY a valid JSON array with this exact structure (no explanation, no mar
         }
         
         const suggestions = JSON.parse(jsonMatch[0]);
-        
-        // Valid ladder levels for validation
-        const validLevels = [
-            'Level 6 - Elimination',
-            'Level 5 - Substitution',
-            'Level 4 - Engineering Controls',
-            'Level 3 - Visual Controls',
-            'Level 2 - Administrative Controls',
-            'Level 1 - Individual Target'
-        ];
-        
-        // Apply suggestions to hazard rows
-        let updated = 0;
+
+        // Apply dropdown correction suggestions.
+        let dropdownUpdatedRows = 0;
         suggestions.forEach(suggestion => {
-            const controlItem = controlData[suggestion.index];
-            if (!controlItem) return;
-            
-            // Update Current Control Ladder
-            if (suggestion.currentLevels?.length > 0 && controlItem.counterLadderSelect) {
-                // Clear existing selections
-                Array.from(controlItem.counterLadderSelect.options).forEach(opt => opt.selected = false);
-                
-                suggestion.currentLevels.forEach(level => {
-                    // Find matching option (case-insensitive)
-                    const matchingOpt = Array.from(controlItem.counterLadderSelect.options).find(
-                        opt => opt.value.toLowerCase() === level.toLowerCase() ||
-                               validLevels.some(v => v.toLowerCase() === level.toLowerCase() && opt.value.toLowerCase() === v.toLowerCase())
-                    );
-                    if (matchingOpt) {
-                        matchingOpt.selected = true;
-                        updated++;
+            const assistIndex = Number(suggestion.assistIndex);
+            if (Number.isNaN(assistIndex)) return;
+
+            const controlItem = rowsNeedingDropdownAssist[assistIndex];
+            if (!controlItem || !controlItem.row) return;
+
+            let rowUpdated = false;
+
+            const suggestedHazard = (suggestion.hazard || '').toString().trim();
+            const suggestedSubHazard = (suggestion.subHazard || '').toString().trim();
+            const suggestedOutcome = (suggestion.outcome || '').toString().trim();
+
+            if (controlItem.hazardNeedsFix && suggestedHazard && controlItem.hazardSelect) {
+                const matchedHazard = matchSelectOption(controlItem.hazardSelect, suggestedHazard);
+                if (matchedHazard) {
+                    controlItem.hazardSelect.value = matchedHazard.value;
+                    controlItem.hazardSelect.classList.remove('goehs-mismatch');
+                    controlItem.hazardSelect.classList.add('goehs-ai-prefilled');
+
+                    if (controlItem.row.id) {
+                        updateTableSubHazards(controlItem.hazardSelect, controlItem.row.id);
+                        controlItem.subHazardSelect = controlItem.row.querySelector('.hazard-sub');
                     }
-                });
-                controlItem.counterLadderSelect.classList.add('goehs-ai-prefilled');
+                    rowUpdated = true;
+                }
             }
-            
-            // Update Predicted Control Ladder
-            if (suggestion.predictedLevels?.length > 0 && controlItem.predLadderSelect) {
-                // Clear existing selections
-                Array.from(controlItem.predLadderSelect.options).forEach(opt => opt.selected = false);
-                
-                suggestion.predictedLevels.forEach(level => {
-                    // Find matching option (case-insensitive)
-                    const matchingOpt = Array.from(controlItem.predLadderSelect.options).find(
-                        opt => opt.value.toLowerCase() === level.toLowerCase() ||
-                               validLevels.some(v => v.toLowerCase() === level.toLowerCase() && opt.value.toLowerCase() === v.toLowerCase())
-                    );
-                    if (matchingOpt) {
-                        matchingOpt.selected = true;
-                        updated++;
-                    }
-                });
-                controlItem.predLadderSelect.classList.add('goehs-ai-prefilled');
+
+            if (controlItem.subHazardNeedsFix && suggestedSubHazard && controlItem.subHazardSelect) {
+                const matchedSubHazard = matchSelectOption(controlItem.subHazardSelect, suggestedSubHazard);
+                if (matchedSubHazard) {
+                    controlItem.subHazardSelect.value = matchedSubHazard.value;
+                    controlItem.subHazardSelect.classList.remove('goehs-mismatch');
+                    controlItem.subHazardSelect.classList.add('goehs-ai-prefilled');
+                    rowUpdated = true;
+                }
+            }
+
+            if (controlItem.outcomeNeedsFix && suggestedOutcome && controlItem.outcomeSelect) {
+                const matchedOutcome = matchSelectOption(controlItem.outcomeSelect, suggestedOutcome);
+                if (matchedOutcome) {
+                    controlItem.outcomeSelect.value = matchedOutcome.value;
+                    controlItem.outcomeSelect.classList.remove('goehs-mismatch');
+                    controlItem.outcomeSelect.classList.add('goehs-ai-prefilled');
+                    rowUpdated = true;
+                }
+            }
+
+            if (rowUpdated) {
+                dropdownUpdatedRows++;
             }
         });
-        
-        if (updated > 0) {
-            showGoehsAlert(`🤖 AI Assist: Updated ${updated} countermeasure ladder selection(s) using external AI.`, 'success');
+
+        if (dropdownUpdatedRows > 0 || ladderUpdatedRows > 0) {
+            const parts = [];
+            if (dropdownUpdatedRows > 0) parts.push(`corrected dropdowns on ${dropdownUpdatedRows} row(s)`);
+            if (ladderUpdatedRows > 0) parts.push(`updated ladder selections on ${ladderUpdatedRows} row(s)`);
+            showGoehsAlert(`🤖 AI Assist: ${parts.join(' and ')}.`, 'success');
         } else {
-            showGoehsAlert('� ️ AI could not classify any controls. Try Intelligent Fill instead.', 'warning');
+            showGoehsAlert('⚠ AI did not return usable dropdown corrections and no ladder updates were made.', 'warning');
         }
-        
+
+        scheduleGoehsIssueCounterRefresh();
     } catch (error) {
         console.error('AI Assist error:', error);
         showGoehsAlert(`❌ AI Assist failed: ${error.message}. Try Intelligent Fill instead.`, 'error');
@@ -3434,190 +4134,34 @@ Return ONLY a valid JSON array with this exact structure (no explanation, no mar
 // ============ HAZARD MANAGEMENT (Tool 3) ============
 
 function addHazardRow() {
+    // Primary path for current UI.
+    if (document.getElementById('hazardTableBody')) {
+        addHazardTableRow();
+        return;
+    }
+
+    // Legacy card fallback (kept minimal for backward compatibility).
+    const container = document.getElementById('hazardRowsContainer');
+    if (!container) {
+        showGoehsAlert('Hazard container not found. Please use the table-based review pane.', 'error');
+        return;
+    }
+
     hazardIdCounter++;
     const hazardId = `hazard-${hazardIdCounter}`;
-    
     goehsHazards.push({ id: hazardId });
-    
-    const container = document.getElementById('hazardRowsContainer');
+
     const row = document.createElement('div');
     row.id = hazardId;
     row.className = 'hazard-row bg-slate-50 border border-slate-200 rounded-lg p-4';
-    
-    // Get task names for dropdown
-    const tasks = collectTaskData();
-    const taskOptions = tasks.length > 0 
-        ? tasks.map((t, i) => `<option value="${t.taskName || `Task ${i+1}`}">${t.taskName || `Task ${i+1}`}</option>`).join('')
-        : '<option value="">-- No tasks defined --</option>';
-    
     row.innerHTML = `
-        <div class="flex justify-between items-center mb-4">
+        <div class="flex justify-between items-center">
             <h4 class="font-semibold text-slate-800">Hazard #${goehsHazards.length}</h4>
-            <button type="button" onclick="removeHazardRow('${hazardId}')" class="text-red-500 hover:text-red-700 text-sm flex items-center gap-1">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                Remove
-            </button>
+            <button type="button" onclick="removeHazardRow('${hazardId}')" class="text-red-500 hover:text-red-700 text-sm">Remove</button>
         </div>
-        
-        <!-- Section A: Initial Assessment -->
-        <div class="mb-4 pb-4 border-b border-slate-300">
-            <h5 class="text-sm font-semibold text-orange-600 mb-3">Initial Assessment</h5>
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-                <div>
-                    <label class="block text-xs font-medium text-slate-600 mb-1">Task Name <span class="text-red-500">*</span></label>
-                    <select class="hazard-task w-full p-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500">
-                        <option value="">-- Select --</option>
-                        ${taskOptions}
-                    </select>
-                </div>
-                <div>
-                    <label class="block text-xs font-medium text-slate-600 mb-1">Hazard <span class="text-red-500">*</span></label>
-                    <select class="hazard-category w-full p-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500" onchange="updateSubHazards(this, '${hazardId}')">
-                        <option value="">-- Select --</option>
-                        ${Object.keys(HAZARD_CATEGORIES).map(h => `<option value="${h}">${h}</option>`).join('')}
-                    </select>
-                </div>
-                <div>
-                    <label class="block text-xs font-medium text-slate-600 mb-1">Sub-Hazard <span class="text-red-500">*</span></label>
-                    <select class="hazard-sub w-full p-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500" disabled>
-                        <option value="">-- Select Hazard First --</option>
-                    </select>
-                </div>
-                <div>
-                    <label class="block text-xs font-medium text-slate-600 mb-1">Potential Outcome</label>
-                    <input type="text" class="hazard-outcome w-full p-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500" placeholder="Outcome">
-                </div>
-                <div class="md:col-span-2">
-                    <label class="block text-xs font-medium text-slate-600 mb-1">Hazard Description</label>
-                    <input type="text" class="hazard-desc w-full p-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500" placeholder="Description">
-                </div>
-                <div>
-                    <label class="block text-xs font-medium text-slate-600 mb-1">Initial Frequency</label>
-                    <select class="hazard-init-freq w-full p-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500" onchange="calculateInitialRisk('${hazardId}')">
-                        <option value="">--</option>
-                        ${FREQUENCY_VALUES.map(f => `<option value="${f}">${f}</option>`).join('')}
-                    </select>
-                </div>
-                <div>
-                    <label class="block text-xs font-medium text-slate-600 mb-1">Initial Severity</label>
-                    <select class="hazard-init-sev w-full p-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500" onchange="calculateInitialRisk('${hazardId}')">
-                        <option value="">--</option>
-                        ${SEVERITY_VALUES.map(s => `<option value="${s}">${s}</option>`).join('')}
-                    </select>
-                </div>
-                <div>
-                    <label class="block text-xs font-medium text-slate-600 mb-1">Initial Likelihood</label>
-                    <select class="hazard-init-like w-full p-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500" onchange="calculateInitialRisk('${hazardId}')">
-                        <option value="">--</option>
-                        ${LIKELIHOOD_VALUES.map(l => `<option value="${l}">${l}</option>`).join('')}
-                    </select>
-                </div>
-                <div>
-                    <label class="block text-xs font-medium text-slate-600 mb-1">Initial Risk Score</label>
-                    <input type="text" class="hazard-init-score w-full p-2 text-sm border border-slate-200 rounded-lg bg-slate-100" readonly>
-                </div>
-                <div>
-                    <label class="block text-xs font-medium text-slate-600 mb-1">Initial Risk Rating</label>
-                    <input type="text" class="hazard-init-rating w-full p-2 text-sm border border-slate-200 rounded-lg bg-slate-100" readonly>
-                </div>
-            </div>
-        </div>
-        
-        <!-- Section B: Countermeasures -->
-        <div class="mb-4 pb-4 border-b border-slate-300">
-            <h5 class="text-sm font-semibold text-blue-600 mb-3">Countermeasures (Residual)</h5>
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-                <div class="md:col-span-2">
-                    <label class="block text-xs font-medium text-slate-600 mb-1">Description of Countermeasures</label>
-                    <input type="text" class="hazard-counter-desc w-full p-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500" placeholder="Countermeasures">
-                </div>
-                <div class="md:col-span-2">
-                    <label class="block text-xs font-medium text-slate-600 mb-1">Countermeasures Ladder</label>
-                    <select class="hazard-counter-ladder w-full p-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500">
-                        <option value="">-- Select --</option>
-                        ${COUNTERMEASURE_LADDER.map(c => `<option value="${c}">${c}</option>`).join('')}
-                    </select>
-                </div>
-                <div>
-                    <label class="block text-xs font-medium text-slate-600 mb-1">Residual Frequency</label>
-                    <select class="hazard-res-freq w-full p-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500" onchange="calculateResidualRisk('${hazardId}')">
-                        <option value="">--</option>
-                        ${FREQUENCY_VALUES.map(f => `<option value="${f}">${f}</option>`).join('')}
-                    </select>
-                </div>
-                <div>
-                    <label class="block text-xs font-medium text-slate-600 mb-1">Residual Severity</label>
-                    <select class="hazard-res-sev w-full p-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500" onchange="calculateResidualRisk('${hazardId}')">
-                        <option value="">--</option>
-                        ${SEVERITY_VALUES.map(s => `<option value="${s}">${s}</option>`).join('')}
-                    </select>
-                </div>
-                <div>
-                    <label class="block text-xs font-medium text-slate-600 mb-1">Residual Likelihood</label>
-                    <select class="hazard-res-like w-full p-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500" onchange="calculateResidualRisk('${hazardId}')">
-                        <option value="">--</option>
-                        ${LIKELIHOOD_VALUES.map(l => `<option value="${l}">${l}</option>`).join('')}
-                    </select>
-                </div>
-                <div>
-                    <label class="block text-xs font-medium text-slate-600 mb-1">Residual Risk Score</label>
-                    <input type="text" class="hazard-res-score w-full p-2 text-sm border border-slate-200 rounded-lg bg-blue-50" readonly>
-                </div>
-                <div>
-                    <label class="block text-xs font-medium text-slate-600 mb-1">Residual Risk Rating</label>
-                    <input type="text" class="hazard-res-rating w-full p-2 text-sm border border-slate-200 rounded-lg bg-blue-50" readonly>
-                </div>
-            </div>
-        </div>
-        
-        <!-- Section C: Predictive -->
-        <div>
-            <h5 class="text-sm font-semibold text-green-600 mb-3">Predictive Controls</h5>
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-                <div class="md:col-span-2">
-                    <label class="block text-xs font-medium text-slate-600 mb-1">Description of Countermeasures Predictive</label>
-                    <input type="text" class="hazard-pred-desc w-full p-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500" placeholder="Future countermeasures">
-                </div>
-                <div class="md:col-span-2">
-                    <label class="block text-xs font-medium text-slate-600 mb-1">Countermeasures Ladder Predictive</label>
-                    <select class="hazard-pred-ladder w-full p-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500">
-                        <option value="">-- Select --</option>
-                        ${COUNTERMEASURE_LADDER.map(c => `<option value="${c}">${c}</option>`).join('')}
-                    </select>
-                </div>
-                <div>
-                    <label class="block text-xs font-medium text-slate-600 mb-1">Predictive Frequency</label>
-                    <select class="hazard-pred-freq w-full p-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500" onchange="calculatePredictiveRisk('${hazardId}')">
-                        <option value="">--</option>
-                        ${FREQUENCY_VALUES.map(f => `<option value="${f}">${f}</option>`).join('')}
-                    </select>
-                </div>
-                <div>
-                    <label class="block text-xs font-medium text-slate-600 mb-1">Predictive Severity</label>
-                    <select class="hazard-pred-sev w-full p-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500" onchange="calculatePredictiveRisk('${hazardId}')">
-                        <option value="">--</option>
-                        ${SEVERITY_VALUES.map(s => `<option value="${s}">${s}</option>`).join('')}
-                    </select>
-                </div>
-                <div>
-                    <label class="block text-xs font-medium text-slate-600 mb-1">Predictive Likelihood</label>
-                    <select class="hazard-pred-like w-full p-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500" onchange="calculatePredictiveRisk('${hazardId}')">
-                        <option value="">--</option>
-                        ${LIKELIHOOD_VALUES.map(l => `<option value="${l}">${l}</option>`).join('')}
-                    </select>
-                </div>
-                <div>
-                    <label class="block text-xs font-medium text-slate-600 mb-1">Predictive Risk Score</label>
-                    <input type="text" class="hazard-pred-score w-full p-2 text-sm border border-slate-200 rounded-lg bg-green-50" readonly>
-                </div>
-                <div>
-                    <label class="block text-xs font-medium text-slate-600 mb-1">Predictive Risk Rating</label>
-                    <input type="text" class="hazard-pred-rating w-full p-2 text-sm border border-slate-200 rounded-lg bg-green-50" readonly>
-                </div>
-            </div>
-        </div>
+        <p class="text-xs text-slate-500 mt-2">Legacy hazard card mode is limited. Use the table-based Final Review pane for full GOEHS export support.</p>
     `;
-    
+
     container.appendChild(row);
 }
 
@@ -3728,20 +4272,18 @@ function escapeCSV(str) {
 }
 
 function generateAssessmentCSV() {
+    if (!validateGoehsRequiredHeaderFields()) {
+        return;
+    }
+
     const orgName = document.getElementById('goehsOrgName').value;
     const location = document.getElementById('goehsLocation').value;
     const department = document.getElementById('goehsDepartment').value;
     const workstation = document.getElementById('goehsWorkstation').value;
-    const title = document.getElementById('goehsAssessmentTitle').value;
-    const date = document.getElementById('goehsAssessmentDate').value;
-    const type = document.getElementById('goehsType').value || 'Safety';
+    const title = (document.getElementById('goehsAssessmentTitle')?.value || '').trim() || 'Untitled Assessment';
+    const date = formatDateForGoehsExport(document.getElementById('goehsAssessmentDate')?.value || '');
+    const type = getGoehsTypeValue();
     const approver = document.getElementById('goehsApprover').value || 'Site Admin';
-    
-    // Validation - removed Equipment, Team Members, Completed By from validation
-    if (!orgName || !location || !title) {
-        showGoehsAlert('Please fill in all required fields (OrgName, Location, Assessment Title).', 'error');
-        return;
-    }
     
     // CSV Headers - these are still needed for GOEHS import format
     const headers = ['OrgName', 'Location', 'Department', 'Workstation', 'Assessment Title', 'Assessment Date', 'Equipment', 'Type', 'Assessment Approver', 'Name of Risk Assessment Team Members', 'Completed By'];
@@ -3756,14 +4298,13 @@ function generateAssessmentCSV() {
 }
 
 function generateTaskCSV() {
+    if (!validateGoehsRequiredHeaderFields()) {
+        return;
+    }
+
     const orgName = document.getElementById('goehsOrgName').value;
     const location = document.getElementById('goehsLocation').value;
     const assessmentTitle = document.getElementById('goehsAssessmentTitle').value;
-    
-    if (!assessmentTitle) {
-        showGoehsAlert('Please enter Assessment Title in Tool 1 first.', 'error');
-        return;
-    }
     
     const tasks = collectTaskData();
     
@@ -3789,14 +4330,13 @@ function generateTaskCSV() {
 }
 
 function generateHazardCSV() {
+    if (!validateGoehsRequiredHeaderFields()) {
+        return;
+    }
+
     const orgName = document.getElementById('goehsOrgName').value;
     const location = document.getElementById('goehsLocation').value;
     const assessmentTitle = document.getElementById('goehsAssessmentTitle').value;
-    
-    if (!assessmentTitle) {
-        showGoehsAlert('Please enter Assessment Title in Tool 1 first.', 'error');
-        return;
-    }
     
     const hazards = collectHazardData();
     
@@ -3832,109 +4372,14 @@ function generateHazardCSV() {
 // Generate a single unified CSV that merges Assessment + Task + Hazard data (one row per hazard)
 // Also copies the data to clipboard for easy pasting
 function generateUnifiedCSV() {
-    // --- Gather Assessment data (Tool 1) ---
-    const orgName = document.getElementById('goehsOrgName').value;
-    const location = document.getElementById('goehsLocation').value;
-    const department = document.getElementById('goehsDepartment').value;
-    const workstation = document.getElementById('goehsWorkstation').value;
-    const assessmentTitle = document.getElementById('goehsAssessmentTitle').value;
-    const date = document.getElementById('goehsAssessmentDate').value;
-    const type = document.getElementById('goehsType').value || 'Safety';
-    const approver = document.getElementById('goehsApprover').value || 'Site Admin';
-
-    if (!assessmentTitle) {
-        showGoehsAlert('Please enter Assessment Title in Tool 1 first.', 'error');
-        return;
-    }
-
-    // --- Gather Task data (Tool 2) ---
-    const tasks = collectTaskData();
-    // Build a lookup: taskName -> task details
-    const taskLookup = {};
-    tasks.forEach(t => {
-        taskLookup[t.taskName] = t;
-    });
-
-    // --- Gather Hazard data (Tool 3) ---
-    const hazards = collectHazardData();
-    if (hazards.length === 0) {
-        showGoehsAlert('No hazard rows to export. Add hazards first.', 'warning');
-        return;
-    }
-
-    // --- Unified CSV Headers (exact order requested) ---
-    const headers = [
-        'OrgName', 'Location', 'Department', 'Workstation',
-        'Assessment Title', 'Assessment Date', 'Equipment', 'Type',
-        'Assessment Approver', 'Name of Risk Assessment Team Members', 'Completed By',
-        'Assessment Title', 'Task Name', 'Task Description', 'Condition Mode',
-        'Core Activity', 'Job Title / Occupation Field',
-        'Hazard', 'Sub-Hazard', 'Potential Outcome', 'Hazard Description',
-        'Initial Frequency', 'Initial Severity', 'Initial Likelihood',
-        'Initial Risk Score', 'Initial Risk Rating',
-        'Description of Countermeasures', 'Countermeasure Ladder',
-        'Residual Frequency', 'Residual Severity', 'Residual Likelihood',
-        'Residual Risk Score', 'Residual Risk Rating',
-        'Description of Countermeasures Predictive', 'Countermeasure Ladder Predictive',
-        'Predictive Frequency', 'Predictive Severity'
-    ];
-
-    // --- Build one row per hazard, merging assessment + matched task + hazard ---
-    const rows = hazards.map(h => {
-        // Match the hazard's taskName to a task row for extra fields
-        const task = taskLookup[h.taskName] || {};
-
-        return [
-            // Assessment columns
-            orgName, location, department, workstation,
-            assessmentTitle, date, '', type,
-            approver, '', '',
-            // Task columns (Assessment Title repeated as per requested header order)
-            assessmentTitle,
-            h.taskName,
-            task.taskDescription || '',
-            task.conditionMode || '',
-            task.coreActivity || '',
-            task.jobTitle || '',
-            // Hazard columns
-            h.hazardCategory, h.subHazard, h.outcome, h.description,
-            h.initFreq, h.initSev, h.initLike, h.initScore, h.initRating,
-            h.counterDesc, h.counterLadder,
-            h.resFreq, h.resSev, h.resLike, h.resScore, h.resRating,
-            h.predDesc, h.predLadder,
-            h.predFreq, h.predSev
-        ];
-    });
-
-    const csvContent = headers.map(escapeCSV).join(',')
-        + '\n' + rows.map(r => r.map(escapeCSV).join(',')).join('\n');
-
-    const safeTitle = (assessmentTitle || 'export').replace(/[^a-zA-Z0-9]/g, '_');
-    const fileName = `GOEHS_Unified_${safeTitle}.csv`;
-    
-    // Download the CSV file
-    downloadCSV(csvContent, fileName);
-    
-    // Copy to clipboard
-    navigator.clipboard.writeText(csvContent).then(() => {
-        showGoehsAlert(
-            `✅ Unified CSV downloaded (${hazards.length} row${hazards.length !== 1 ? 's' : ''}) and copied to clipboard!\n📋 Ready to paste into spreadsheet or text editor.`,
-            'success'
-        );
-    }).catch(err => {
-        console.error('Clipboard error:', err);
-        // Still show success for download even if clipboard fails
-        showGoehsAlert(
-            `✅ Unified CSV downloaded (${hazards.length} row${hazards.length !== 1 ? 's' : ''})!\n� ️ Clipboard copy failed - please try copying manually.`,
-            'warning'
-        );
-    });
+    showGoehsAlert('Unified CSV path is disabled in simplified GOEHS flow. Generating vendor XLSX instead.', 'info');
+    generateExcelWithSheets();
 }
 
 function collectHazardData() {
     const hazards = [];
-    // Support both old card format (.hazard-row divs) and new table format (.hazard-table-row tr)
-    const rows = document.querySelectorAll('.hazard-table-row');
+    // Collect only active table rows; soft-deleted rows are excluded from export.
+    const rows = getActiveHazardTableRows();
     
     rows.forEach(row => {
         // Get multi-select values for ladder fields
@@ -3949,6 +4394,7 @@ function collectHazardData() {
         
         hazards.push({
             taskName: row.querySelector('.hazard-task')?.value || '',
+            mode: normalizeGoehsConditionMode(row.querySelector('.hazard-mode')?.value || 'Routine'),
             hazardCategory: row.querySelector('.hazard-category')?.value || '',
             subHazard: row.querySelector('.hazard-sub')?.value || '',
             outcome: row.querySelector('.hazard-outcome')?.value || '',
@@ -4035,118 +4481,28 @@ function mapHazardToVendor(appHazard) {
 
 // Copy Assessment CSV to clipboard
 function copyAssessmentCSV() {
-    const assessmentTitle = document.getElementById('goehsAssessmentTitle').value;
-    if (!assessmentTitle) {
-        showGoehsAlert('Please enter Assessment Title first.', 'error');
-        return;
-    }
-    
-    let orgName = document.getElementById('goehsOrgName').value;
-    let location = document.getElementById('goehsLocation').value;
-    const department = document.getElementById('goehsDepartment').value;
-    const workstation = document.getElementById('goehsWorkstation').value;
-    const date = document.getElementById('goehsAssessmentDate').value;
-    const type = document.getElementById('goehsType').value || 'Safety';
-    const approver = document.getElementById('goehsApprover').value || 'Site Admin';
-    
-    // Map to vendor values
-    if (VENDOR_ORG_NAMES.includes(orgName)) {
-        orgName = orgName; // Already matches vendor format
-    }
-    if (orgName === 'Mfg - EMEA' && VENDOR_LOCATIONS['Mfg - EMEA'].includes(location)) {
-        location = location; // Already matches vendor format
-    }
-    
-    // Tab-separated values (no headers, single row)
-    const row = [orgName, location, department, workstation, assessmentTitle, date, '', type, approver, '', ''];
-    const tsvContent = row.map(v => (v || '').toString().replace(/\t/g, ' ')).join('\t');
-    
-    navigator.clipboard.writeText(tsvContent).then(() => {
-        showGoehsAlert('✅ Assessment data copied to clipboard! (Tab-separated, ready to paste)', 'success');
-    }).catch(err => {
-        showGoehsAlert('Failed to copy to clipboard. Please try again.', 'error');
-        console.error('Clipboard error:', err);
-    });
+    showGoehsAlert('Copy Assessment CSV is disabled in simplified GOEHS flow. Use the XLSX download button.', 'info');
 }
 
 // Copy Task CSV to clipboard
 function copyTaskCSV() {
-    const assessmentTitle = document.getElementById('goehsAssessmentTitle').value;
-    if (!assessmentTitle) {
-        showGoehsAlert('Please enter Assessment Title in Tool 1 first.', 'error');
-        return;
-    }
-    
-    const orgName = document.getElementById('goehsOrgName').value;
-    const location = document.getElementById('goehsLocation').value;
-    const tasks = collectTaskData();
-    
-    if (tasks.length === 0) {
-        showGoehsAlert('No tasks to copy. Add tasks first.', 'warning');
-        return;
-    }
-    
-    // Tab-separated values (no headers)
-    const rows = tasks.map(t => [orgName, location, assessmentTitle, t.taskName, t.taskDescription, t.conditionMode, t.coreActivity, t.jobTitle]);
-    const tsvContent = rows.map(r => r.map(v => (v || '').toString().replace(/\t/g, ' ')).join('\t')).join('\n');
-    
-    navigator.clipboard.writeText(tsvContent).then(() => {
-        showGoehsAlert(`✅ Task data copied to clipboard! ${tasks.length} task(s) ready to paste.`, 'success');
-    }).catch(err => {
-        showGoehsAlert('Failed to copy to clipboard. Please try again.', 'error');
-        console.error('Clipboard error:', err);
-    });
+    showGoehsAlert('Copy Task CSV is disabled in simplified GOEHS flow. Use the XLSX download button.', 'info');
 }
 
 // Copy Hazard CSV to clipboard
 function copyHazardCSV() {
-    const assessmentTitle = document.getElementById('goehsAssessmentTitle').value;
-    if (!assessmentTitle) {
-        showGoehsAlert('Please enter Assessment Title in Tool 1 first.', 'error');
-        return;
-    }
-    
-    let orgName = document.getElementById('goehsOrgName').value;
-    let location = document.getElementById('goehsLocation').value;
-    const hazards = collectHazardData();
-    
-    if (hazards.length === 0) {
-        showGoehsAlert('No hazards to copy. Add hazards first.', 'warning');
-        return;
-    }
-    
-    // Map to vendor values
-    if (VENDOR_ORG_NAMES.includes(orgName)) {
-        orgName = orgName; // Already matches vendor format
-    }
-    if (orgName === 'Mfg - EMEA' && VENDOR_LOCATIONS['Mfg - EMEA'].includes(location)) {
-        location = location; // Already matches vendor format
-    }
-    
-    // Tab-separated values (no headers) with hazard category mapping
-    const rows = hazards.map(h => [
-        orgName, location, assessmentTitle, h.taskName, mapHazardToVendor(h.hazardCategory), h.subHazard, h.outcome, h.description,
-        h.initFreq, h.initSev, h.initLike, h.initScore, h.initRating,
-        h.counterDesc, h.counterLadder, h.resFreq, h.resSev, h.resLike, h.resScore, h.resRating,
-        h.predDesc, h.predLadder, h.predFreq, h.predSev, h.predLike, h.predScore, h.predRating
-    ]);
-    const tsvContent = rows.map(r => r.map(v => (v || '').toString().replace(/\t/g, ' ')).join('\t')).join('\n');
-    
-    navigator.clipboard.writeText(tsvContent).then(() => {
-        showGoehsAlert(`✅ Hazard data copied to clipboard! ${hazards.length} hazard(s) ready to paste.`, 'success');
-    }).catch(err => {
-        showGoehsAlert('Failed to copy to clipboard. Please try again.', 'error');
-        console.error('Clipboard error:', err);
-    });
+    showGoehsAlert('Copy Hazard CSV is disabled in simplified GOEHS flow. Use the XLSX download button.', 'info');
 }
 
 // Generate Excel file with 3 sheets (Assessment, Task, Hazard)
 function generateExcelWithSheets() {
-    const assessmentTitle = document.getElementById('goehsAssessmentTitle').value;
-    if (!assessmentTitle) {
-        showGoehsAlert('Please enter Assessment Title in Tool 1 first.', 'error');
+    if (!validateGoehsRequiredHeaderFields()) {
         return;
     }
+
+    const titleInput = (document.getElementById('goehsAssessmentTitle')?.value || '').trim();
+    const projectName = (document.getElementById('projectNameInput')?.value || '').trim();
+    const assessmentTitle = titleInput || projectName || 'Untitled Assessment';
 
     if (typeof XLSX === 'undefined') {
         showGoehsAlert('Excel library not loaded. Please try the CSV download instead.', 'error');
@@ -4158,20 +4514,18 @@ function generateExcelWithSheets() {
     const location    = document.getElementById('goehsLocation').value;
     const department  = document.getElementById('goehsDepartment').value;
     const workstation = document.getElementById('goehsWorkstation').value;
-    const date        = document.getElementById('goehsAssessmentDate').value;
+    const date        = formatDateForGoehsExport(document.getElementById('goehsAssessmentDate')?.value || '');
     const equipment   = document.getElementById('goehsEquipment')?.value || '';
-    const type        = document.getElementById('goehsType').value || 'Safety';
+    const type        = getGoehsTypeValue();
     const approver    = document.getElementById('goehsApprover').value || '(Site Admin)';
     const teamMembers = document.getElementById('goehsTeamMembers')?.value || '';
     const completedBy = document.getElementById('goehsCompletedBy')?.value || '';
 
-    // Build task lookup map keyed by taskName (populated from Tool 2)
-    const tasks = collectTaskData();
-    const taskMap = {};
-    tasks.forEach(t => { taskMap[t.taskName] = t; });
-
     // Collect hazard rows — values already validated against GOEHS whitelists in the UI
     const hazards = collectHazardData();
+
+    // Build task lookup map from available task rows (if any) and risk-table-derived metadata fallback.
+    const taskMap = getGoehsTaskMetadataMap(hazards);
 
     if (hazards.length === 0) {
         showGoehsAlert('No hazards found. Please add hazards in Tool 3 first.', 'error');
@@ -4229,7 +4583,15 @@ function generateExcelWithSheets() {
 
     // -- One flat data row per hazard (denormalised) --
     const dataRows = hazards.map((h, idx) => {
-        const task = taskMap[h.taskName] || {};
+        const taskName = (h.taskName || '').trim() || 'Unspecified Task';
+        const task = taskMap[taskName] || {
+            taskDescription: taskName,
+            conditionMode: 'Routine',
+            coreActivity: suggestCoreActivity(taskName) || '',
+            jobTitle: suggestJobTitle(taskName) || ''
+        };
+        const conditionMode = normalizeGoehsConditionMode(h.mode || task.conditionMode || 'Routine');
+
         return [
             idx + 1,                                      // Row
             orgName,                                      // OrgName*
@@ -4243,11 +4605,11 @@ function generateExcelWithSheets() {
             approver,                                     // Assessment Approver*
             teamMembers,                                  // Name of Risk Assessment Team Members
             completedBy,                                  // Completed By
-            h.taskName,                                           // Task Name *
-            task.taskDescription || h.taskName,                   // Task Description *
-            xlateCondition(task.conditionMode || 'Routine'),       // Condition Mode *
-            task.coreActivity    || '',                            // Core Activity
-            task.jobTitle        || '',                            // Job Title / Occupation Field
+            taskName,                                      // Task Name *
+            task.taskDescription || taskName,              // Task Description *
+            xlateCondition(conditionMode),                 // Condition Mode *
+            task.coreActivity || suggestCoreActivity(taskName) || '',
+            task.jobTitle || suggestJobTitle(taskName) || '',
             xlate(h.hazardCategory),                               // Hazard *
             xlate(h.subHazard),                                    // Sub-Hazard *
             h.outcome,                                             // Potential Outcome * (pre-translated in UI)
@@ -4264,13 +4626,13 @@ function generateExcelWithSheets() {
             h.resLike,                                    // Residual Likelihood *
             h.resScore,                                   // Residual Risk Score
             h.resRating,                                  // Residual Risk Rating
-            h.predDesc,                                   // Description of Countermeasures Predictive
-            normalizeLadder(h.predLadder),                // Countermeasure Ladder Predictive (whitelisted)
-            h.predFreq,                                   // Predictive Frequency
-            h.predSev,                                    // Predictive Severity
-            h.predLike,                                   // Predictive Likelihood
-            h.predScore,                                  // Predictive Risk Score
-            h.predRating                                  // Predictive Risk Rating
+            h.predDesc || '',                             // Description of Countermeasures Predictive
+            normalizeLadder(h.predLadder || ''),          // Countermeasure Ladder Predictive (whitelisted)
+            h.predFreq || '',                             // Predictive Frequency
+            h.predSev || '',                              // Predictive Severity
+            h.predLike || '',                             // Predictive Likelihood
+            h.predScore || '',                            // Predictive Risk Score
+            h.predRating || ''                            // Predictive Risk Rating
         ];
     });
 

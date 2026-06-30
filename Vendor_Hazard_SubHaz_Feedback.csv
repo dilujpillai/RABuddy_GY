@@ -1,0 +1,177 @@
+Row Type,Current Category,Current Sub-Hazard,Proposed Sub-Hazard (Current),Status,Remarks,Exact Change Required
+Category,Biological Hazards,,,Retain,Category label already matches current whitelist.,Retain
+Sub-Hazard,Biological Hazards,Animal or insect bites/stings,Animal or insect bites/stings,Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Biological Hazards,Animal waste,Animal waste,Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Biological Hazards,Bloodborne pathogens,Bloodborne pathogens,Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Biological Hazards,Contaminated waste or biological material,Contaminated waste or biological material,Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Biological Hazards,Food hygiene,Food hygiene,Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Biological Hazards,Handling human or animal bodily fluids,Handling human or animal bodily fluids,Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Biological Hazards,Hazardous vegetation,Hazardous vegetation,Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Biological Hazards,Legionnella (specific bacteria),Legionella (specific bacteria),Change,Spelling correction to match current whitelist key exactly.,"Replace ""Legionnella (specific bacteria)"" with ""Legionella (specific bacteria)"""
+Sub-Hazard,Biological Hazards,Molds or allergens,Molds or allergens,Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Biological Hazards,Potability of water,Potability of water,Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Biological Hazards,"Viruses, bacteria, fungi","Viruses, bacteria, fungi",Retain,Matches current whitelist exactly.,Retain
+Category,Chemical Hazards,,,Retain,Category label already matches current whitelist.,Retain
+Sub-Hazard,Chemical Hazards,Acute toxicity materials,Acute toxicity materials,Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Chemical Hazards,Asbestos,Asbestos,Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Chemical Hazards,"Carcinogens, mutagens, reprotoxic (CMRs) materials","Carcinogens, mutagens, reprotoxic (CMRs) materials",Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Chemical Hazards,Chemical spills or leaks,Chemical spills or leaks,Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Chemical Hazards,Chemicals [Generic],Chemicals [Generic],Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Chemical Hazards,Corrosive materials,Corrosive materials,Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Chemical Hazards,Crystalline silica,Crystalline silica,Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Chemical Hazards,Endocrine disrupters,Endocrine disrupters,Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Chemical Hazards,Explosive materials,Explosive materials,Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Chemical Hazards,Fibers other than asbestos,Fibers other than asbestos,Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Chemical Hazards,Flammable materials,Flammable materials,Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Chemical Hazards,Gas under pressure,Gas under pressure,Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Chemical Hazards,"Health hazard, sensitizers, allergens materials","Health hazard, sensitizers, allergens materials",Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Chemical Hazards,Improper labeling or storage,Improper labeling or storage,Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Chemical Hazards,Incompatible chemical reactions,Incompatible chemical reactions,Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Chemical Hazards,Lead Containing Material,Lead-containing material,Change,Hyphenation and casing must match current whitelist key exactly.,"Replace ""Lead Containing Material"" with ""Lead-containing material"""
+Sub-Hazard,Chemical Hazards,Nanomaterials,Nanomaterials,Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Chemical Hazards,Oil,Oil,Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Chemical Hazards,Organic peroxides,Organic peroxides,Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Chemical Hazards,Oxidising materials,Oxidising materials,Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Chemical Hazards,"Particulate material (dust, smoke, fog, aerosol)","Particulate material (dust, smoke, fog, aerosol)",Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Chemical Hazards,Sock / vibration sensitive substances,Shock / vibration sensitive substances,Change,Typo correction (Sock -> Shock) to match current whitelist key.,"Replace ""Sock / vibration sensitive substances"" with ""Shock / vibration sensitive substances"""
+Sub-Hazard,Chemical Hazards,Water reactive substances,Water reactive substances,Retain,Matches current whitelist exactly.,Retain
+Category,Ergonomic Hazards,,,Retain,Category label already matches current whitelist.,Retain
+Sub-Hazard,Ergonomic Hazards,Carrying,Carrying,Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Ergonomic Hazards,Computer workstation / Screen,Computer workstation / Screen,Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Ergonomic Hazards,Force,Force,Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Ergonomic Hazards,Inadequate tool or workstation design,Inadequate tool or workstation design,Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Ergonomic Hazards,Lifting/Lowering,Lifting/Lowering,Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Ergonomic Hazards,Poor ergonomics [Generic],Poor ergonomics [Generic],Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Ergonomic Hazards,Postures (Hit list),Postures (Hit list),Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Ergonomic Hazards,Pulling,Pulling,Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Ergonomic Hazards,Pushing,Pushing,Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Ergonomic Hazards,Soft tissue compression,Soft tissue compression,Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Ergonomic Hazards,Standing or Sitting for long periods,Standing or Sitting for long periods,Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Ergonomic Hazards,Unfitting gloves,Ill-fitting gloves,Change,Vendor wording differs; current canonical sub-hazard is Ill-fitting gloves.,"Replace ""Unfitting gloves"" with ""Ill-fitting gloves"""
+Category,Fire / Explosion Hazards,,,Change,Vendor category label differs from current canonical category key used by dropdown and mapping.,"Replace ""Fire / Explosion Hazards"" with ""Fire and Explosion"""
+Sub-Hazard,Fire / Explosion Hazards,"Dust explosions (e.g., black, wood, metal dust","Dust explosions (e.g., coal, wood, metal dust)",Change,Current canonical label uses coal and includes closing parenthesis.,"Replace ""Dust explosions (e.g., black, wood, metal dust"" with ""Dust explosions (e.g., coal, wood, metal dust)"""
+Sub-Hazard,Fire / Explosion Hazards,Flammable and combustible materials,Flammable and combustible materials,Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Fire / Explosion Hazards,"Ignition sources (open flames, sparks, static)","Ignition sources (open flames, sparks, static)",Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Fire / Explosion Hazards,Oxygen-enriched environments,Oxygen-enriched environments,Retain,Matches current whitelist exactly.,Retain
+Category,Hazardous Energy,,,Retain,Category label already matches current whitelist.,Retain
+Sub-Hazard,Hazardous Energy,Arc flash,Arc flash,Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Hazardous Energy,Compressed air,Compressed air,Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Hazardous Energy,Electricity,Electricity,Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Hazardous Energy,Electromagnetic fields,Electromagnetic fields,Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Hazardous Energy,Electrostatic,Electrostatic,Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Hazardous Energy,Equipment under pressure,Equipment under pressure,Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Hazardous Energy,Exothermic chemical reaction,Exothermic chemical reaction,Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Hazardous Energy,Gravity,Gravity,Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Hazardous Energy,Hazardous Energy [Generic],Hazardous Energy [Generic],Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Hazardous Energy,Hydraulic,Hydraulic,Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Hazardous Energy,Kinetic energy,Kinetic energy,Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Hazardous Energy,Magnetic,Magnetic,Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Hazardous Energy,Pneumatic,Pneumatic,Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Hazardous Energy,"Stored energy (pneumatic, hydraulic, mechanical, electrical)","Stored energy (pneumatic, hydraulic, mechanical, electrical)",Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Hazardous Energy,"Thermal energy (steam, heated surfaces)","Thermal energy (steam, heated surfaces)",Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Hazardous Energy,Vacuum,Vacuum,Retain,Matches current whitelist exactly.,Retain
+Category,Mechanical / Machinery Hazards,,,Retain,Category label already matches current whitelist.,Retain
+Sub-Hazard,Mechanical / Machinery Hazards,Acceleration / deceleration,Acceleration / deceleration,Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Mechanical / Machinery Hazards,"Angular, sharp and cutting elements","Angular, sharp and cutting elements",Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Mechanical / Machinery Hazards,Degraded or malfunctioning equipment,Degraded or malfunctioning equipment,Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Mechanical / Machinery Hazards,"Ejection (parts, materials)","Ejection (parts, materials)",Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Mechanical / Machinery Hazards,Equipment failure,Equipment failure,Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Mechanical / Machinery Hazards,"Hand tools (cut, impact, puncture, etc.)","Hand tools (cut, impact, puncture, etc.)",Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Mechanical / Machinery Hazards,Improper use of tools/machines,Improper use of tools/machines,Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Mechanical / Machinery Hazards,Inadequate guarding,Inadequate guarding,Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Mechanical / Machinery Hazards,Moving parts (crushing),Moving parts (crushing),Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Mechanical / Machinery Hazards,Moving parts (cutting),Moving parts (cutting),Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Mechanical / Machinery Hazards,Pinch / nip points,Pinch / nip points,Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Mechanical / Machinery Hazards,Powered tools,Powered tools,Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Mechanical / Machinery Hazards,Rotating parts (entanglement),Rotating parts (entanglement),Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Mechanical / Machinery Hazards,Use of lifting equipment and accessories,Use of lifting equipment and accessories,Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Mechanical / Machinery Hazards,"Use of suspension equipment (jacks, etc.)","Use of suspension equipment (jacks, etc.)",Retain,Matches current whitelist exactly.,Retain
+Category,Organizational / Psychosocial Hazards,,,Change,Vendor category label differs from current canonical category key used by dropdown and mapping.,"Replace ""Organizational / Psychosocial Hazards"" with ""Organizational and Psychosocial"""
+Sub-Hazard,Organizational / Psychosocial Hazards,Ambiguite of the roles and responsibilities,Ambiguity of the roles and responsibilities,Change,Spelling correction to match current whitelist key exactly.,"Replace ""Ambiguite of the roles and responsibilities"" with ""Ambiguity of the roles and responsibilities"""
+Sub-Hazard,Organizational / Psychosocial Hazards,Coactivity,Coactivity,Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Organizational / Psychosocial Hazards,Dealing with aggressive or violent people,Dealing with aggressive or violent people,Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Organizational / Psychosocial Hazards,"Discrimination (e.g. gender, race, age)","Discrimination (e.g. gender, race, age)",Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Organizational / Psychosocial Hazards,Disrupted sleep pattern (shift work),Disrupted sleep pattern (shift work),Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Organizational / Psychosocial Hazards,Distraction,Distraction,Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Organizational / Psychosocial Hazards,"Employment restriction (e.g. Pregnant/breastfeeding, handicap)","Employment restriction (e.g. Pregnant/breastfeeding, handicap)",Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Organizational / Psychosocial Hazards,"Exposure to distressing situations (e.g. emergency services, healthcare, customer complaints)","Exposure to distressing situations (e.g. emergency services, healthcare, customer complaints)",Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Organizational / Psychosocial Hazards,High job demands (physical or mental workload),High job demands (physical or mental workload),Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Organizational / Psychosocial Hazards,Inadequate rest areas,Inadequate rest areas,Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Organizational / Psychosocial Hazards,Inadequate staffing,Inadequate staffing,Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Organizational / Psychosocial Hazards,Incompatible simultaneous activities,Incompatible simultaneous activities,Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Organizational / Psychosocial Hazards,Inconsistent communication during organizational change,Inconsistent communication during organizational change,Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Organizational / Psychosocial Hazards,Insufficient / inadequate training,Insufficient / inadequate training,Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Organizational / Psychosocial Hazards,Isolation (especially in remote work or lone working roles),Isolation (especially in remote work or lone working roles),Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Organizational / Psychosocial Hazards,Job insecurity or precarious employment,Job insecurity or precarious employment,Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Organizational / Psychosocial Hazards,Lack of adherence to standard,Lack of adherence to standard,Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Organizational / Psychosocial Hazards,Lack of communication or feedback,Lack of communication or feedback,Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Organizational / Psychosocial Hazards,Lack of employee involvement in decision-making,Lack of employee involvement in decision-making,Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Organizational / Psychosocial Hazards,Lack of privacy or personal space,Lack of privacy or personal space,Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Organizational / Psychosocial Hazards,Lack of recognition or reward,Lack of recognition or reward,Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Organizational / Psychosocial Hazards,Lack of standard,Lack of standard,Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Organizational / Psychosocial Hazards,Lack of transparency or trust in leadership,Lack of transparency or trust in leadership,Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Organizational / Psychosocial Hazards,Long working hours or shift work,Long working hours or shift work,Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Organizational / Psychosocial Hazards,Low job control or autonomy,Low job control or autonomy,Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Organizational / Psychosocial Hazards,Misuse of computer systems / equipment,Misuse of computer systems / equipment,Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Organizational / Psychosocial Hazards,Monotonous or repetitive tasks,Monotonous or repetitive tasks,Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Organizational / Psychosocial Hazards,New hire / temporary worker,New hire / temporary worker,Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Organizational / Psychosocial Hazards,Overcrowded or chaotic workspaces,Overcrowded or chaotic workspaces,Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Organizational / Psychosocial Hazards,Poor organizational justice (unfair treatment),Poor organizational justice (unfair treatment),Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Organizational / Psychosocial Hazards,Poor supervisor or managerial support,Poor supervisor or managerial support,Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Organizational / Psychosocial Hazards,Remote Work Specific Hazards,Remote Work Specific Hazards,Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Organizational / Psychosocial Hazards,Unclear job roles or expectations,Unclear job roles or expectations,Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Organizational / Psychosocial Hazards,Unfamiliar work,Unfamiliar work,Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Organizational / Psychosocial Hazards,Unrealistic deadlines,Unrealistic deadlines,Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Organizational / Psychosocial Hazards,Violations of rules,Violations of rules,Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Organizational / Psychosocial Hazards,Work-Life Balance,Work-Life Balance,Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Organizational / Psychosocial Hazards,Workplace bullying or harassment,Workplace bullying or harassment,Retain,Matches current whitelist exactly.,Retain
+Category,Physical Health Hazards,,,Retain,Category label already matches current whitelist.,Retain
+Sub-Hazard,Physical Health Hazards,Cold stress,Cold stress,Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Physical Health Hazards,Electro-magnetic fields,Electro-magnetic fields,Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Physical Health Hazards,Heat stress,Heat stress,Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Physical Health Hazards,"Ionizing radiation (X-rays, radioactive elements)","Ionizing radiation (X-rays, radioactive elements)",Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Physical Health Hazards,Noise exposure,Noise exposure,Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Physical Health Hazards,"Non-ionizing radiation (UV, microwave, laser, welding radiations)","Non-ionizing radiation (UV, microwave, laser, welding radiations)",Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Physical Health Hazards,Physical health [Generic],Physical health [Generic],Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Physical Health Hazards,"Poor lighting (intensity, glare, reflection)","Poor lighting (intensity, glare, reflection)",Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Physical Health Hazards,Severe draft (eg. cold air current),Severe draft (e.g. cold air current),Change,Punctuation/format normalization to exact current whitelist label.,"Replace ""Severe draft (eg. cold air current)"" with ""Severe draft (e.g. cold air current)"""
+Sub-Hazard,Physical Health Hazards,Smoke and fumes,Smoke and fumes,Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Physical Health Hazards,"Vibration / Impact (hand-arm, whole-body)","Vibration / Impact (hand-arm, whole-body)",Retain,Matches current whitelist exactly.,Retain
+Category,Transportation Hazards,,,Change,Vendor category label differs from current canonical category key used by dropdown and mapping.,"Replace ""Transportation Hazards"" with ""Transportation"""
+Sub-Hazard,Transportation Hazards,"High speed vehicle, tire grip loss","High speed vehicle, tire grip loss",Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Transportation Hazards,Inadequate load securing,Inadequate load securing,Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Transportation Hazards,Interraction bicycle/bicycle,Interaction bicycle/bicycle,Change,Typo correction (Interraction -> Interaction).,"Replace ""Interraction bicycle/bicycle"" with ""Interaction bicycle/bicycle"""
+Sub-Hazard,Transportation Hazards,Interraction bicycle/Vehicle,Interaction bicycle/Vehicle,Change,Typo correction (Interraction -> Interaction).,"Replace ""Interraction bicycle/Vehicle"" with ""Interaction bicycle/Vehicle"""
+Sub-Hazard,Transportation Hazards,Interraction pedestrian/bicycle,Interaction pedestrian/bicycle,Change,Typo correction (Interraction -> Interaction).,"Replace ""Interraction pedestrian/bicycle"" with ""Interaction pedestrian/bicycle"""
+Sub-Hazard,Transportation Hazards,Interraction pedestrian/pedestrian,Interaction pedestrian/pedestrian,Change,Typo correction (Interraction -> Interaction).,"Replace ""Interraction pedestrian/pedestrian"" with ""Interaction pedestrian/pedestrian"""
+Sub-Hazard,Transportation Hazards,Interraction pedestrian/Vehicle,Interaction pedestrian/Vehicle,Change,Typo correction (Interraction -> Interaction).,"Replace ""Interraction pedestrian/Vehicle"" with ""Interaction pedestrian/Vehicle"""
+Sub-Hazard,Transportation Hazards,Interraction Vehicle/Stationnary items,Interaction Vehicle/Stationary items,Change,Typo corrections (Interraction/Stationnary) to current whitelist key.,"Replace ""Interraction Vehicle/Stationnary items"" with ""Interaction Vehicle/Stationary items"""
+Sub-Hazard,Transportation Hazards,Interraction Vehicle/Vehicle,Interaction Vehicle/Vehicle,Change,Typo correction (Interraction -> Interaction).,"Replace ""Interraction Vehicle/Vehicle"" with ""Interaction Vehicle/Vehicle"""
+Sub-Hazard,Transportation Hazards,Poor road or yard conditions,Poor road or yard conditions,Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Transportation Hazards,Traffic [Generic],Traffic [Generic],Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Transportation Hazards,Unintentional vehicle movement,Unintentional vehicle movement,Retain,Matches current whitelist exactly.,Retain
+Category,Workplace / Infrastructure Design,,,Retain,Category label already matches current whitelist.,Retain
+Sub-Hazard,Workplace / Infrastructure Design,Clutter / Mess,Clutter / Mess,Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Workplace / Infrastructure Design,Coactivity area,Coactivity area,Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Workplace / Infrastructure Design,Cold surface,Cold surface,Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Workplace / Infrastructure Design,Confined spaces,Confined spaces,Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Workplace / Infrastructure Design,Congested or obstructed workplace,Congested or obstructed workplace,Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Workplace / Infrastructure Design,Engulfment,Engulfment,Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Workplace / Infrastructure Design,Extreme cold,Extreme cold,Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Workplace / Infrastructure Design,Extreme heat,Extreme heat,Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Workplace / Infrastructure Design,Extreme wind,Extreme wind,Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Workplace / Infrastructure Design,Hot surface,Hot surface,Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Workplace / Infrastructure Design,Inclined surface,Inclined surface,Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Workplace / Infrastructure Design,Lone work,Lone work,Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Workplace / Infrastructure Design,Other adverse weather conditions,Other adverse weather conditions,Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Workplace / Infrastructure Design,Poor ventilation,Poor ventilation,Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Workplace / Infrastructure Design,Poor visibility,Poor visibility,Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Workplace / Infrastructure Design,"Protusion (bump, puncture, cut, etc.)","Protrusion (bump, puncture, cut, etc.)",Change,Spelling correction (Protusion -> Protrusion).,"Replace ""Protusion (bump, puncture, cut, etc.)"" with ""Protrusion (bump, puncture, cut, etc.)"""
+Sub-Hazard,Workplace / Infrastructure Design,Rough surface,Rough surface,Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Workplace / Infrastructure Design,"Slippery, eneven, unstable or damaged floor","Slippery, uneven, unstable or damaged floor",Change,Spelling correction (eneven -> uneven).,"Replace ""Slippery, eneven, unstable or damaged floor"" with ""Slippery, uneven, unstable or damaged floor"""
+Sub-Hazard,Workplace / Infrastructure Design,"Slips, trips, and falls (same level or height)","Slips, trips, and falls (same level or height)",Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Workplace / Infrastructure Design,Snow or ice,Snow or ice,Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Workplace / Infrastructure Design,Temporary works or unstable structures,Temporary works or unstable structures,Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Workplace / Infrastructure Design,Unsecured items at height,Unsecured items at height,Retain,Matches current whitelist exactly.,Retain
+Sub-Hazard,Workplace / Infrastructure Design,Work at height (<1.2m - <4 feet),Work at height (less than 1.2m / 4 feet),Change,Current whitelist uses standardized threshold wording for less-than condition.,"Replace ""Work at height (<1.2m - <4 feet)"" with ""Work at height (less than 1.2m / 4 feet)"""
+Sub-Hazard,Workplace / Infrastructure Design,Work at height (≥1.2m - ≥4 feet),Work at height (1.2m / 4 feet or more),Change,Closest current whitelist entry selected to maintain exact dropdown compatibility.,"Replace ""Work at height (≥1.2m - ≥4 feet)"" with ""Work at height (1.2m / 4 feet or more)"""

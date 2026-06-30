@@ -1,8 +1,6 @@
 ﻿ <!DOCTYPE html>
 <html lang='en-US'>
 <head>
-    <meta charset='UTF-8'>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Risk Assessment Buddy Smart (3.0)</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
@@ -22,7 +20,6 @@
                             200: '#a9c1e0',
                             300: '#7ea1d1',
                             400: '#5382c1',
-                            500: '#1a5faa',
                             600: '#002c5f',
                             700: '#00234d',
                             800: '#001a3d',
@@ -344,6 +341,12 @@
             background-color: #fef2f2 !important;
             animation: empty-field-pulse 2s ease-in-out infinite;
         }
+        .goehs-mismatch {
+            border: 2px solid #ef4444 !important;
+            background-color: #fef2f2 !important;
+            color: #b91c1c !important;
+            box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.12);
+        }
         @keyframes empty-field-pulse {
             0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
             50% { box-shadow: 0 0 0 4px rgba(239, 68, 68, 0); }
@@ -370,6 +373,352 @@
             font-weight: 600;
             z-index: 10;
         }
+
+        /* GOEHS Modal Styling (scoped) */
+        #goehsModal {
+            --goehs-accent: #ea580c;
+            --goehs-accent-dark: #c2410c;
+            --goehs-ink: #0f172a;
+            --goehs-surface: #ffffff;
+            --goehs-soft: #f8fafc;
+            --goehs-border: #dbe4ee;
+            --goehs-shadow: 0 24px 55px rgba(15, 23, 42, 0.34);
+            background:
+                radial-gradient(circle at 8% 12%, rgba(251, 146, 60, 0.16) 0%, transparent 38%),
+                radial-gradient(circle at 85% 88%, rgba(30, 64, 175, 0.17) 0%, transparent 45%),
+                rgba(2, 6, 23, 0.62) !important;
+        }
+
+        #goehsModal > div {
+            border: 1px solid rgba(255, 255, 255, 0.26);
+            box-shadow: var(--goehs-shadow);
+            background: linear-gradient(180deg, #ffffff 0%, #f9fbff 100%);
+            position: relative;
+        }
+
+        #goehsModal > div::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, #ea580c 0%, #f59e0b 45%, #0284c7 100%);
+            z-index: 4;
+        }
+
+        #goehsModal #goehsSingleScreenBanner {
+            background:
+                linear-gradient(90deg, rgba(255, 237, 213, 0.95), rgba(254, 243, 199, 0.96));
+            border-bottom-color: #f1d9b8;
+        }
+
+        #goehsModal #goehsAutoPopulateBanner {
+            border-radius: 12px;
+            border-width: 1px;
+            box-shadow: 0 6px 20px rgba(15, 23, 42, 0.08);
+        }
+
+        #goehsModal input,
+        #goehsModal select,
+        #goehsModal textarea {
+            border-color: var(--goehs-border);
+            background: #ffffff;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+        }
+
+        #goehsModal input:focus,
+        #goehsModal select:focus,
+        #goehsModal textarea:focus {
+            border-color: #fb923c !important;
+            box-shadow: 0 0 0 3px rgba(251, 146, 60, 0.22) !important;
+            outline: none;
+            background: #fffefc;
+        }
+
+        #goehsModal #goehsAssessmentForm > div {
+            background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+            border: 1px solid #e6edf5;
+            border-radius: 14px;
+            padding: 16px;
+        }
+
+        #goehsModal #goehs-tool3 .overflow-auto {
+            border-color: #c8d4e2;
+            box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.7);
+            background: #f8fbff;
+        }
+
+        #goehsModal #hazardBatchTable thead th {
+            letter-spacing: 0.02em;
+            text-transform: uppercase;
+            font-size: 10.5px;
+        }
+
+        #goehsModal #hazardBatchTable tbody td {
+            background: #ffffff;
+            transition: background-color 0.18s ease;
+        }
+
+        #goehsModal #hazardBatchTable tbody tr:hover td {
+            background: #f7fafc;
+        }
+
+        #goehsModal #hazardBatchTable input,
+        #goehsModal #hazardBatchTable select {
+            min-height: 30px;
+            border-color: #d1dce8;
+        }
+
+        #goehsModal #hazardBatchTable .hazard-counter-ladder {
+            border-style: dashed;
+            border-color: #93c5fd;
+            background: #f8fbff;
+        }
+
+        #goehsModal .goehs-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.45rem;
+            min-height: 38px;
+            padding: 0.55rem 0.95rem;
+            border-radius: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.24);
+            color: #ffffff;
+            font-size: 0.8rem;
+            font-weight: 600;
+            line-height: 1;
+            box-shadow: 0 6px 16px rgba(15, 23, 42, 0.13);
+            transition: transform 0.18s ease, box-shadow 0.18s ease, filter 0.18s ease;
+        }
+
+        #goehsModal .goehs-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 10px 20px rgba(15, 23, 42, 0.2);
+            filter: brightness(1.02);
+        }
+
+        #goehsModal .goehs-btn svg {
+            width: 16px;
+            height: 16px;
+            flex-shrink: 0;
+        }
+
+        #goehsModal .goehs-issue-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 38px;
+            padding: 0.55rem 0.95rem;
+            border-radius: 10px;
+            border: 1px solid #bbf7d0;
+            background: #ecfdf5;
+            color: #047857;
+            font-size: 0.8rem;
+            font-weight: 700;
+            line-height: 1;
+            box-shadow: 0 6px 16px rgba(15, 23, 42, 0.1);
+            cursor: help;
+            transition: transform 0.18s ease, box-shadow 0.18s ease;
+        }
+
+        #goehsModal .goehs-issue-badge.has-issues {
+            border-color: #fecdd3;
+            background: #fff1f2;
+            color: #be123c;
+        }
+
+        #goehsModal .goehs-issue-badge:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 10px 20px rgba(15, 23, 42, 0.16);
+        }
+
+        #goehsModal .goehs-btn-indigo {
+            background: #002c5f;
+        }
+
+        #goehsModal .goehs-btn-indigo:hover {
+            background: #001f43;
+        }
+
+        #goehsModal .goehs-btn-ai {
+            background: linear-gradient(90deg, #ec4899 0%, #e11d48 100%);
+        }
+
+        #goehsModal .goehs-btn-ai:hover {
+            background: linear-gradient(90deg, #db2777 0%, #be123c 100%);
+        }
+
+        #goehsModal .goehs-btn-success {
+            background: #16a34a;
+        }
+
+        #goehsModal .goehs-btn-success:hover {
+            background: #15803d;
+        }
+
+        #goehsModal .goehs-btn-download {
+            min-height: 44px;
+            padding: 0.75rem 1.2rem;
+            font-size: 0.92rem;
+            font-weight: 700;
+        }
+
+        #goehsModal .goehs-btn-icon-danger {
+            width: 28px;
+            height: 28px;
+            min-height: 28px;
+            padding: 0;
+            border-radius: 8px;
+            border: 1px solid #fecaca;
+            background: #fff1f2;
+            color: #dc2626;
+            box-shadow: none;
+        }
+
+        #goehsModal .goehs-btn-icon-danger:hover {
+            background: #ffe4e6;
+            color: #b91c1c;
+            box-shadow: 0 4px 10px rgba(220, 38, 38, 0.18);
+            transform: translateY(-1px);
+        }
+
+        #goehsModal .goehs-btn-icon-danger svg {
+            width: 14px;
+            height: 14px;
+        }
+
+        #goehsModal .goehs-btn-icon-restore {
+            width: 28px;
+            height: 28px;
+            min-height: 28px;
+            padding: 0;
+            border-radius: 8px;
+            border: 1px solid #bfdbfe;
+            background: #eff6ff;
+            color: #2563eb;
+            box-shadow: none;
+        }
+
+        #goehsModal .goehs-btn-icon-restore:hover {
+            background: #dbeafe;
+            color: #1d4ed8;
+            box-shadow: 0 4px 10px rgba(37, 99, 235, 0.18);
+            transform: translateY(-1px);
+        }
+
+        #goehsModal .goehs-btn-icon-restore svg {
+            width: 14px;
+            height: 14px;
+        }
+
+        #goehsModal #hazardBatchTable .goehs-row-delete-wrap {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+        }
+
+        #goehsModal #hazardBatchTable .goehs-row-delete-label {
+            font-size: 10px;
+            font-weight: 600;
+            line-height: 1;
+            color: #475569;
+            white-space: nowrap;
+        }
+
+        #goehsModal #hazardBatchTable tr.goehs-row-deleted td {
+            background: #f8fafc !important;
+            color: #94a3b8;
+            text-decoration: line-through;
+        }
+
+        #goehsModal #hazardBatchTable tr.goehs-row-deleted .goehs-row-delete-btn,
+        #goehsModal #hazardBatchTable tr.goehs-row-deleted .goehs-row-delete-label {
+            text-decoration: none;
+        }
+
+        #goehsModal button[onclick="closeGoehsModal()"] {
+            width: 38px;
+            height: 38px;
+            border-radius: 999px;
+            border: 1px solid rgba(255, 255, 255, 0.42);
+            background: rgba(255, 255, 255, 0.12);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            transition: background-color 0.2s ease, transform 0.2s ease;
+        }
+
+        #goehsModal button[onclick="closeGoehsModal()"]:hover {
+            background: rgba(255, 255, 255, 0.24);
+            transform: scale(1.03);
+        }
+
+        #goehsModal .overflow-auto::-webkit-scrollbar {
+            height: 9px;
+            width: 9px;
+        }
+
+        #goehsModal .overflow-auto::-webkit-scrollbar-thumb {
+            background: #94a3b8;
+            border-radius: 999px;
+        }
+
+        #goehsModal .overflow-auto::-webkit-scrollbar-track {
+            background: #e2e8f0;
+        }
+
+        @media (max-width: 1024px) {
+            #goehsModal {
+                padding: 0 !important;
+            }
+
+            #goehsModal > div {
+                width: 100% !important;
+                max-width: 100% !important;
+                height: 100% !important;
+                border-radius: 0 !important;
+            }
+        }
+
+        @media (max-width: 768px) {
+            #goehsModal > div > div:first-child {
+                padding: 14px 16px !important;
+            }
+
+            #goehsModal > div > div:first-child h2 {
+                font-size: 1.2rem !important;
+            }
+
+            #goehsModal > div > div:nth-child(3) {
+                padding: 14px !important;
+            }
+
+            #goehsModal #goehsAssessmentForm > div {
+                padding: 12px;
+            }
+
+            #goehsModal #goehs-tool3 .flex.justify-between.items-start.flex-wrap.gap-4 {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            #goehsModal #goehs-tool3 .goehs-actions .goehs-btn,
+            #goehsModal #goehs-tool3 .goehs-actions .goehs-issue-badge {
+                flex: 1 1 calc(50% - 8px);
+                justify-content: center;
+            }
+        }
+
+        @media (max-width: 520px) {
+            #goehsModal #goehs-tool3 .goehs-actions .goehs-btn,
+            #goehsModal #goehs-tool3 .goehs-actions .goehs-issue-badge {
+                flex: 1 1 100%;
+            }
+        }
+
         @keyframes placeholder-pulse {
             0%, 100% { 
                 background-color: rgba(251, 191, 36, 0.2);
@@ -379,24 +728,6 @@
                 background-color: rgba(251, 191, 36, 0.3);
                 box-shadow: 0 0 0 6px rgba(251, 191, 36, 0);
             }
-        }
-        /* Recording microphone pulse animation */
-        @keyframes recording-pulse {
-            0%, 100% { 
-                transform: scale(1);
-                box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
-            }
-            50% { 
-                transform: scale(1.1);
-                box-shadow: 0 0 0 12px rgba(239, 68, 68, 0);
-            }
-        }
-        .speech-btn.recording {
-            animation: recording-pulse 1s ease-in-out infinite !important;
-            background-color: #dc2626 !important;
-        }
-        .speech-btn.recording:hover {
-            background-color: #b91c1c !important;
         }
         /* Recording indicator overlay */
         .recording-indicator {
@@ -464,6 +795,198 @@
             color: #fbbf24;
             font-weight: 500;
         }
+        .dictation-target {
+            transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+        }
+        .dictation-target-active {
+            border-color: #0ea5e9 !important;
+            background-color: #ffffff !important;
+            box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.2) !important;
+        }
+
+        /* Full-screen capture modal: micro-polish */
+        @keyframes fullscreen-modal-pop {
+            from {
+                opacity: 0;
+                transform: translateY(10px) scale(0.99);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+
+        @keyframes fullscreen-chip-rise {
+            from {
+                opacity: 0;
+                transform: translateY(3px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        #fullscreenVideoModal .fullscreen-modal-shell {
+            animation: fullscreen-modal-pop 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
+        }
+        #fullscreenVideoModal .fullscreen-video-pane,
+        #fullscreenVideoModal .fullscreen-thumb-pane {
+            transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+        }
+        #fullscreenVideoModal .fullscreen-video-pane:hover {
+            border-color: rgba(255, 255, 255, 0.2);
+            box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+        }
+        #fullscreenVideoModal .fullscreen-shortcut-chip {
+            letter-spacing: 0.03em;
+            transition: background-color 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+            animation: fullscreen-chip-rise 200ms ease-out;
+        }
+        #fullscreenVideoModal .fullscreen-shortcut-chip:hover {
+            background-color: rgba(255, 255, 255, 0.24);
+            border-color: rgba(255, 255, 255, 0.36);
+            transform: translateY(-1px);
+        }
+        #fullscreenVideoModal .fullscreen-shortcut-chip:nth-child(2) {
+            animation-delay: 40ms;
+        }
+        #fullscreenVideoModal .fullscreen-shortcut-chip:nth-child(3) {
+            animation-delay: 80ms;
+        }
+        #fullscreenVideoModal .fullscreen-close-btn:focus-visible,
+        #fullscreenVideoModal #captureFrameBtn:focus-visible,
+        #fullscreenVideoModal .fullscreen-modal-actions .rab-btn:focus-visible,
+        #fullscreenVideoModal .fullscreen-thumb-item .fullscreen-thumb-delete:focus-visible {
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.45);
+        }
+        #fullscreenVideoModal #captureFrameBtn {
+            letter-spacing: 0.01em;
+            box-shadow: 0 10px 28px rgba(127, 29, 29, 0.45);
+            transition: box-shadow 0.2s ease, filter 0.2s ease, background-color 0.2s ease;
+        }
+        #fullscreenVideoModal #captureFrameBtn:hover {
+            filter: brightness(1.03);
+            box-shadow: 0 14px 30px rgba(127, 29, 29, 0.5);
+        }
+        #fullscreenVideoModal .fullscreen-modal-actions .rab-btn {
+            transition: transform 0.18s ease, box-shadow 0.18s ease;
+        }
+        #fullscreenVideoModal .fullscreen-modal-actions .rab-btn:hover {
+            transform: translateY(-1px);
+        }
+        #fullscreenVideoModal .fullscreen-thumb-item {
+            transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+        }
+        #fullscreenVideoModal .fullscreen-thumb-item:hover {
+            border-color: #a9c1e0;
+            box-shadow: 0 6px 14px rgba(15, 23, 42, 0.1);
+            transform: translateY(-1px);
+        }
+        #fullscreenVideoModal .fullscreen-thumb-item .fullscreen-thumb-delete {
+            transition: opacity 0.2s ease, background-color 0.2s ease;
+        }
+        #fullscreenVideoModal .fullscreen-thumb-item .fullscreen-thumb-name {
+            font-weight: 600;
+            letter-spacing: 0.01em;
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            #fullscreenVideoModal .fullscreen-modal-shell,
+            #fullscreenVideoModal .fullscreen-shortcut-chip,
+            #fullscreenVideoModal .fullscreen-video-pane,
+            #fullscreenVideoModal .fullscreen-thumb-pane,
+            #fullscreenVideoModal .fullscreen-modal-actions .rab-btn,
+            #fullscreenVideoModal .fullscreen-thumb-item,
+            #fullscreenVideoModal .fullscreen-thumb-item .fullscreen-thumb-delete,
+            #fullscreenVideoModal #captureFrameBtn {
+                animation: none !important;
+                transition: none !important;
+            }
+        }
+
+        /* Full-screen capture modal: responsive layout and spacing rhythm */
+        @media (max-width: 1279px) {
+            #fullscreenVideoModal .fullscreen-modal-shell {
+                height: calc(100vh - 0.75rem);
+            }
+            #fullscreenVideoModal .fullscreen-modal-main {
+                padding: 0.625rem;
+            }
+            #fullscreenVideoModal .fullscreen-layout {
+                grid-template-rows: minmax(0, 1fr) auto;
+                gap: 0.625rem;
+            }
+            #fullscreenVideoModal .fullscreen-thumb-pane {
+                max-height: 28vh;
+            }
+            #fullscreenVideoModal .fullscreen-modal-footer {
+                padding-top: 0.75rem;
+                padding-bottom: 0.75rem;
+            }
+            #fullscreenVideoModal .fullscreen-modal-actions {
+                width: 100%;
+                justify-content: flex-end;
+            }
+            #fullscreenThumbnailPanel {
+                display: flex;
+                flex-direction: row;
+                align-items: flex-start;
+                gap: 0.75rem;
+                overflow-x: auto;
+                overflow-y: hidden;
+                padding-bottom: 0.35rem;
+            }
+            #fullscreenThumbnailPanel .fullscreen-thumb-item {
+                width: 10.5rem;
+                min-width: 10.5rem;
+                flex: 0 0 auto;
+            }
+            #fullscreenThumbnailPanel .fullscreen-thumb-item p {
+                white-space: normal;
+                line-height: 1.25;
+            }
+        }
+
+        @media (max-width: 639px) {
+            #fullscreenVideoModal {
+                padding: 0.5rem;
+            }
+            #fullscreenVideoModal .fullscreen-modal-shell {
+                height: calc(100vh - 0.5rem);
+                border-radius: 1rem;
+            }
+            #fullscreenVideoModal .fullscreen-modal-main {
+                padding: 0.5rem;
+            }
+            #fullscreenVideoModal .fullscreen-video-pane {
+                min-height: 220px;
+            }
+            #fullscreenVideoModal #captureFrameBtn {
+                bottom: 0.75rem;
+                padding: 0.55rem 1rem;
+                font-size: 0.875rem;
+            }
+            #fullscreenVideoModal .fullscreen-modal-actions .rab-btn {
+                height: 30px !important;
+                padding: 6px 12px !important;
+                font-size: 12px !important;
+            }
+        }
+
+        @media (min-width: 1280px) {
+            #fullscreenThumbnailPanel {
+                display: block;
+                overflow-x: hidden;
+                overflow-y: auto;
+            }
+            #fullscreenThumbnailPanel .fullscreen-thumb-item {
+                width: 100%;
+                min-width: 0;
+            }
+        }
+
         /* Style for hidden file input */
         input[type="file"].hidden-file-input {
             width: 0.1px;
@@ -480,6 +1003,53 @@
         .deleted-row td { text-decoration: line-through; opacity: 0.55; }
         .delete-btn { background:#ef4444; color:#fff; padding:6px 8px; border-radius:6px; border:none; cursor:pointer; }
         .restore-btn { background:#10b981; color:#fff; padding:6px 8px; border-radius:6px; border:none; cursor:pointer; }
+
+        .task-row-toggle-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.35rem;
+            min-height: 32px;
+            min-width: 78px;
+            padding: 0.4rem 0.7rem;
+            border-radius: 10px;
+            border: 1px solid transparent;
+            color: #ffffff;
+            font-size: 0.76rem;
+            font-weight: 700;
+            line-height: 1;
+            letter-spacing: 0.01em;
+            box-shadow: 0 4px 12px rgba(15, 23, 42, 0.16);
+            transition: transform 0.16s ease, box-shadow 0.16s ease, filter 0.16s ease;
+        }
+
+        .task-row-toggle-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 8px 16px rgba(15, 23, 42, 0.2);
+            filter: brightness(1.03);
+        }
+
+        .task-row-toggle-btn:focus-visible {
+            outline: 2px solid rgba(59, 130, 246, 0.55);
+            outline-offset: 1px;
+        }
+
+        .task-row-toggle-btn.task-row-toggle-delete {
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+            border-color: #fecaca;
+        }
+
+        .task-row-toggle-btn.task-row-toggle-restore {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            border-color: #a7f3d0;
+        }
+
+        .task-row-toggle-btn.task-row-toggle-modal {
+            min-height: 36px;
+            min-width: 120px;
+            padding: 0.5rem 0.95rem;
+            font-size: 0.84rem;
+        }
         
         /* Hierarchy of Control Triangle */
         #controlTriangle {
@@ -1869,11 +2439,17 @@
                 <div class="lightbox-form-wrapper flex-none w-full md:w-[38%] bg-white/[0.97] backdrop-blur-xl rounded-2xl shadow-2xl border border-slate-200/80 flex flex-col max-h-[80vh] overflow-hidden">
                     
                     <!-- Form header -->
-                    <div class="px-5 pt-5 pb-3 border-b border-slate-100">
+                    <div class="px-5 pt-5 pb-3 border-b border-slate-100 flex items-center justify-between gap-3">
                         <h3 class="text-sm font-semibold text-slate-800 uppercase tracking-wider flex items-center gap-2">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
                             Step Details
                         </h3>
+                        <button id="speechModeBtn" type="button" class="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border border-slate-200 bg-slate-100 text-slate-700 hover:bg-slate-200 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-indigo-400" title="Start dictation mode">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+                            </svg>
+                            <span>Audio Mode</span>
+                        </button>
                     </div>
 
                     <!-- Scrollable form body -->
@@ -1883,34 +2459,19 @@
                             <!-- Description -->
                             <div class="relative group">
                                 <label for="stepDescription" class="block text-xs font-medium text-slate-500 mb-1.5 uppercase tracking-wide">Description of step</label>
-                                <textarea id="stepDescription" rows="3" placeholder="Describe the task or step being assessed..." class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-800 placeholder-slate-400 focus:bg-white focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400 transition-all duration-200 resize-none pr-10"></textarea>
-                                <button type="button" class="speech-btn absolute bottom-3 right-2.5 text-slate-400 hover:text-indigo-600 p-1.5 rounded-lg hover:bg-indigo-50 transition-all duration-200 focus:outline-none" data-target="stepDescription">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
-                                    </svg>
-                                </button>
+                                <textarea id="stepDescription" rows="3" placeholder="Describe the task or step being assessed..." class="dictation-target w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-800 placeholder-slate-400 focus:bg-white focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400 transition-all duration-200 resize-none"></textarea>
                             </div>
                             
                             <!-- Hazards -->
                             <div class="relative group">
                                 <label for="spotHazards" class="block text-xs font-medium text-slate-500 mb-1.5 uppercase tracking-wide">What can go wrong / spot hazards</label>
-                                <textarea id="spotHazards" rows="3" placeholder="Identify potential hazards..." class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-800 placeholder-slate-400 focus:bg-white focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400 transition-all duration-200 resize-none pr-10"></textarea>
-                                <button type="button" class="speech-btn absolute bottom-3 right-2.5 text-slate-400 hover:text-indigo-600 p-1.5 rounded-lg hover:bg-indigo-50 transition-all duration-200 focus:outline-none" data-target="spotHazards">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
-                                    </svg>
-                                </button>
+                                <textarea id="spotHazards" rows="3" placeholder="Identify potential hazards..." class="dictation-target w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-800 placeholder-slate-400 focus:bg-white focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400 transition-all duration-200 resize-none"></textarea>
                             </div>
                             
                             <!-- Controls -->
                             <div class="relative group">
                                 <label for="existingControls" class="block text-xs font-medium text-slate-500 mb-1.5 uppercase tracking-wide">Any existing controls</label>
-                                <textarea id="existingControls" rows="3" placeholder="List current safety measures..." class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-800 placeholder-slate-400 focus:bg-white focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400 transition-all duration-200 resize-none pr-10"></textarea>
-                                <button type="button" class="speech-btn absolute bottom-3 right-2.5 text-slate-400 hover:text-indigo-600 p-1.5 rounded-lg hover:bg-indigo-50 transition-all duration-200 focus:outline-none" data-target="existingControls">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
-                                    </svg>
-                                </button>
+                                <textarea id="existingControls" rows="3" placeholder="List current safety measures..." class="dictation-target w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-800 placeholder-slate-400 focus:bg-white focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400 transition-all duration-200 resize-none"></textarea>
                             </div>
 
                             <!-- Risk Rating - collapsible section -->
@@ -1981,64 +2542,87 @@
     </div>
 
     <!-- NEW: Full-Screen Video Capture Modal -->
-    <div id="fullscreenVideoModal" class="fixed inset-0 z-[110] bg-black hidden flex flex-col" style="display: none;">
-        <!-- Header with instructions and close button -->
-        <div class="bg-gradient-to-r from-indigo-900 to-blue-900 text-white p-6 flex justify-between items-center">
-            <div>
-                <h2 class="text-2xl font-bold mb-2">Full-Screen Video Capture</h2>
-                <p class="text-indigo-200 text-sm"><strong>Pause</strong> the video → <strong>Click on video</strong> to capture frame • <strong>SPACE</strong> = Play/Pause • <strong>C</strong> = Capture • <strong>ESC</strong> = Exit</p>
+    <div id="fullscreenVideoModal" class="fixed inset-0 z-[110] hidden items-center justify-center bg-slate-950/90 backdrop-blur-md p-3 sm:p-4" style="display: none;">
+        <div class="fullscreen-modal-shell w-full max-w-[1600px] h-[95vh] rounded-2xl border border-white/10 bg-slate-900/80 shadow-2xl overflow-hidden flex flex-col">
+            <!-- Header with instructions and close button -->
+            <div class="bg-gradient-to-r from-indigo-700 to-blue-800 text-white px-4 sm:px-6 py-3.5 sm:py-4 flex items-start justify-between gap-4 border-b border-white/15">
+                <div class="min-w-0">
+                    <h2 class="text-xl sm:text-2xl font-bold mb-1 flex items-center gap-2.5">
+                        <span class="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-white/15 border border-white/25 text-white/95">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4.5 w-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M3 7h4l2-2h6l2 2h4v12H3V7z" />
+                                <circle cx="12" cy="13" r="3.5" />
+                            </svg>
+                        </span>
+                        <span>Full-Screen Video Capture</span>
+                    </h2>
+                    <p class="text-indigo-100 text-xs sm:text-sm">Pause the video and use <strong>Capture Frame</strong> to save images.</p>
+                    <div class="flex flex-wrap items-center gap-2 mt-2">
+                        <span class="fullscreen-shortcut-chip px-2 py-1 rounded-md bg-white/15 border border-white/20 text-[11px] font-semibold">SPACE Play/Pause</span>
+                        <span class="fullscreen-shortcut-chip px-2 py-1 rounded-md bg-white/15 border border-white/20 text-[11px] font-semibold">C Capture</span>
+                        <span class="fullscreen-shortcut-chip px-2 py-1 rounded-md bg-white/15 border border-white/20 text-[11px] font-semibold">ESC Exit</span>
+                    </div>
+                </div>
+                <button onclick="closeFullscreenVideoModal()" class="fullscreen-close-btn bg-white/10 hover:bg-white/20 text-white/80 hover:text-white backdrop-blur-sm rounded-full w-10 h-10 flex items-center justify-center transition-all duration-200 cursor-pointer border border-white/10" aria-label="Close fullscreen capture modal">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
             </div>
-            <button onclick="closeFullscreenVideoModal()" class="text-white text-3xl font-bold hover:text-indigo-300 transition">×</button>
-        </div>
 
-        <!-- Main content area -->
-        <div class="flex-1 flex gap-4 p-6 bg-black overflow-hidden">
-            <!-- Video player (left/center) -->
-            <div class="flex-1 flex flex-col items-center justify-center min-h-0">
-                <div id="videoWrapperContainer" class="relative w-full h-full flex items-center justify-center">
-                    <video id="fullscreenVideoPlayer" class="max-w-full max-h-full object-contain rounded-lg shadow-2xl cursor-pointer" controls autoplay></video>
-                    <!-- Flash overlay for capture feedback -->
-                    <div id="captureFlashOverlay" class="absolute inset-0 bg-white pointer-events-none opacity-0 rounded-lg transition-opacity duration-150" style="z-index:5;"></div>
-                    <!-- Floating capture button on the video -->
-                    <button id="captureFrameBtn" onclick="captureFullscreenFrame()" class="absolute bottom-16 left-1/2 -translate-x-1/2 bg-red-600/90 hover:bg-red-700 active:scale-95 text-white font-bold py-3 px-8 rounded-full shadow-lg transition-all flex items-center gap-2 text-lg backdrop-blur-sm" style="z-index:10;" title="Capture current frame (or press C)">
-                        📸 Capture Frame
-                    </button>
-                    <!-- Paused state hint overlay -->
-                    <div id="pausedCaptureHint" class="absolute inset-0 flex items-center justify-center pointer-events-none opacity-0 transition-opacity duration-300 rounded-lg" style="z-index:4; background: rgba(0,0,0,0.25);">
-                        <div class="bg-black/70 backdrop-blur-sm text-white px-6 py-3 rounded-full text-lg font-semibold shadow-xl">
-                            👆 Click on video to capture this frame
+            <!-- Main content area -->
+            <div class="fullscreen-modal-main flex-1 min-h-0 p-3 sm:p-4 lg:p-5">
+                <div class="fullscreen-layout h-full grid grid-cols-1 grid-rows-[minmax(0,1fr)_auto] xl:grid-cols-[minmax(0,1fr)_320px] xl:grid-rows-1 gap-3 sm:gap-4">
+                    <!-- Video player (left/center) -->
+                    <div class="fullscreen-video-pane min-h-[240px] sm:min-h-[300px] xl:min-h-0 rounded-2xl border border-white/10 bg-black/35 backdrop-blur-sm overflow-hidden">
+                        <div id="videoWrapperContainer" class="relative w-full h-full flex items-center justify-center p-2">
+                            <video id="fullscreenVideoPlayer" class="w-full h-full max-h-full object-contain rounded-xl shadow-2xl" controls></video>
+                            <!-- Flash overlay for capture feedback -->
+                            <div id="captureFlashOverlay" class="absolute inset-0 bg-white pointer-events-none opacity-0 rounded-xl transition-opacity duration-150" style="z-index:5;"></div>
+                            <!-- Floating capture button on the video -->
+                            <button id="captureFrameBtn" onclick="captureFullscreenFrame()" class="absolute bottom-6 left-1/2 -translate-x-1/2 inline-flex items-center gap-2 bg-red-600/90 hover:bg-red-700 active:scale-95 text-white font-bold py-2.5 px-6 rounded-full border border-red-400/30 shadow-xl transition-all text-base backdrop-blur-sm" style="z-index:10;" title="Capture current frame (or press C)">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M3 7h4l2-2h6l2 2h4v12H3V7z" />
+                                    <circle cx="12" cy="13" r="3.5" />
+                                </svg>
+                                <span>Capture Frame</span>
+                            </button>
+                            <!-- Paused state hint overlay -->
+                            <div id="pausedCaptureHint" class="absolute inset-0 flex items-center justify-center pointer-events-none opacity-0 transition-opacity duration-300 rounded-xl" style="z-index:4; background: rgba(0,0,0,0.25);">
+                                <div class="bg-black/70 backdrop-blur-sm text-white px-5 py-2.5 rounded-full text-sm sm:text-base font-semibold shadow-xl border border-white/10">
+                                    Use Capture Frame button (or press C)
+                                </div>
+                            </div>
+                            <!-- Warmup loader overlay -->
+                            <div id="videoWarmupOverlay" class="absolute inset-0 flex flex-col items-center justify-center rounded-xl" style="z-index:20; background: rgba(0,0,0,0.75); display: none;">
+                                <div class="flex flex-col items-center gap-4">
+                                    <div style="width:48px;height:48px;border:4px solid rgba(255,255,255,0.2);border-top-color:#ffd100;border-radius:50%;animation:warmup-spin 0.8s linear infinite;"></div>
+                                    <p class="text-white text-lg font-semibold">Preparing for image scrubbing...</p>
+                                    <p class="text-indigo-300 text-sm">Loading face detection model for first use</p>
+                                </div>
+                            </div>
+                            <style>@keyframes warmup-spin{to{transform:rotate(360deg)}}</style>
                         </div>
                     </div>
-                    <!-- Warmup loader overlay -->
-                    <div id="videoWarmupOverlay" class="absolute inset-0 flex flex-col items-center justify-center rounded-lg" style="z-index:20; background: rgba(0,0,0,0.75); display: none;">
-                        <div class="flex flex-col items-center gap-4">
-                            <div style="width:48px;height:48px;border:4px solid rgba(255,255,255,0.2);border-top-color:#ffd100;border-radius:50%;animation:warmup-spin 0.8s linear infinite;"></div>
-                            <p class="text-white text-lg font-semibold">Preparing for image scrubbing...</p>
-                            <p class="text-indigo-300 text-sm">Loading face detection model for first use</p>
+
+                    <!-- Thumbnail panel (right) -->
+                    <div class="fullscreen-thumb-pane min-h-0 max-h-[30vh] xl:max-h-none bg-white/[0.97] backdrop-blur-xl rounded-2xl shadow-2xl border border-slate-200/80 flex flex-col overflow-hidden">
+                        <div class="px-4 py-3 border-b border-slate-100 bg-slate-50/80">
+                            <h3 class="text-slate-800 font-semibold text-sm uppercase tracking-wide">Captured Frames (<span id="frameCount">0</span>)</h3>
+                        </div>
+                        <div id="fullscreenThumbnailPanel" class="flex-1 overflow-y-auto p-3 xl:space-y-2">
+                            <p class="text-slate-400 text-center text-sm mt-8">Captured frames appear here</p>
                         </div>
                     </div>
-                    <style>@keyframes warmup-spin{to{transform:rotate(360deg)}}</style>
                 </div>
             </div>
 
-            <!-- Thumbnail panel (right) -->
-            <div class="w-64 bg-slate-900 rounded-lg shadow-2xl flex flex-col overflow-hidden border border-slate-700">
-                <div class="bg-slate-800 p-4 border-b border-slate-700">
-                    <h3 class="text-white font-semibold">Captured Frames (<span id="frameCount">0</span>)</h3>
+            <!-- Footer with action buttons -->
+            <div class="fullscreen-modal-footer px-4 sm:px-5 py-3.5 border-t border-white/10 bg-slate-900/70 backdrop-blur-sm flex flex-wrap justify-between items-center gap-3">
+                <p class="text-xs sm:text-sm text-slate-300">Exiting will load <span id="frameCountFooter">0</span> frame(s) to your review pane</p>
+                <div class="rab-row fullscreen-modal-actions">
+                    <button onclick="clearCapturedFrames()" class="rab-btn rab-c-slate">Clear All</button>
+                    <button onclick="downloadCapturedFrames()" class="rab-btn rab-c-emerald">Download Frames</button>
+                    <button onclick="closeFullscreenVideoModal()" class="rab-btn rab-c-indigo">Exit & Load to Review</button>
                 </div>
-                <div id="fullscreenThumbnailPanel" class="flex-1 overflow-y-auto p-3 space-y-2">
-                    <p class="text-slate-400 text-center text-sm mt-8">Captured frames appear here</p>
-                </div>
-            </div>
-        </div>
-
-        <!-- Footer with action buttons -->
-        <div class="bg-slate-900 text-white p-4 flex justify-between items-center border-t border-slate-700">
-            <p class="text-sm text-slate-300">💡 Exiting will load <span id="frameCountFooter">0</span> frame(s) to your review pane</p>
-            <div class="flex gap-3">
-                <button onclick="clearCapturedFrames()" class="bg-slate-700 hover:bg-slate-600 text-white font-semibold py-2 px-6 rounded-lg transition">Clear All</button>
-                <button onclick="downloadCapturedFrames()" class="bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-6 rounded-lg transition">Download Frames</button>
-                <button onclick="closeFullscreenVideoModal()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-6 rounded-lg transition">Exit & Load to Review</button>
             </div>
         </div>
     </div>
@@ -2285,7 +2869,7 @@
 
             <!-- Navigation Controls -->
             <div class="flex items-center gap-3 flex-shrink-0">
-                <button id="modalDeleteBtn" class="delete-btn bg-red-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-red-700 transition text-sm" title="Delete this task" data-en-text="🗑️ Delete">🗑️ Delete</button>
+                <button id="modalDeleteBtn" class="delete-btn task-row-toggle-btn task-row-toggle-delete task-row-toggle-modal" title="Delete this task" data-en-text="🗑️ Delete">🗑️ Delete</button>
                 <button id="modalCancelBtn" class="bg-slate-400 text-white font-semibold py-2 px-4 rounded-lg hover:bg-slate-500 transition text-sm" data-en-text="Close">Close</button>
                 <button id="modalFooterPrevBtn" class="min-w-[100px] bg-slate-200 text-slate-800 font-semibold py-2 px-3 rounded-lg hover:bg-slate-300 transition shadow-sm text-sm" title="Previous task (← arrow)" data-en-text="← Previous">← Previous</button>
                 <span id="modalTaskCounter" class="text-slate-600 font-medium text-sm">1 / 1</span>
@@ -3684,7 +4268,7 @@ data.forEach((row, index) => {
                     <td class="${tdClasses}"><input type="text" value="${DOMPurify.sanitize(row['Current Control'] || '')}" class="${inputClasses}"></td>
                     <td class="${tdClasses}"><input type="text" value="${DOMPurify.sanitize(row['Routine/Non-Routine/Emergency Situation'] || '')}" class="${inputClasses}"></td>
                     <td class="${tdClasses} text-center actions-cell"></td>
-                    <td class="${tdClasses} text-center"><button onclick="toggleRowDelete(${index}, this)" class="${isDeleted ? 'restore-btn' : 'delete-btn'}" title="${isDeleted ? 'Restore row' : 'Delete row'}">${isDeleted ? 'Restore' : '🗑'}</button></td>
+                    <td class="${tdClasses} text-center"><button onclick="toggleRowDelete(${index}, this)" class="${getTaskDeleteRestoreButtonClass(isDeleted)}" title="${isDeleted ? 'Restore row' : 'Delete row'}" aria-label="${isDeleted ? 'Restore row' : 'Delete row'}">${isDeleted ? 'Restore' : '🗑'}</button></td>
                 </tr>`;
                 // --- END MODIFICATION ---
             });
@@ -3724,6 +4308,34 @@ data.forEach((row, index) => {
             updateAllControlIndicators();
             // --- END NEW ---
         }
+
+        function getTaskDeleteRestoreButtonClass(isDeleted, options = {}) {
+            const isModal = options && options.modal === true;
+            const variantClass = isDeleted ? 'restore-btn task-row-toggle-restore' : 'delete-btn task-row-toggle-delete';
+            return `${variantClass} task-row-toggle-btn${isModal ? ' task-row-toggle-modal' : ''}`;
+        }
+
+        function applyTaskDeleteRestoreButtonState(button, isDeleted, options = {}) {
+            if (!button) return;
+
+            const isModal = options && options.modal === true;
+            const deleteLabel = isModal ? '🗑️ Delete' : '🗑';
+            const restoreLabel = isModal ? '↩️ Restore' : 'Restore';
+            const deleteTitle = isModal ? 'Delete this task' : 'Delete row';
+            const restoreTitle = isModal ? 'Restore this task' : 'Restore row';
+
+            button.textContent = isDeleted ? restoreLabel : deleteLabel;
+            button.className = getTaskDeleteRestoreButtonClass(isDeleted, { modal: isModal });
+            button.title = isDeleted ? restoreTitle : deleteTitle;
+            button.setAttribute('aria-label', isDeleted ? restoreTitle : deleteTitle);
+
+            if (isModal) {
+                button.setAttribute('data-en-text', isDeleted ? '↩️ Restore' : '🗑️ Delete');
+            }
+        }
+
+        window.getTaskDeleteRestoreButtonClass = getTaskDeleteRestoreButtonClass;
+        window.applyTaskDeleteRestoreButtonState = applyTaskDeleteRestoreButtonState;
 
         // Function to update control measures indicator on table row
         function updateControlIndicator(rowIndex) {
@@ -5117,17 +5729,8 @@ data.forEach((row, index) => {
             // Update modal delete button state
             const modalDeleteBtn = document.getElementById('modalDeleteBtn');
             if (modalDeleteBtn) {
-                if (isRowDeleted) {
-                    modalDeleteBtn.textContent = t('↩️ Restore');
-                    modalDeleteBtn.setAttribute('data-en-text', '↩️ Restore');
-                    modalDeleteBtn.className = 'restore-btn bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-lg transition text-sm';
-                    modalDeleteBtn.title = 'Restore this task';
-                } else {
-                    modalDeleteBtn.textContent = t('🗑️ Delete');
-                    modalDeleteBtn.setAttribute('data-en-text', '🗑️ Delete');
-                    modalDeleteBtn.className = 'delete-btn bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded-lg transition text-sm';
-                    modalDeleteBtn.title = 'Delete this task';
-                }
+                applyTaskDeleteRestoreButtonState(modalDeleteBtn, isRowDeleted, { modal: true });
+                modalDeleteBtn.textContent = t(isRowDeleted ? '↩️ Restore' : '🗑️ Delete');
             }
             let formHtml = '';
             
@@ -6631,14 +7234,10 @@ window.toggleRowDelete = function(rowIndex, btn) {
     const buttonsToUpdate = [btn, tableRowBtn].filter(b => b);
     buttonsToUpdate.forEach(button => {
         try {
-            if (isDeleted) {
-                button.textContent = 'Restore';
-                button.className = 'restore-btn';
-                button.title = 'Restore row';
-            } else {
-                button.textContent = '🗑';
-                button.className = 'delete-btn';
-                button.title = 'Delete row';
+            const isModalButton = button.id === 'modalDeleteBtn';
+            applyTaskDeleteRestoreButtonState(button, isDeleted, { modal: isModalButton });
+            if (isModalButton) {
+                button.textContent = t(isDeleted ? '↩️ Restore' : '🗑️ Delete');
             }
         } catch (e) { /* ignore UI update issues */ }
     });
@@ -6662,6 +7261,13 @@ window.toggleRowDelete = function(rowIndex, btn) {
     } catch (e) {
         console.warn('Error updating row controls for delete toggle:', e);
     }
+
+    if (typeof window.syncMainTableRowStateToGoehs === 'function') {
+        const sourceRowIndex = Number(row.dataset.rowIndex);
+        if (!Number.isNaN(sourceRowIndex)) {
+            window.syncMainTableRowStateToGoehs(sourceRowIndex, isDeleted);
+        }
+    }
 }
 
 // --- Restore row from modal ---
@@ -6676,9 +7282,7 @@ window.restoreRowFromModal = function(rowIndex) {
     // Find and update the delete button in that row
     const btn = row.querySelector('.restore-btn, .delete-btn');
     if (btn) {
-        btn.textContent = '🗑';
-        btn.className = 'delete-btn';
-        btn.title = 'Delete row';
+        applyTaskDeleteRestoreButtonState(btn, false, { modal: false });
     }
     
     // Re-enable all controls in the row
@@ -6691,6 +7295,13 @@ window.restoreRowFromModal = function(rowIndex) {
     
     // Refresh the modal view to update UI
     loadModalTaskDetails(rowIndex);
+
+    if (typeof window.syncMainTableRowStateToGoehs === 'function') {
+        const sourceRowIndex = Number(row.dataset.rowIndex);
+        if (!Number.isNaN(sourceRowIndex)) {
+            window.syncMainTableRowStateToGoehs(sourceRowIndex, false);
+        }
+    }
 }
 
 // --- Translation Storage to track original values ---
@@ -7243,6 +7854,7 @@ window.LIKELIHOOD_SCALE = LIKELIHOOD_SCALE;
             });
         }
         function closeLightboxFunc() {
+            disableSpeechMode();
             // Notify image editor BEFORE clearing ID so annotations get baked
             if (window.ImageEditor) window.ImageEditor.onLightboxClose();
             lightboxModal.style.display = 'none';
@@ -7262,10 +7874,14 @@ window.LIKELIHOOD_SCALE = LIKELIHOOD_SCALE;
 
         let faceApiWarmedUp = false; // Track whether face-api model has been warmed up
 
-        async function warmUpFaceApi(player) {
+        async function warmUpFaceApi(player, options = {}) {
             if (faceApiWarmedUp) return;
+            const showOverlay = options.showOverlay === true;
             const warmupOverlay = document.getElementById('videoWarmupOverlay');
-            if (warmupOverlay) warmupOverlay.style.display = 'flex';
+            if (warmupOverlay) {
+                warmupOverlay.style.pointerEvents = 'none';
+                if (showOverlay) warmupOverlay.style.display = 'flex';
+            }
             try {
                 // Run a tiny dummy detection to force model initialization
                 const tinyCanvas = document.createElement('canvas');
@@ -7290,6 +7906,31 @@ window.LIKELIHOOD_SCALE = LIKELIHOOD_SCALE;
             }
         }
 
+        function cleanupFullscreenVideoPlayerHandlers(player) {
+            if (!player) return;
+
+            if (player._captureClickHandler) {
+                player.removeEventListener('click', player._captureClickHandler);
+                player._captureClickHandler = null;
+            }
+            if (player._pauseHandler) {
+                player.removeEventListener('pause', player._pauseHandler);
+                player._pauseHandler = null;
+            }
+            if (player._playHandler) {
+                player.removeEventListener('play', player._playHandler);
+                player._playHandler = null;
+            }
+            if (player._loadedMetadataHandler) {
+                player.removeEventListener('loadedmetadata', player._loadedMetadataHandler);
+                player._loadedMetadataHandler = null;
+            }
+            if (player._warmupTimer) {
+                clearTimeout(player._warmupTimer);
+                player._warmupTimer = null;
+            }
+        }
+
         window.openFullscreenVideoCapture = function(videoElement) {
             if (!videoElement || !videoElement.src) {
                 showCustomAlert('No video to capture from.', 'error');
@@ -7305,41 +7946,58 @@ window.LIKELIHOOD_SCALE = LIKELIHOOD_SCALE;
             // Set up the fullscreen modal
             const modal = document.getElementById('fullscreenVideoModal');
             const player = document.getElementById('fullscreenVideoPlayer');
+            const pausedHint = document.getElementById('pausedCaptureHint');
+            const warmupOverlay = document.getElementById('videoWarmupOverlay');
+
+            cleanupFullscreenVideoPlayerHandlers(player);
+
+            if (fullscreenSpacebarListener) {
+                document.removeEventListener('keydown', fullscreenSpacebarListener);
+                fullscreenSpacebarListener = null;
+            }
 
             // Clone the video element to fullscreen player
+            const resumeTime = Number(videoElement.currentTime) || 0;
             player.src = videoElement.src;
-            player.currentTime = videoElement.currentTime;
+            player.preload = 'auto';
+
+            if (pausedHint) pausedHint.style.opacity = '0';
+            if (warmupOverlay) warmupOverlay.style.display = 'none';
+
+            const startPlayer = async () => {
+                if (resumeTime > 0) {
+                    try {
+                        const safeTime = Number.isFinite(player.duration) && player.duration > 0
+                            ? Math.min(resumeTime, Math.max(0, player.duration - 0.05))
+                            : resumeTime;
+                        player.currentTime = safeTime;
+                    } catch (e) {
+                        console.warn('Could not seek fullscreen video to previous position:', e);
+                    }
+                }
+
+                // Prioritize initial playback; defer warm-up to reduce first-open hitching.
+                player.play().catch(err => {
+                    console.warn('Autoplay was blocked for fullscreen video:', err);
+                });
+
+                if (!faceApiWarmedUp) {
+                    player._warmupTimer = setTimeout(() => warmUpFaceApi(player, { showOverlay: false }), 300);
+                }
+            };
+
+            if (player.readyState >= 1) {
+                startPlayer();
+            } else {
+                player._loadedMetadataHandler = () => startPlayer();
+                player.addEventListener('loadedmetadata', player._loadedMetadataHandler, { once: true });
+            }
             
             // Show modal
             modal.style.display = 'flex';
             document.body.style.overflow = 'hidden'; // Prevent scrolling
 
-            // Warm up face-api model in the background while user watches video
-            if (player.readyState >= 2) {
-                warmUpFaceApi(player);
-            } else {
-                player.addEventListener('loadeddata', () => warmUpFaceApi(player), { once: true });
-            }
-
-            // --- Click-on-video to capture when paused ---
-            player._captureClickHandler = (e) => {
-                // Ignore clicks on the native controls bar (bottom ~40px of video)
-                const rect = player.getBoundingClientRect();
-                const clickY = e.clientY - rect.top;
-                const controlsBarHeight = 45;
-                if (clickY > rect.height - controlsBarHeight) return; // Let native controls work
-
-                if (player.paused) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    captureFullscreenFrame();
-                }
-                // If playing, native click will pause — that's fine
-            };
-            player.addEventListener('click', player._captureClickHandler);
-
-            // --- Show/hide "click to capture" hint when paused ---
-            const pausedHint = document.getElementById('pausedCaptureHint');
+            // --- Show/hide capture hint when paused ---
             player._pauseHandler = () => { if (pausedHint) pausedHint.style.opacity = '1'; };
             player._playHandler = () => { if (pausedHint) pausedHint.style.opacity = '0'; };
             player.addEventListener('pause', player._pauseHandler);
@@ -7372,6 +8030,10 @@ window.LIKELIHOOD_SCALE = LIKELIHOOD_SCALE;
         window.captureFullscreenFrame = async function() {
             const player = document.getElementById('fullscreenVideoPlayer');
             if (!player.src) return;
+            if (player.readyState < 2 || !player.videoWidth || !player.videoHeight) {
+                showCustomAlert('Video is still loading. Please wait a moment, then capture.', 'info');
+                return;
+            }
 
             // Visual flash feedback — white flash over the video
             const flash = document.getElementById('captureFlashOverlay');
@@ -7432,11 +8094,11 @@ window.LIKELIHOOD_SCALE = LIKELIHOOD_SCALE;
 
             const url = URL.createObjectURL(blob);
             const thumb = document.createElement('div');
-            thumb.className = 'relative group';
+            thumb.className = 'relative group fullscreen-thumb-item rounded-lg border border-slate-200 bg-white p-1.5 shadow-sm';
             thumb.innerHTML = `
-                <img src="${url}" alt="Frame ${index + 1}" class="w-full h-auto rounded shadow-md cursor-pointer hover:scale-105 transition-transform">
-                <button onclick="removeFullscreenThumbnail(${index})" class="absolute top-1 right-1 bg-red-600 hover:bg-red-700 text-white rounded-full w-6 h-6 text-xs font-bold opacity-0 group-hover:opacity-100 transition">×</button>
-                <p class="text-white text-xs mt-1 text-center">${name.substring(0, 20)}...</p>
+                <img src="${url}" alt="Frame ${index + 1}" class="w-full h-auto rounded-md border border-slate-200 shadow-sm cursor-pointer transition-transform duration-200 group-hover:scale-[1.02]">
+                <button onclick="removeFullscreenThumbnail(${index})" class="fullscreen-thumb-delete absolute top-2 right-2 bg-red-600 hover:bg-red-700 text-white rounded-full w-6 h-6 text-xs font-bold opacity-0 group-hover:opacity-100 transition focus:opacity-100 focus:outline-none">×</button>
+                <p class="fullscreen-thumb-name text-slate-600 text-[11px] mt-1.5 text-center truncate" title="${name}">${name.substring(0, 20)}...</p>
             `;
             panel.appendChild(thumb);
         }
@@ -7444,7 +8106,7 @@ window.LIKELIHOOD_SCALE = LIKELIHOOD_SCALE;
         window.removeFullscreenThumbnail = function(index) {
             fullscreenCapturedFrames.splice(index, 1);
             const panel = document.getElementById('fullscreenThumbnailPanel');
-            const thumbs = panel.querySelectorAll('.relative');
+            const thumbs = panel.querySelectorAll('.fullscreen-thumb-item');
             if (thumbs[index]) {
                 thumbs[index].remove();
             }
@@ -7509,10 +8171,16 @@ window.LIKELIHOOD_SCALE = LIKELIHOOD_SCALE;
         window.closeFullscreenVideoModal = function() {
             const modal = document.getElementById('fullscreenVideoModal');
             const player = document.getElementById('fullscreenVideoPlayer');
+            const pausedHint = document.getElementById('pausedCaptureHint');
+            const warmupOverlay = document.getElementById('videoWarmupOverlay');
             
             // Stop video playback
             player.pause();
+            cleanupFullscreenVideoPlayerHandlers(player);
             player.src = '';
+            player.load();
+            if (pausedHint) pausedHint.style.opacity = '0';
+            if (warmupOverlay) warmupOverlay.style.display = 'none';
             
             // Remove event listener
             if (fullscreenSpacebarListener) {
@@ -9095,12 +9763,26 @@ downloadBtn.addEventListener('click', async () => {
 });
 // EXPOSE THE HELPER FUNCTION GLOBALLY
     window.addImagesToZip = addImagesToZip;
-    // --- Speech-to-Text Feature (Enhanced) ---
+    // --- Speech-to-Text Feature (Global Audio Mode) ---
 let recognition = null;
 let currentTarget = null;
 let isRecording = false;
+let isSpeechModeEnabled = false;
+let isSpeechPaused = false;
 let interimTranscript = '';
-const speechBtns = document.querySelectorAll('.speech-btn');
+
+const speechModeBtn = document.getElementById('speechModeBtn');
+const dictationTargets = [
+    document.getElementById('stepDescription'),
+    document.getElementById('spotHazards'),
+    document.getElementById('existingControls')
+].filter(Boolean);
+
+const DICTATION_LABELS = {
+    stepDescription: 'Description',
+    spotHazards: 'Hazards',
+    existingControls: 'Controls'
+};
 
 // Language code mapping for speech recognition
 const SPEECH_LANG_MAP = {
@@ -9114,24 +9796,83 @@ function getSpeechLanguage() {
     return SPEECH_LANG_MAP[appLang] || 'en-US';
 }
 
+function getSpeechLanguageName() {
+    const langNames = { 'en-US': 'English', 'fr-FR': 'Français', 'de-DE': 'Deutsch' };
+    return langNames[getSpeechLanguage()] || getSpeechLanguage();
+}
+
+function getTargetLabel(target) {
+    if (!target) return '';
+    return DICTATION_LABELS[target.id] || target.id;
+}
+
+function setActiveDictationTarget(target) {
+    dictationTargets.forEach(field => field.classList.remove('dictation-target-active'));
+    if (!target) {
+        currentTarget = null;
+        return;
+    }
+    currentTarget = target;
+    target.classList.add('dictation-target-active');
+
+    if (isSpeechModeEnabled && isRecording) {
+        showRecordingIndicator(true, getSpeechLanguageName(), target);
+    }
+}
+
+function updateSpeechModeButton() {
+    if (!speechModeBtn) return;
+
+    let label = 'Audio Mode';
+    let title = 'Start dictation mode';
+    let iconPath = 'M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z';
+
+    speechModeBtn.classList.remove('bg-slate-100', 'hover:bg-slate-200', 'text-slate-700', 'border-slate-200');
+    speechModeBtn.classList.remove('bg-red-600', 'hover:bg-red-700', 'text-white', 'border-red-700');
+    speechModeBtn.classList.remove('bg-amber-500', 'hover:bg-amber-600', 'text-white', 'border-amber-600');
+
+    if (!isSpeechModeEnabled) {
+        speechModeBtn.classList.add('bg-slate-100', 'hover:bg-slate-200', 'text-slate-700', 'border-slate-200');
+    } else if (isRecording) {
+        label = 'Pause Audio';
+        title = 'Pause dictation';
+        iconPath = 'M10 9v6m4-6v6M9 19h6a2 2 0 002-2V7a2 2 0 00-2-2H9a2 2 0 00-2 2v10a2 2 0 002 2z';
+        speechModeBtn.classList.add('bg-red-600', 'hover:bg-red-700', 'text-white', 'border-red-700');
+    } else {
+        label = 'Resume Audio';
+        title = 'Resume dictation';
+        iconPath = 'M14.752 11.168l-6.518-3.73A1 1 0 007 8.308v7.384a1 1 0 001.234.97l6.518-1.87A1 1 0 0015.5 14.82V12.18a1 1 0 00-.748-1.012z';
+        speechModeBtn.classList.add('bg-amber-500', 'hover:bg-amber-600', 'text-white', 'border-amber-600');
+    }
+
+    speechModeBtn.title = title;
+    speechModeBtn.innerHTML = `
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="${iconPath}" />
+        </svg>
+        <span>${label}</span>
+    `;
+}
+
 function initSpeechRecognition() {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) {
-        speechBtns.forEach(btn => btn.style.display = 'none');
-        console.warn("Speech Recognition not supported in this browser.");
-        showCustomAlert("Speech-to-text is not supported in your browser. Try Chrome for best results.", 'info');
+        if (speechModeBtn) speechModeBtn.style.display = 'none';
+        console.warn('Speech Recognition not supported in this browser.');
+        showCustomAlert('Speech-to-text is not supported in your browser. Try Chrome for best results.', 'info');
         return false;
     }
+
     recognition = new SpeechRecognition();
-    recognition.lang = getSpeechLanguage(); // Sync with app language
-    recognition.continuous = true; // Keep listening until manually stopped
-    recognition.interimResults = true; // Show real-time transcription
+    recognition.lang = getSpeechLanguage();
+    recognition.continuous = true;
+    recognition.interimResults = true;
     recognition.maxAlternatives = 1;
 
     recognition.onresult = (event) => {
         let finalTranscript = '';
         interimTranscript = '';
-        
+
         for (let i = event.resultIndex; i < event.results.length; i++) {
             const transcript = event.results[i][0].transcript;
             if (event.results[i].isFinal) {
@@ -9140,25 +9881,26 @@ function initSpeechRecognition() {
                 interimTranscript += transcript;
             }
         }
-        
+
         if (currentTarget) {
-            // Append final transcript to textarea
             if (finalTranscript) {
                 const currentVal = currentTarget.value;
                 const needsSpace = currentVal && !currentVal.endsWith(' ') && !currentVal.endsWith('\n');
                 currentTarget.value = currentVal + (needsSpace ? ' ' : '') + finalTranscript;
                 currentTarget.dispatchEvent(new Event('input'));
             }
-            
-            // Show interim (live) transcription in a floating indicator
             updateInterimDisplay(interimTranscript);
         }
     };
 
     recognition.onerror = (event) => {
+        if (event.error === 'aborted' && (isSpeechPaused || !isSpeechModeEnabled)) {
+            return;
+        }
+
         console.error('Speech recognition error:', event.error);
         let errorMsg = 'Speech recognition error';
-        switch(event.error) {
+        switch (event.error) {
             case 'no-speech':
                 errorMsg = t('No speech detected. Please speak into your microphone.');
                 break;
@@ -9175,20 +9917,28 @@ function initSpeechRecognition() {
                 errorMsg = t('Speech recognition error: ') + event.error;
         }
         showCustomAlert(errorMsg, 'error');
-        stopRecognition();
+        disableSpeechMode();
     };
 
     recognition.onend = () => {
-        // If still recording, restart (handles browser auto-stop)
-        if (isRecording && currentTarget) {
+        isRecording = false;
+
+        if (isSpeechModeEnabled && !isSpeechPaused && currentTarget) {
             try {
                 recognition.start();
+                isRecording = true;
+                updateSpeechModeButton();
+                showRecordingIndicator(true, getSpeechLanguageName(), currentTarget);
             } catch (e) {
-                stopRecognition();
+                console.warn('Speech restart failed:', e);
+                updateSpeechModeButton();
             }
-        } else {
-            stopRecognition();
+            return;
         }
+
+        updateInterimDisplay('');
+        showRecordingIndicator(false);
+        updateSpeechModeButton();
     };
 
     return true;
@@ -9197,12 +9947,12 @@ function initSpeechRecognition() {
 // Floating interim display for live transcription preview
 function updateInterimDisplay(text) {
     let interimDiv = document.getElementById('speechInterimDisplay');
-    
+
     if (!text) {
         if (interimDiv) interimDiv.style.display = 'none';
         return;
     }
-    
+
     if (!interimDiv) {
         interimDiv = document.createElement('div');
         interimDiv.id = 'speechInterimDisplay';
@@ -9213,32 +9963,34 @@ function updateInterimDisplay(text) {
         `;
         document.body.appendChild(interimDiv);
     }
-    
+
     interimDiv.querySelector('.interim-text').textContent = '🎤 ' + text + '...';
     interimDiv.style.display = 'block';
 }
 
 // Show/hide recording indicator at top of screen
-function showRecordingIndicator(show, langName = '') {
+function showRecordingIndicator(show, langName = '', targetField = null) {
     let indicator = document.getElementById('recordingIndicator');
-    
+
     if (!show) {
         if (indicator) indicator.remove();
         return;
     }
-    
+
     if (!indicator) {
         indicator = document.createElement('div');
         indicator.id = 'recordingIndicator';
         indicator.className = 'recording-indicator';
         document.body.appendChild(indicator);
     }
-    
+
+    const label = getTargetLabel(targetField || currentTarget);
+    const labelText = label ? ` • ${label}` : '';
     indicator.innerHTML = `
         <span class="rec-dot"></span>
         <span>REC</span>
-        <span style="font-weight: 400; opacity: 0.9;">• ${langName}</span>
-        <span style="font-size: 12px; opacity: 0.7; margin-left: 8px;">(click mic to stop)</span>
+        <span style="font-weight: 400; opacity: 0.9;">• ${langName}${labelText}</span>
+        <span style="font-size: 12px; opacity: 0.7; margin-left: 8px;">(click Audio Mode to pause)</span>
     `;
 }
 
@@ -9246,80 +9998,125 @@ function startRecognition(targetTextarea) {
     if (!recognition) {
         if (!initSpeechRecognition()) return;
     }
-    
-    // Update language before starting (in case user changed app language)
+
+    if (!targetTextarea) {
+        showCustomAlert('Click Description, Hazards, or Controls to choose where dictation should go.', 'info');
+        return;
+    }
+
     recognition.lang = getSpeechLanguage();
-    
     currentTarget = targetTextarea;
-    isRecording = true;
-    
+    isSpeechModeEnabled = true;
+    isSpeechPaused = false;
+
     try {
         recognition.start();
+        isRecording = true;
     } catch (e) {
-        // Already started, stop and restart
-        recognition.stop();
-        setTimeout(() => {
-            try { recognition.start(); } catch (err) { console.error(err); }
-        }, 100);
-    }
-    
-    // Show current language name
-    const langNames = { 'en-US': 'English', 'fr-FR': 'Français', 'de-DE': 'Deutsch' };
-    const currentLangName = langNames[recognition.lang] || recognition.lang;
-    
-    // Show prominent recording indicator at top
-    showRecordingIndicator(true, currentLangName);
-    
-    // Update button to recording state with custom recording class
-    speechBtns.forEach(btn => {
-        if (btn.dataset.target === targetTextarea.id) {
-            btn.classList.add('recording');
-            btn.classList.remove('bg-indigo-600', 'hover:bg-indigo-700');
-            // Change to stop icon
-            btn.querySelector('svg').innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 10a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z" />';
+        try {
+            recognition.stop();
+            setTimeout(() => {
+                try {
+                    recognition.start();
+                    isRecording = true;
+                    updateSpeechModeButton();
+                    showRecordingIndicator(true, getSpeechLanguageName(), targetTextarea);
+                } catch (err) {
+                    console.error(err);
+                }
+            }, 100);
+        } catch (err) {
+            console.error(err);
         }
-    });
+    }
+
+    updateSpeechModeButton();
+    showRecordingIndicator(true, getSpeechLanguageName(), targetTextarea);
 }
 
-function stopRecognition() {
+function pauseRecognition() {
+    isSpeechPaused = true;
     isRecording = false;
     if (recognition) {
         try { recognition.stop(); } catch (e) { /* ignore */ }
     }
-    currentTarget = null;
     interimTranscript = '';
-    
-    // Hide recording indicator
+    updateInterimDisplay('');
     showRecordingIndicator(false);
-    
-    // Hide interim display
-    const interimDiv = document.getElementById('speechInterimDisplay');
-    if (interimDiv) interimDiv.style.display = 'none';
-    
-    // Reset all buttons
-    speechBtns.forEach(btn => {
-        btn.classList.remove('recording', 'bg-red-600', 'hover:bg-red-700', 'animate-pulse');
-        btn.classList.add('bg-indigo-600', 'hover:bg-indigo-700');
-        // Reset to mic icon
-        btn.querySelector('svg').innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />';
+    updateSpeechModeButton();
+}
+
+function disableSpeechMode() {
+    isSpeechModeEnabled = false;
+    isSpeechPaused = false;
+    isRecording = false;
+    if (recognition) {
+        try { recognition.stop(); } catch (e) { /* ignore */ }
+    }
+    interimTranscript = '';
+    updateInterimDisplay('');
+    showRecordingIndicator(false);
+    setActiveDictationTarget(null);
+    updateSpeechModeButton();
+}
+
+function enableSpeechMode() {
+    isSpeechModeEnabled = true;
+    isSpeechPaused = false;
+    if (!currentTarget) {
+        const focusedField = dictationTargets.find(field => field === document.activeElement);
+        if (focusedField) {
+            setActiveDictationTarget(focusedField);
+        }
+    }
+
+    if (currentTarget) {
+        startRecognition(currentTarget);
+    } else {
+        updateSpeechModeButton();
+        showCustomAlert('Audio mode enabled. Click Description, Hazards, or Controls to start dictation.', 'info');
+    }
+}
+
+function handleDictationTargetSelect(target) {
+    setActiveDictationTarget(target);
+    if (isSpeechModeEnabled && !isSpeechPaused) {
+        if (!isRecording) {
+            startRecognition(target);
+        } else {
+            showRecordingIndicator(true, getSpeechLanguageName(), target);
+        }
+    }
+}
+
+dictationTargets.forEach(target => {
+    target.addEventListener('focus', () => handleDictationTargetSelect(target));
+    target.addEventListener('click', () => handleDictationTargetSelect(target));
+});
+
+if (speechModeBtn) {
+    speechModeBtn.addEventListener('click', () => {
+        if (!isSpeechModeEnabled) {
+            enableSpeechMode();
+            return;
+        }
+
+        if (isRecording) {
+            pauseRecognition();
+            return;
+        }
+
+        isSpeechPaused = false;
+        if (currentTarget) {
+            startRecognition(currentTarget);
+        } else {
+            updateSpeechModeButton();
+            showCustomAlert('Click Description, Hazards, or Controls to choose dictation target.', 'info');
+        }
     });
 }
 
-// Attach click handlers to buttons
-speechBtns.forEach(btn => {
-    btn.addEventListener('click', () => {
-        const targetId = btn.dataset.target;
-        const targetTextarea = document.getElementById(targetId);
-        if (!targetTextarea) return;
-
-        if (currentTarget === targetTextarea) {
-            stopRecognition();
-        } else {
-            if (currentTarget) stopRecognition(); // Stop any active
-            startRecognition(targetTextarea);
-        }
-    });
-});
+updateSpeechModeButton();
 
 // Initialize speech recognition when DOM is ready (or lightbox opens)
 document.addEventListener('DOMContentLoaded', initSpeechRecognition);
@@ -9439,6 +10236,7 @@ async function saveProject() {
 }
 
 async function loadProject(file) {
+    const pendingWorkflowContext = window.pendingGoehsWorkflowContext || null;
     try {
         const text = await file.text();
         const projectData = JSON.parse(text);
@@ -9520,9 +10318,7 @@ async function loadProject(file) {
                     // Update the button UI in the Delete cell (last td)
                     const delBtn = row.querySelector('td:last-child button');
                     if (delBtn) {
-                        delBtn.textContent = 'Restore';
-                        delBtn.className = 'restore-btn';
-                        delBtn.title = 'Restore row';
+                        applyTaskDeleteRestoreButtonState(delBtn, true, { modal: false });
                     }
                     // Also disable row controls so struck appearance is accurate
                     try {
@@ -9656,11 +10452,27 @@ if (projectData.tableData && projectData.tableData.counterMeasures) {
                 table.scrollIntoView({ behavior: 'smooth', block: 'start' });
             }
         }, 300);
+
+        if (pendingWorkflowContext && pendingWorkflowContext.source) {
+            if (typeof window.setGoehsWorkflowContext === 'function') {
+                window.setGoehsWorkflowContext(pendingWorkflowContext.source, pendingWorkflowContext.metadata || {});
+            } else {
+                window.goehsWorkflowContext = {
+                    source: pendingWorkflowContext.source,
+                    setAt: new Date().toISOString(),
+                    metadata: pendingWorkflowContext.metadata || {}
+                };
+            }
+        }
         
         showCustomAlert("Project loaded successfully!", 'success');
     } catch (error) {
         console.error("Error loading project:", error);
         showCustomAlert("Failed to load project: Invalid file.", 'error');
+    } finally {
+        if (pendingWorkflowContext) {
+            window.pendingGoehsWorkflowContext = null;
+        }
     }
 }
 
@@ -10708,6 +11520,32 @@ downloadBtn.addEventListener('click', async () => {
                 
                 // Success - load data
                 window.directGoehsContext = data.process_context;
+                const workflowSource = (window.GOEHS_WORKFLOW_SOURCES && window.GOEHS_WORKFLOW_SOURCES.RA2025_SINGLE) || 'RA2025_SINGLE';
+                if (typeof window.setGoehsWorkflowContext === 'function') {
+                    window.setGoehsWorkflowContext(workflowSource, {
+                        workflow: 'ra2025_manual_mapper_autodetect_retry',
+                        sourceFile: window.ra2025PendingFile ? window.ra2025PendingFile.name : null,
+                        selectedSheetIndex: window.ra2025SelectedSheetIndex || null,
+                        sheetName: data.sheet_name || null,
+                        detectedLanguage: data.detectedLang || null,
+                        riskItemCount: data.risk_items.length,
+                        processContext: data.process_context || null
+                    });
+                } else {
+                    window.goehsWorkflowContext = {
+                        source: workflowSource,
+                        setAt: new Date().toISOString(),
+                        metadata: {
+                            workflow: 'ra2025_manual_mapper_autodetect_retry',
+                            sourceFile: window.ra2025PendingFile ? window.ra2025PendingFile.name : null,
+                            selectedSheetIndex: window.ra2025SelectedSheetIndex || null,
+                            sheetName: data.sheet_name || null,
+                            detectedLanguage: data.detectedLang || null,
+                            riskItemCount: data.risk_items.length,
+                            processContext: data.process_context || null
+                        }
+                    };
+                }
                 const tableData = convertRA2025ToTableFormat(data.risk_items);
                 
                 if (window.buildTableFromData) {
@@ -10816,6 +11654,31 @@ downloadBtn.addEventListener('click', async () => {
         // Store raw data for potential remapping
         window.ra2025RawRiskItems = riskItems;
         window.ra2025LoadedFile = window.ra2025PendingFile;
+        const mappedColumns = Object.fromEntries(Object.entries(cols).filter(([, val]) => !!val));
+        const workflowSource = (window.GOEHS_WORKFLOW_SOURCES && window.GOEHS_WORKFLOW_SOURCES.RA2025_SINGLE) || 'RA2025_SINGLE';
+        if (typeof window.setGoehsWorkflowContext === 'function') {
+            window.setGoehsWorkflowContext(workflowSource, {
+                workflow: 'ra2025_manual_mapping',
+                sourceFile: window.ra2025PendingFile ? window.ra2025PendingFile.name : null,
+                selectedSheetIndex: window.ra2025SelectedSheetIndex || null,
+                dataStartRow: dataStartRow,
+                riskItemCount: riskItems.length,
+                mappedColumns: mappedColumns
+            });
+        } else {
+            window.goehsWorkflowContext = {
+                source: workflowSource,
+                setAt: new Date().toISOString(),
+                metadata: {
+                    workflow: 'ra2025_manual_mapping',
+                    sourceFile: window.ra2025PendingFile ? window.ra2025PendingFile.name : null,
+                    selectedSheetIndex: window.ra2025SelectedSheetIndex || null,
+                    dataStartRow: dataStartRow,
+                    riskItemCount: riskItems.length,
+                    mappedColumns: mappedColumns
+                }
+            };
+        }
         
         // Close modal
         closeRA2025ColumnMapper();
@@ -12226,6 +13089,19 @@ async function loadFile(file) {
 
             const mainAppInput = document.getElementById('projectFileInput');
             if(mainAppInput) {
+                const activeSheet = gyAllSheets.find(s => s.index === gyActiveSheetIdx);
+                window.pendingGoehsWorkflowContext = {
+                    source: (window.GOEHS_WORKFLOW_SOURCES && window.GOEHS_WORKFLOW_SOURCES.LEGACY_AI) || 'LEGACY_AI',
+                    metadata: {
+                        workflow: 'legacy_excel_ai_processing',
+                        sourceFile: gyFilename || null,
+                        activeSheetIndex: gyActiveSheetIdx || null,
+                        activeSheetName: activeSheet ? activeSheet.name : null,
+                        sheetCount: Array.isArray(gyAllSheets) ? gyAllSheets.length : 0,
+                        mappedStepCount: Array.isArray(gyFullData) ? gyFullData.length : 0
+                    }
+                };
+
                 const dataTransfer = new DataTransfer();
                 dataTransfer.items.add(file);
                 mainAppInput.files = dataTransfer.files;
@@ -15383,7 +16259,7 @@ ${JSON.stringify(payload, null, 2)}`;
 </script>
 
 <!-- ========================================================================== -->
-<!-- GOEHS INTEGRATION MODAL - THREE TOOLS WITH CSV GENERATION -->
+<!-- GOEHS INTEGRATION MODAL - SINGLE SCREEN WITH CSV GENERATION -->
 <!-- ========================================================================== -->
 <div id="goehsModal" class="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm p-2 flex items-center justify-center" style="display: none;">
     <div class="bg-white m-auto rounded-xl shadow-2xl w-full max-w-[98vw] h-[96vh] overflow-hidden flex flex-col">
@@ -15397,26 +16273,9 @@ ${JSON.stringify(payload, null, 2)}`;
             <button onclick="closeGoehsModal()" class="text-white hover:text-orange-200 text-3xl font-bold leading-none">&times;</button>
         </div>
 
-        <!-- Tab Navigation -->
-        <div class="flex border-b border-slate-200 bg-slate-50 overflow-x-auto">
-            <button class="goehs-tab-btn active px-6 py-4 font-semibold text-orange-600 border-b-2 border-orange-600 bg-white transition whitespace-nowrap" data-tab="tool1">
-                <span class="flex items-center gap-2">
-                    <span class="bg-orange-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm">1</span>
-                    Assessment Batch
-                </span>
-            </button>
-            <button class="goehs-tab-btn px-6 py-4 font-semibold text-slate-600 border-b-2 border-transparent hover:bg-slate-100 transition whitespace-nowrap" data-tab="tool2">
-                <span class="flex items-center gap-2">
-                    <span class="bg-slate-400 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm">2</span>
-                    Task Batch
-                </span>
-            </button>
-            <button class="goehs-tab-btn px-6 py-4 font-semibold text-slate-600 border-b-2 border-transparent hover:bg-slate-100 transition whitespace-nowrap" data-tab="tool3">
-                <span class="flex items-center gap-2">
-                    <span class="bg-slate-400 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm">3</span>
-                    Hazard Batch
-                </span>
-            </button>
+        <!-- Single-screen mode info -->
+        <div id="goehsSingleScreenBanner" class="border-b border-slate-200 bg-amber-50 px-6 py-3">
+            <p class="text-sm text-amber-900 font-medium">Single-screen mode is active: complete Header and Final Review on one page.</p>
         </div>
 
         <!-- Tab Content Area -->
@@ -15425,8 +16284,8 @@ ${JSON.stringify(payload, null, 2)}`;
             <!-- ====== TOOL 1: Assessment Batch Upload Tool ====== -->
             <div id="goehs-tool1" class="goehs-tab-content">
                 <div class="mb-6">
-                    <h3 class="text-xl font-bold text-slate-900 mb-2">Tool 1: Assessment Batch Upload</h3>
-                    <p class="text-slate-600">Enter assessment header information. This data will be used across all three tools.</p>
+                    <h3 class="text-xl font-bold text-slate-900 mb-2">Section 1: Assessment Header</h3>
+                    <p class="text-slate-600">Enter assessment header information. This data will be used in final GOEHS batch upload output.</p>
                 </div>
                 
                 <!-- Auto-Populate Info Banner -->
@@ -15435,8 +16294,8 @@ ${JSON.stringify(payload, null, 2)}`;
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-green-600 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                         <div>
                             <h4 class="font-semibold text-green-800">Hybrid Mode: Auto-Population Enabled</h4>
-                            <p class="text-green-700 text-sm mt-1">Your risk table data will automatically populate Tools 2 (Tasks) and 3 (Hazards). The data will be mapped from the Risk Assessment table when you navigate to each tool.</p>
-                            <p class="text-green-700 text-sm mt-2"><strong>Workflow:</strong> Fill in the assessment header below → Navigate to Tool 2 (auto-populated) → Navigate to Tool 3 (auto-populated) → Generate CSVs for vendor upload.</p>
+                            <p class="text-green-700 text-sm mt-1">Your risk table data will automatically populate the Final Review pane. The data is mapped from the Risk Assessment table.</p>
+                            <p class="text-green-700 text-sm mt-2"><strong>Workflow:</strong> Fill in the assessment header below → Review and adjust final rows → Download GOEHS batch upload file.</p>
                         </div>
                     </div>
                 </div>
@@ -15464,142 +16323,64 @@ ${JSON.stringify(payload, null, 2)}`;
                             </select>
                         </div>
 
-                        <!-- Department (Level 3a) -->
+                        <!-- Department (Optional free text) -->
                         <div>
                             <label class="block text-sm font-semibold text-slate-700 mb-2">Department</label>
-                            <select id="goehsDepartment" class="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500" disabled>
-                                <option value="">-- Select Department --</option>
-                            </select>
+                            <input type="text" id="goehsDepartment" class="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500" placeholder="Enter department (optional)">
                         </div>
 
-                        <!-- Workstation (Level 3b) -->
+                        <!-- Workstation (Optional free text) -->
                         <div>
                             <label class="block text-sm font-semibold text-slate-700 mb-2">Workstation</label>
-                            <select id="goehsWorkstation" class="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500" disabled>
-                                <option value="">-- Select Workstation --</option>
-                            </select>
+                            <input type="text" id="goehsWorkstation" class="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500" placeholder="Enter workstation (optional)">
                         </div>
 
                         <!-- Assessment Title -->
                         <div class="md:col-span-2">
-                            <label class="block text-sm font-semibold text-slate-700 mb-2">
-                                Assessment Title <span class="text-red-500">*</span>
-                            </label>
-                            <input type="text" id="goehsAssessmentTitle" class="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500" placeholder="e.g., Q1 2026 Production Line Risk Assessment" required>
+                            <label class="block text-sm font-semibold text-slate-700 mb-2">Assessment Title</label>
+                            <input type="text" id="goehsAssessmentTitle" class="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500" placeholder="e.g., Q1 2026 Production Line Risk Assessment (optional)">
                         </div>
 
                         <!-- Assessment Date -->
                         <div>
                             <label class="block text-sm font-semibold text-slate-700 mb-2">Assessment Date</label>
-                            <input type="text" id="goehsAssessmentDate" class="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500" placeholder="DD-MMM-YYYY">
-                            <p class="text-xs text-slate-500 mt-1">Format: DD-MMM-YYYY (e.g., 19-Jan-2026)</p>
-                        </div>
-
-                        <!-- Type -->
-                        <div>
-                            <label class="block text-sm font-semibold text-slate-700 mb-2">Type</label>
-                            <input type="text" id="goehsType" class="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 bg-slate-50" value="Safety" readonly>
+                            <input type="date" id="goehsAssessmentDate" class="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500">
+                            <p class="text-xs text-slate-500 mt-1">Date picker input. Export format: DD-MMM-YYYY.</p>
                         </div>
 
                         <!-- Assessment Approver -->
                         <div>
-                            <label class="block text-sm font-semibold text-slate-700 mb-2">
-                                Assessment Approver <span class="text-red-500">*</span>
-                            </label>
+                            <label class="block text-sm font-semibold text-slate-700 mb-2">Assessment Approver</label>
                             <input type="text" id="goehsApprover" class="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 bg-slate-50" value="(Site Admin)" readonly>
                         </div>
-                    </div>
-
-                    <!-- Action Buttons -->
-                    <div class="flex flex-wrap gap-4 pt-6 border-t border-slate-200">
-                        <button type="button" onclick="copyAssessmentCSV()" class="flex-1 sm:flex-none bg-cyan-600 text-white font-semibold py-3 px-6 rounded-lg hover:bg-cyan-700 transition flex items-center justify-center gap-2">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
-                            📋 Copy Assessment CSV
-                        </button>
-                        <button type="button" onclick="goToTool(2)" class="flex-1 sm:flex-none bg-orange-600 text-white font-semibold py-3 px-6 rounded-lg hover:bg-orange-700 transition">
-                            Next: Task Batch →
-                        </button>
                     </div>
                 </form>
             </div>
 
-            <!-- ====== TOOL 2: Task Batch Upload Tool ====== -->
-            <div id="goehs-tool2" class="goehs-tab-content hidden">
-                <div class="mb-6">
-                    <div class="flex justify-between items-start flex-wrap gap-4">
-                        <div>
-                            <h3 class="text-xl font-bold text-slate-900 mb-2">Tool 2: Task Batch Upload</h3>
-                            <p class="text-slate-600">Add tasks for this assessment. Each task can have multiple hazards in Tool 3.</p>
-                        </div>
-                        <div class="flex gap-2 flex-wrap">
-                            <button type="button" onclick="aiPopulateTaskFields()" class="bg-indigo-600 text-white font-medium py-2 px-4 rounded-lg hover:bg-indigo-700 transition flex items-center gap-2 text-sm" title="Use keyword matching to suggest Core Activity and Job Title">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
-                                ⚡ Intelligent Fill
-                            </button>
-                            <button type="button" onclick="aiAssistTaskFields()" class="bg-gradient-to-r from-pink-500 to-rose-500 text-white font-medium py-2 px-4 rounded-lg hover:from-pink-600 hover:to-rose-600 transition flex items-center gap-2 text-sm shadow-md" title="Use AI (OpenRouter) to intelligently suggest Core Activity and Job Title">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" /></svg>
-                                🤖 AI Assist
-                            </button>
-                            <button type="button" onclick="resyncTasksFromTable()" class="bg-indigo-600 text-white font-medium py-2 px-4 rounded-lg hover:bg-indigo-700 transition flex items-center gap-2 text-sm">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
-                                Re-sync from Table
-                            </button>
-                        </div>
-                    </div>
-                    <div class="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                        <p class="text-blue-800 text-sm"><strong>Assessment:</strong> <span id="tool2AssessmentTitle" class="font-mono">-</span></p>
-                    </div>
-                </div>
-
-                <!-- Task Rows Container -->
-                <div id="taskRowsContainer" class="space-y-4 mb-6">
-                    <!-- Task rows will be added here dynamically -->
-                </div>
-
-                <!-- Add Task Button -->
-                <button type="button" onclick="addTaskRow()" class="w-full py-3 border-2 border-dashed border-slate-300 rounded-lg text-slate-600 hover:border-orange-500 hover:text-orange-600 transition flex items-center justify-center gap-2">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
-                    Add Another Task
-                </button>
-
-                <!-- Action Buttons -->
-                <div class="flex flex-wrap gap-4 pt-6 mt-6 border-t border-slate-200">
-                    <button type="button" onclick="goToTool(1)" class="flex-1 sm:flex-none bg-slate-500 text-white font-semibold py-3 px-6 rounded-lg hover:bg-slate-600 transition">
-                        ← Back to Assessment
-                    </button>
-                    <button type="button" onclick="copyTaskCSV()" class="flex-1 sm:flex-none bg-cyan-600 text-white font-semibold py-3 px-6 rounded-lg hover:bg-cyan-700 transition flex items-center justify-center gap-2">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
-                        📋 Copy Task CSV
-                    </button>
-                    <button type="button" onclick="goToTool(3)" class="flex-1 sm:flex-none bg-orange-600 text-white font-semibold py-3 px-6 rounded-lg hover:bg-orange-700 transition">
-                        Next: Hazard Batch →
-                    </button>
-                </div>
-            </div>
-
-            <!-- ====== TOOL 3: Hazard Batch Upload Tool ====== -->
-            <div id="goehs-tool3" class="goehs-tab-content hidden h-full flex flex-col">
+            <!-- ====== SECTION 2: Final Review Pane ====== -->
+            <div id="goehs-tool3" class="goehs-tab-content mt-8 pt-6 border-t border-slate-200 flex flex-col">
                 <!-- Fixed Header Section -->
                 <div class="flex-shrink-0 mb-4">
                     <div class="flex justify-between items-start flex-wrap gap-4">
                         <div>
-                            <h3 class="text-xl font-bold text-slate-900 mb-2">Tool 3: Hazard Batch Upload</h3>
-                            <p class="text-slate-600 text-sm">Hazard data is displayed in table format matching the CSV output. Scroll horizontally to see all columns.</p>
+                            <h3 class="text-xl font-bold text-slate-900 mb-2">Section 2: Final Review Pane</h3>
+                            <p class="text-slate-600 text-sm">Review and refine GOEHS batch upload rows before downloading the vendor XLSX.</p>
                         </div>
-                        <div class="flex gap-2 flex-wrap">
-                            <button type="button" onclick="aiPopulateHazardFields()" class="bg-indigo-600 text-white font-medium py-2 px-4 rounded-lg hover:bg-indigo-700 transition flex items-center gap-2 text-sm" title="Use keyword matching to suggest Countermeasure Ladder">
+                        <div class="flex gap-2 flex-wrap goehs-actions">
+                            <button type="button" onclick="aiPopulateHazardFields()" class="goehs-btn goehs-btn-indigo" title="Use keyword matching to suggest Countermeasure Ladder">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
                                 ⚡ Intelligent Fill
                             </button>
-                            <button type="button" onclick="aiAssistHazardFields()" class="bg-gradient-to-r from-pink-500 to-rose-500 text-white font-medium py-2 px-4 rounded-lg hover:from-pink-600 hover:to-rose-600 transition flex items-center gap-2 text-sm shadow-md" title="Use AI (OpenRouter) to intelligently suggest Countermeasure Ladder">
+                            <button type="button" id="goehsAiAssistBtn" class="goehs-btn goehs-btn-ai" title="Use AI (OpenRouter) to suggest controls and outcomes">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" /></svg>
                                 🤖 AI Assist
                             </button>
-                            <button type="button" onclick="resyncHazardsFromTable()" class="bg-indigo-600 text-white font-medium py-2 px-4 rounded-lg hover:bg-indigo-700 transition flex items-center gap-2 text-sm">
+                            <span id="goehsIssueCounter" class="goehs-issue-badge" role="status" aria-live="polite" title="No unresolved issues in Final Review. Deleted rows are excluded.">Issues: 0</span>
+                            <button type="button" onclick="resyncHazardsFromTable()" class="goehs-btn goehs-btn-indigo">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
                                 Re-sync
                             </button>
-                            <button type="button" onclick="addHazardTableRow()" class="bg-green-600 text-white font-medium py-2 px-4 rounded-lg hover:bg-green-700 transition flex items-center gap-2 text-sm">
+                            <button type="button" onclick="addHazardTableRow()" class="goehs-btn goehs-btn-success">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
                                 Add Row
                             </button>
@@ -15612,11 +16393,13 @@ ${JSON.stringify(payload, null, 2)}`;
 
                 <!-- Scrollable Table Container -->
                 <div class="flex-1 overflow-auto border border-slate-300 rounded-lg bg-white">
-                    <table id="hazardBatchTable" class="w-full text-xs border-collapse min-w-[2500px]">
+                    <table id="hazardBatchTable" class="w-full text-xs border-collapse min-w-[1900px]">
                         <thead class="sticky top-0 z-10">
                             <tr class="bg-slate-800 text-white">
+                                <th class="p-2 border-r border-slate-600 text-center font-semibold w-14">Del</th>
                                 <th class="p-2 border-r border-slate-600 text-left font-semibold w-8">#</th>
                                 <th class="p-2 border-r border-slate-600 text-left font-semibold min-w-[120px]">Task Name</th>
+                                <th class="p-2 border-r border-slate-600 text-left font-semibold min-w-[120px]">Mode</th>
                                 <th class="p-2 border-r border-slate-600 text-left font-semibold min-w-[100px] bg-orange-700">Hazard</th>
                                 <th class="p-2 border-r border-slate-600 text-left font-semibold min-w-[120px] bg-orange-700">Sub-Hazard</th>
                                 <th class="p-2 border-r border-slate-600 text-left font-semibold min-w-[120px]">Outcome</th>
@@ -15633,14 +16416,6 @@ ${JSON.stringify(payload, null, 2)}`;
                                 <th class="p-2 border-r border-slate-600 text-center font-semibold w-16 bg-blue-700">Res L</th>
                                 <th class="p-2 border-r border-slate-600 text-center font-semibold w-16 bg-blue-700">Score</th>
                                 <th class="p-2 border-r border-slate-600 text-center font-semibold w-20 bg-blue-700">Rating</th>
-                                <th class="p-2 border-r border-slate-600 text-left font-semibold min-w-[150px] bg-green-700">Pred. Controls</th>
-                                <th class="p-2 border-r border-slate-600 text-left font-semibold min-w-[100px] bg-green-700">Ladder</th>
-                                <th class="p-2 border-r border-slate-600 text-center font-semibold w-16 bg-green-700">Pred F</th>
-                                <th class="p-2 border-r border-slate-600 text-center font-semibold w-16 bg-green-700">Pred S</th>
-                                <th class="p-2 border-r border-slate-600 text-center font-semibold w-16 bg-green-700">Pred L</th>
-                                <th class="p-2 border-r border-slate-600 text-center font-semibold w-16 bg-green-700">Score</th>
-                                <th class="p-2 border-r border-slate-600 text-center font-semibold w-20 bg-green-700">Rating</th>
-                                <th class="p-2 text-center font-semibold w-10">Del</th>
                             </tr>
                         </thead>
                         <tbody id="hazardTableBody">
@@ -15651,18 +16426,7 @@ ${JSON.stringify(payload, null, 2)}`;
 
                 <!-- Action Buttons -->
                 <div class="flex-shrink-0 flex flex-wrap gap-4 pt-4 mt-4 border-t border-slate-200">
-                    <button type="button" onclick="goToTool(2)" class="flex-1 sm:flex-none bg-slate-500 text-white font-semibold py-3 px-6 rounded-lg hover:bg-slate-600 transition">
-                        ← Back to Tasks
-                    </button>
-                    <button type="button" onclick="copyHazardCSV()" class="flex-1 sm:flex-none bg-cyan-600 text-white font-semibold py-3 px-6 rounded-lg hover:bg-cyan-700 transition flex items-center justify-center gap-2">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
-                        📋 Copy Hazard CSV
-                    </button>
-                    <button type="button" onclick="generateUnifiedCSV()" class="flex-1 sm:flex-none bg-orange-600 text-white font-semibold py-3 px-6 rounded-lg hover:bg-orange-700 transition flex items-center justify-center gap-2">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-                        📥 Download Unified CSV
-                    </button>
-                    <button type="button" onclick="generateExcelWithSheets()" class="flex-1 sm:flex-none bg-green-600 text-white font-semibold py-3 px-6 rounded-lg hover:bg-green-700 transition flex items-center justify-center gap-2">
+                    <button type="button" onclick="generateExcelWithSheets()" class="goehs-btn goehs-btn-success goehs-btn-download flex-1 sm:flex-none">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
                         📊 Download GOEHS Batch Upload (.xlsx)
                     </button>

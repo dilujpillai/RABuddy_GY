@@ -173,14 +173,45 @@ const GOEHS_CONDITION_TRANSLATIONS = {
 
 // Returns the translated display label for a GOEHS dropdown value in the current UI language.
 // The option value attribute always stays in English — only the visible text is translated.
+function normalizeRegistryTranslationKey(value) {
+    return String(value || '')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .replace(/&/g, ' and ')
+        .replace(/[^a-z0-9]+/g, ' ')
+        .trim()
+        .split(' ')
+        .filter(Boolean)
+        .map(token => (token.length > 3 && token.endsWith('s') ? token.slice(0, -1) : token))
+        .join(' ');
+}
+
 function goehsUiLabel(val) {
     if (!val) return val;
     const lang = localStorage.getItem('appLanguage') || 'en';
     if (lang === 'en') return val;
     // Ladder levels use GOEHS_LADDER_TRANSLATIONS
     if (GOEHS_LADDER_TRANSLATIONS[lang]?.[val]) return GOEHS_LADDER_TRANSLATIONS[lang][val];
+
     // Everything else (hazard categories, sub-hazards, outcomes) uses window.TRANSLATIONS
-    return window.TRANSLATIONS?.[lang]?.[val] || val;
+    const langMap = window.TRANSLATIONS?.[lang];
+    if (!langMap) return val;
+    if (langMap[val]) return langMap[val];
+
+    // Fallback 1: case-insensitive key lookup
+    const valueLower = String(val).toLowerCase();
+    for (const [key, translated] of Object.entries(langMap)) {
+        if (key.toLowerCase() === valueLower) return translated;
+    }
+
+    // Fallback 2: normalized lookup (handles punctuation/plural/casing drift)
+    const normalizedValue = normalizeRegistryTranslationKey(val);
+    for (const [key, translated] of Object.entries(langMap)) {
+        if (normalizeRegistryTranslationKey(key) === normalizedValue) return translated;
+    }
+
+    return val;
 }
 
 // ============================================================
