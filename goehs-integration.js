@@ -3162,6 +3162,20 @@ document.addEventListener('DOMContentLoaded', function() {
     // Workstation change handler - save to localStorage
     document.getElementById('goehsWorkstation')?.addEventListener('input', saveGoehsAssessmentData);
     document.getElementById('goehsWorkstation')?.addEventListener('change', saveGoehsAssessmentData);
+
+    // Assessment title must be provided before XLSX download.
+    document.getElementById('goehsAssessmentTitle')?.addEventListener('input', function() {
+        if ((this.value || '').trim()) {
+            this.classList.remove('goehs-empty-required');
+        }
+        syncGoehsAssessmentTitleDisplays();
+    });
+    document.getElementById('goehsAssessmentTitle')?.addEventListener('change', function() {
+        if ((this.value || '').trim()) {
+            this.classList.remove('goehs-empty-required');
+        }
+        syncGoehsAssessmentTitleDisplays();
+    });
     
     // Tab switching
     document.querySelectorAll('.goehs-tab-btn').forEach(btn => {
@@ -4500,9 +4514,24 @@ function generateExcelWithSheets() {
         return;
     }
 
-    const titleInput = (document.getElementById('goehsAssessmentTitle')?.value || '').trim();
-    const projectName = (document.getElementById('projectNameInput')?.value || '').trim();
-    const assessmentTitle = titleInput || projectName || 'Untitled Assessment';
+    const assessmentTitleField = document.getElementById('goehsAssessmentTitle');
+    const titleInput = (assessmentTitleField?.value || '').trim();
+
+    if (!titleInput) {
+        if (assessmentTitleField) {
+            assessmentTitleField.classList.add('goehs-empty-required');
+            assessmentTitleField.focus();
+            assessmentTitleField.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+        showGoehsAlert('Assessment Title is mandatory before download. Please enter it to continue.', 'error');
+        return;
+    }
+
+    if (assessmentTitleField) {
+        assessmentTitleField.classList.remove('goehs-empty-required');
+    }
+
+    const assessmentTitle = titleInput;
 
     if (typeof XLSX === 'undefined') {
         showGoehsAlert('Excel library not loaded. Please try the CSV download instead.', 'error');
