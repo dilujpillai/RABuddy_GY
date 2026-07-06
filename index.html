@@ -1324,10 +1324,10 @@
         .bcm-preset-row select { padding: 4px 8px; border: 1px solid #a9c1e0; border-radius: 6px; font-size: 11px; background: white; }
         .bcm-preset-row .bcm-hint { font-size: 10px; color: #64748b; margin-left: auto; }
         /* Excel Preview Table */
-        .bcm-preview-wrap { max-height: 200px; overflow: auto; border: 1px solid #cbd5e1; border-radius: 8px; margin-bottom: 10px; background: #fff; }
-        .bcm-preview-table { width: 100%; border-collapse: collapse; font-size: 10px; font-family: 'Consolas', monospace; }
-        .bcm-preview-table th { position: sticky; top: 0; background: #002c5f; color: #fff; padding: 4px 6px; text-align: center; font-weight: 700; font-size: 9px; letter-spacing: 0.5px; z-index: 1; }
-        .bcm-preview-table td { padding: 3px 6px; border-bottom: 1px solid #e2e8f0; white-space: nowrap; max-width: 150px; overflow: hidden; text-overflow: ellipsis; }
+        .bcm-preview-wrap { max-height: 200px; overflow-x: auto; overflow-y: auto; border: 1px solid #cbd5e1; border-radius: 8px; margin-bottom: 10px; background: #fff; touch-action: pan-x pan-y; -webkit-overflow-scrolling: touch; }
+        .bcm-preview-table { width: max-content; min-width: 100%; border-collapse: collapse; font-size: 10px; font-family: 'Consolas', monospace; }
+        .bcm-preview-table th { position: sticky; top: 0; background: #002c5f; color: #fff; padding: 4px 6px; text-align: center; font-weight: 700; font-size: 9px; letter-spacing: 0.5px; z-index: 1; min-width: 100px; }
+        .bcm-preview-table td { padding: 3px 6px; border-bottom: 1px solid #e2e8f0; white-space: nowrap; max-width: 150px; min-width: 100px; overflow: hidden; text-overflow: ellipsis; }
         .bcm-preview-table tr:hover td { background: #edf2f9; }
         .bcm-preview-table tr.bcm-header-row td { background: #fef3c7; font-weight: 700; }
         .bcm-preview-table td.bcm-col-highlight { background: #dcfce7; border: 1px solid #86efac; }
@@ -11021,12 +11021,12 @@ downloadBtn.addEventListener('click', async () => {
 
 <!-- RA 2025 Manual Column Mapper Modal (Fallback when auto-detection fails) -->
 <div id="ra2025ColumnMapperModal" class="gy-modal-overlay" style="display:none;">
-    <div class="gy-modal-content" style="max-width: 1200px; max-height: 90vh; overflow: hidden; display: flex; flex-direction: column;">
+    <div class="gy-modal-content" style="width: 96vw; max-width: 1700px; max-height: 92vh; overflow: hidden; display: flex; flex-direction: column; padding: 24px;">
         <button class="gy-close-modal" onclick="closeRA2025ColumnMapper()">×</button>
         
         <div style="flex-shrink: 0;">
-            <h2 style="text-align:center; color:#2c3e50; margin-top:0;">🗺️ RA 2025 Column Mapper</h2>
-            <p style="text-align:center; color:#7f8c8d; margin-bottom:10px;">Auto-detection couldn't identify your file format. Please map columns manually below.</p>
+            <h2 style="text-align:center; color:#1e293b; margin-top:0; margin-bottom: 4px;">🗺️ RA 2025 Column Mapper</h2>
+            <p style="text-align:center; color:#64748b; margin-bottom:10px;">Auto-detection couldn't identify your file format. Please map columns manually below.</p>
             
             <!-- Language indicator -->
             <div id="ra2025DetectedLang" style="text-align:center; margin-bottom:15px;">
@@ -11035,129 +11035,72 @@ downloadBtn.addEventListener('click', async () => {
         </div>
         
         <!-- Two-panel layout: Preview + Mapping -->
-        <div style="display: flex; gap: 20px; flex: 1; overflow: hidden; min-height: 0;">
+        <div class="ra2025-map-layout" style="flex: 1; min-height: 0;">
             
             <!-- Left Panel: Excel Preview -->
-            <div style="flex: 1; display: flex; flex-direction: column; border-right: 1px solid #e2e8f0; padding-right: 15px; min-width: 0;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-shrink: 0;">
-                    <h4 style="font-weight: bold; color: #475569; font-size: 14px;">📊 File Preview</h4>
+            <div style="display: flex; flex-direction: column; min-width: 0;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-shrink: 0; padding: 8px 12px; border: 1px solid #e2e8f0; border-radius: 10px; background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);">
+                    <h4 style="font-weight: 700; color: #334155; font-size: 13px; margin: 0;">📊 Exact Sheet Preview</h4>
                     <div style="display: flex; gap: 8px; align-items: center;">
-                        <label style="font-size: 11px; color: #64748b;">Header Row:</label>
+                        <label style="font-size: 11px; color: #64748b; font-weight: 600;">Header Row:</label>
                         <input type="number" id="ra2025HeaderRow" value="14" min="1" max="50" 
-                               style="width: 50px; padding: 4px 8px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 12px;"
+                               style="width: 56px; padding: 4px 8px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 12px;"
                                onchange="updateRA2025Preview()">
-                        <label style="font-size: 11px; color: #64748b;">Data Start:</label>
+                        <label style="font-size: 11px; color: #64748b; font-weight: 600;">Data Start:</label>
                         <input type="number" id="ra2025DataStartRow" value="15" min="1" max="100" 
-                               style="width: 50px; padding: 4px 8px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 12px;"
+                               style="width: 56px; padding: 4px 8px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 12px;"
                                onchange="updateRA2025Preview()">
+                        <label style="font-size: 11px; color: #64748b; font-weight: 600;">Default Mode:</label>
+                        <select id="ra2025DefaultRoutineType" style="padding: 4px 8px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 12px; color: #0f172a; background: #ffffff;">
+                            <option value="Routine" selected>Routine</option>
+                            <option value="Non-Routine">Non-Routine</option>
+                            <option value="Emergency Situation">Emergency Situation</option>
+                        </select>
                     </div>
                 </div>
-                <div id="ra2025PreviewContainer" style="flex: 1; overflow: auto; border: 1px solid #e2e8f0; border-radius: 8px; background: #f8fafc;">
-                    <table id="ra2025PreviewTable" style="width: 100%; border-collapse: collapse; font-size: 11px;">
-                        <thead id="ra2025PreviewHead" style="background: #002c5f; color: white; position: sticky; top: 0;"></thead>
-                        <tbody id="ra2025PreviewBody"></tbody>
-                    </table>
+                <div id="ra2025PreviewViewport" class="ra2025-preview-viewport">
+                    <div id="ra2025PreviewContainer" class="preview-pan-container ra2025-preview-container" style="touch-action: pan-x pan-y; -webkit-overflow-scrolling: touch;">
+                        <table id="ra2025PreviewTable" style="width: max-content; min-width: 100%; border-collapse: collapse; font-size: 11px;">
+                            <thead id="ra2025PreviewHead" style="position: sticky; top: 0; z-index: 2;"></thead>
+                            <tbody id="ra2025PreviewBody"></tbody>
+                        </table>
+                    </div>
+                    <div id="ra2025PreviewScrollHost" class="ra2025-preview-scroll-host ra2025-scroll-overlay" title="Horizontal scroll">
+                        <div id="ra2025PreviewScrollContent" class="ra2025-preview-scroll-content"></div>
+                    </div>
+                    <div id="ra2025PreviewScrollHostY" class="ra2025-preview-scroll-host-y ra2025-scroll-overlay" title="Vertical scroll">
+                        <div id="ra2025PreviewScrollContentY" class="ra2025-preview-scroll-content-y"></div>
+                    </div>
                 </div>
-                <p style="font-size: 10px; color: #94a3b8; margin-top: 5px; flex-shrink: 0;">💡 Click a column header to select it for mapping. Highlighted columns show current mappings.</p>
+                <p style="font-size: 10px; color: #64748b; margin-top: 6px; flex-shrink: 0;">💡 Use the <strong>Map to</strong> dropdown row in the header to assign each column. Mapped columns are highlighted in green.</p>
             </div>
             
             <!-- Right Panel: Column Mapping -->
-            <div style="width: 320px; flex-shrink: 0; display: flex; flex-direction: column;">
-                <h4 style="font-weight: bold; color: #475569; font-size: 14px; margin-bottom: 10px;">🎯 Map Columns</h4>
-                
-                <div style="flex: 1; overflow-y: auto; padding-right: 5px;">
-                    <!-- Required Fields -->
-                    <div style="margin-bottom: 15px;">
-                        <div style="font-size: 10px; font-weight: bold; color: #dc2626; text-transform: uppercase; margin-bottom: 8px;">Required Fields</div>
-                        
-                        <div class="ra2025-map-field">
-                            <label>Task/Step Description</label>
-                            <input type="text" id="ra2025ColTaskDesc" placeholder="B" class="ra2025-col-input" data-field="taskDesc">
-                            <span class="ra2025-field-hint">Main task or job step text</span>
-                        </div>
-                    </div>
-                    
-                    <!-- Optional Fields -->
-                    <div style="font-size: 10px; font-weight: bold; color: #059669; text-transform: uppercase; margin-bottom: 8px;">Optional Fields</div>
-                    
-                    <div class="ra2025-map-field">
-                        <label>Task ID / Step No</label>
-                        <input type="text" id="ra2025ColTaskId" placeholder="A" class="ra2025-col-input" data-field="taskId">
-                    </div>
-                    
-                    <div class="ra2025-map-field">
-                        <label>Hazard Group</label>
-                        <input type="text" id="ra2025ColHazardGroup" placeholder="C" class="ra2025-col-input" data-field="hazardGroup">
-                    </div>
-                    
-                    <div class="ra2025-map-field">
-                        <label>Hazard Detail/List</label>
-                        <input type="text" id="ra2025ColHazardDetail" placeholder="D" class="ra2025-col-input" data-field="hazardDetail">
-                    </div>
-                    
-                    <div class="ra2025-map-field">
-                        <label>Risk/Consequence</label>
-                        <input type="text" id="ra2025ColConsequence" placeholder="E" class="ra2025-col-input" data-field="consequence">
-                    </div>
-                    
-                    <div class="ra2025-map-field">
-                        <label>Hazard Source</label>
-                        <input type="text" id="ra2025ColSource" placeholder="G" class="ra2025-col-input" data-field="source">
-                    </div>
-                    
-                    <div class="ra2025-map-field">
-                        <label>Current Control</label>
-                        <input type="text" id="ra2025ColControl" placeholder="H" class="ra2025-col-input" data-field="currentControl">
-                    </div>
-                    
-                    <div class="ra2025-map-field">
-                        <label>Frequency</label>
-                        <input type="text" id="ra2025ColFrequency" placeholder="I or J" class="ra2025-col-input" data-field="frequency">
-                    </div>
-                    
-                    <div class="ra2025-map-field">
-                        <label>Severity</label>
-                        <input type="text" id="ra2025ColSeverity" placeholder="K" class="ra2025-col-input" data-field="severity">
-                    </div>
-                    
-                    <div class="ra2025-map-field">
-                        <label>Likelihood</label>
-                        <input type="text" id="ra2025ColLikelihood" placeholder="L" class="ra2025-col-input" data-field="likelihood">
-                    </div>
-                    
-                    <div class="ra2025-map-field">
-                        <label>Risk Score</label>
-                        <input type="text" id="ra2025ColRiskScore" placeholder="M" class="ra2025-col-input" data-field="riskScore">
-                    </div>
-                    
-                    <div class="ra2025-map-field">
-                        <label>New/Proposed Control</label>
-                        <input type="text" id="ra2025ColNewControl" placeholder="N" class="ra2025-col-input" data-field="newControl">
-                    </div>
-                    
-                    <div class="ra2025-map-field">
-                        <label>Hierarchy Level</label>
-                        <input type="text" id="ra2025ColHierarchy" placeholder="O" class="ra2025-col-input" data-field="hierarchy">
-                    </div>
+            <aside class="ra2025-map-side">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; padding-bottom:8px; border-bottom:2px solid #86efac;">
+                    <h4 style="font-size: 0.82rem; font-weight: 700; color: #166534; margin: 0;">✅ Mapping Feedback</h4>
+                    <span id="ra2025MapCounts" style="font-size:11px; font-weight:700; color:#166534; background:white; border:1px solid #86efac; border-radius:999px; padding:2px 10px;">0/13 mapped</span>
                 </div>
-                
+                <div style="font-size:11px; color:#166534; margin-bottom:8px;">Map columns from the preview header. This board updates live with green feedback.</div>
+                <div id="ra2025MapFeedbackList" class="ra2025-map-feedback"></div>
+
                 <!-- Parsing Status -->
-                <div id="ra2025MappingStatus" style="margin-top: 10px; padding: 8px; background: #f1f5f9; border-radius: 6px; font-size: 11px; color: #475569; flex-shrink: 0;">
-                    Ready to parse. Map at least the Task Description column.
+                <div id="ra2025MappingStatus" style="margin-top: 10px; padding: 10px; background: #f0fdf4; border: 1px solid #86efac; border-radius: 8px; font-size: 11px; color: #166534; font-weight: 600;">
+                    Ready to parse. Map at least the Task/Step Description column.
                 </div>
-            </div>
+            </aside>
         </div>
-        
+
         <!-- Action Buttons -->
         <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 15px; padding-top: 15px; border-top: 2px solid #e2e8f0; flex-shrink: 0;">
             <button onclick="closeRA2025ColumnMapper()" style="padding: 10px 20px; background: #f1f5f9; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; color: #64748b;">
                 Cancel
             </button>
             <div style="display: flex; gap: 10px;">
-                <button onclick="tryAutoDetectRA2025()" style="padding: 10px 20px; background: #fef3c7; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; color: #92400e;">
+                <button type="button" class="rab-btn rab-c-amber" onclick="tryAutoDetectRA2025()">
                     🔄 Re-try Auto-Detect
                 </button>
-                <button onclick="parseWithManualMapping()" style="padding: 10px 20px; background: #002c5f; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; color: white;">
+                <button type="button" id="ra2025ParseLoadBtn" class="rab-btn rab-c-blue" onclick="parseWithManualMapping()">
                     ✓ Parse & Load to Table
                 </button>
             </div>
@@ -11167,65 +11110,235 @@ downloadBtn.addEventListener('click', async () => {
 
 <style>
 /* RA 2025 Column Mapper Styles */
-.ra2025-map-field {
-    margin-bottom: 10px;
+.ra2025-map-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 360px;
+    gap: 14px;
+    align-items: start;
 }
-.ra2025-map-field label {
-    display: block;
+.ra2025-map-side {
+    border: 1px solid #86efac;
+    border-radius: 10px;
+    background: linear-gradient(180deg, #f0fdf4 0%, #dcfce7 100%);
+    padding: 10px;
+    max-height: 100%;
+    overflow: auto;
+}
+.ra2025-map-feedback {
+    border: 1px solid #86efac;
+    border-radius: 8px;
+    background: #ffffff;
+    padding: 8px;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 6px;
+}
+.ra2025-preview-viewport {
+    flex: 1;
+    min-height: 0;
+    position: relative;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    background: #ffffff;
+    overflow: hidden;
+}
+.ra2025-preview-container {
+    width: 100%;
+    height: 100%;
+    overflow-x: auto;
+    overflow-y: auto;
+}
+.ra2025-scroll-overlay {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.18s ease;
+}
+.ra2025-preview-viewport:hover .ra2025-scroll-overlay,
+.ra2025-preview-viewport:focus-within .ra2025-scroll-overlay,
+.ra2025-preview-viewport.preview-scroll-active .ra2025-scroll-overlay {
+    opacity: 1;
+    pointer-events: auto;
+}
+.ra2025-preview-scroll-host {
+    left: 10px;
+    right: 24px;
+    bottom: 8px;
+    height: 12px;
+    overflow-x: scroll;
+    overflow-y: hidden;
+    border: 1px solid rgba(123, 155, 198, 0.45);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.88);
+    backdrop-filter: blur(4px);
+    scrollbar-width: thin;
+    scrollbar-color: #5c86bd #dfe7f2;
+}
+.ra2025-preview-scroll-host-y {
+    top: 10px;
+    right: 8px;
+    bottom: 24px;
+    width: 12px;
+    overflow-y: scroll;
+    overflow-x: hidden;
+    border: 1px solid rgba(123, 155, 198, 0.45);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.88);
+    backdrop-filter: blur(4px);
+    scrollbar-width: thin;
+    scrollbar-color: #5c86bd #dfe7f2;
+}
+.ra2025-preview-scroll-content {
+    height: 1px;
+    min-width: 100%;
+}
+.ra2025-preview-scroll-content-y {
+    width: 1px;
+    min-height: 100%;
+}
+#ra2025PreviewContainer {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+#ra2025PreviewContainer::-webkit-scrollbar {
+    width: 0;
+    height: 0;
+}
+.ra2025-preview-scroll-host::-webkit-scrollbar {
+    height: 10px;
+}
+.ra2025-preview-scroll-host-y::-webkit-scrollbar {
+    width: 10px;
+}
+.ra2025-preview-scroll-host::-webkit-scrollbar-track,
+.ra2025-preview-scroll-host-y::-webkit-scrollbar-track {
+    background: #dfe7f2;
+    border-radius: 999px;
+}
+.ra2025-preview-scroll-host::-webkit-scrollbar-thumb,
+.ra2025-preview-scroll-host-y::-webkit-scrollbar-thumb {
+    background: #5c86bd;
+    border-radius: 999px;
+    border: 1px solid #dfe7f2;
+}
+.ra2025-preview-scroll-host::-webkit-scrollbar-thumb:hover,
+.ra2025-preview-scroll-host-y::-webkit-scrollbar-thumb:hover {
+    background: #355f97;
+}
+.ra2025-feedback-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 8px;
+    border-radius: 6px;
     font-size: 11px;
     font-weight: 600;
-    color: #374151;
-    margin-bottom: 3px;
 }
-.ra2025-col-input {
-    width: 100%;
-    padding: 6px 10px;
-    border: 1px solid #d1d5db;
-    border-radius: 6px;
-    font-size: 12px;
-    text-transform: uppercase;
-    transition: all 0.2s;
+.ra2025-feedback-row.mapped {
+    background: #dcfce7;
+    color: #166534;
 }
-.ra2025-col-input:focus {
-    outline: none;
-    border-color: #002c5f;
-    box-shadow: 0 0 0 3px rgba(0, 44, 95, 0.1);
+.ra2025-feedback-row.pending {
+    background: #fee2e2;
+    color: #b91c1c;
 }
-.ra2025-col-input.mapped {
-    background: #ecfdf5;
-    border-color: #10b981;
+.ra2025-feedback-label {
+    flex: 1;
 }
-.ra2025-field-hint {
-    display: block;
+.ra2025-feedback-value {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 10px;
+    font-weight: 700;
+    max-width: 210px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.ra2025-feedback-required {
     font-size: 9px;
-    color: #9ca3af;
-    margin-top: 2px;
+    font-weight: 700;
+    color: #b91c1c;
+    margin-left: 6px;
 }
 #ra2025PreviewTable th {
-    padding: 8px 6px;
+    padding: 6px;
     text-align: left;
     font-size: 10px;
     font-weight: 600;
-    cursor: pointer;
     transition: background 0.2s;
     white-space: nowrap;
-    background: #002c5f;
-    color: white;
+    min-width: 150px;
+    background: #f1f5f9;
+    color: #475569;
+    border-bottom: 1px solid #e2e8f0;
 }
-#ra2025PreviewTable th:hover {
-    background: #001a3d;
+#ra2025PreviewTable tr.ra2025-map-row th {
+    background: #f8fafc;
+    color: #64748b;
+    font-weight: 700;
+    border-bottom: 1px solid #e2e8f0;
 }
 #ra2025PreviewTable th.selected-col {
-    background: #16a34a !important;
+    background: #dcfce7 !important;
+    color: #166534;
+}
+#ra2025PreviewTable .ra2025-header-map-select {
+    width: 100%;
+    border: 1px solid #cbd5e1;
+    border-radius: 4px;
+    padding: 3px 6px;
+    font-size: 10px;
+    font-weight: 600;
+    color: #0f172a;
+    background: #ffffff;
+}
+#ra2025PreviewTable .ra2025-header-col {
+    font-weight: 700;
+    font-size: 10px;
+    color: #334155;
+}
+#ra2025PreviewTable .ra2025-header-title {
+    display: block;
+    margin-top: 2px;
+    font-size: 10px;
+    color: #64748b;
+    max-width: 180px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+#ra2025PreviewTable .ra2025-map-badge {
+    margin-top: 4px;
+    display: inline-block;
+    padding: 2px 6px;
+    border-radius: 999px;
+    font-size: 9px;
+    font-weight: 700;
+    background: #dcfce7;
+    color: #166534;
+}
+#ra2025PreviewTable .ra2025-row-label {
+    background: #f8fafc;
+    color: #64748b;
+    font-weight: 700;
+    position: sticky;
+    left: 0;
+    z-index: 1;
 }
 #ra2025PreviewTable td {
     padding: 6px;
     border-bottom: 1px solid #e2e8f0;
     font-size: 10px;
-    max-width: 150px;
+    min-width: 150px;
+    max-width: 220px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+#ra2025PreviewTable tr.ra2025-map-row th:first-child,
+#ra2025PreviewTable tr:nth-child(2) th:first-child,
+#ra2025PreviewTable .ra2025-row-label {
+    min-width: 90px;
 }
 #ra2025PreviewTable tr:nth-child(even) {
     background: #f8fafc;
@@ -11236,6 +11349,21 @@ downloadBtn.addEventListener('click', async () => {
 .ra2025-col-mapped {
     background: #dcfce7 !important;
 }
+.preview-pan-container {
+    cursor: grab;
+}
+.preview-pan-container.preview-panning {
+    cursor: grabbing;
+    user-select: none;
+}
+@media (max-width: 1280px) {
+    .ra2025-map-layout {
+        grid-template-columns: 1fr;
+    }
+    .ra2025-map-side {
+        max-height: none;
+    }
+}
 </style>
 
 <script>
@@ -11244,420 +11372,962 @@ downloadBtn.addEventListener('click', async () => {
     let ra2025SheetDoc = null;
     let ra2025Strings = [];
     let ra2025AllRows = [];
-    let ra2025SelectedField = null;
-    
-    // Open the column mapper modal and load preview
-    // sheetIndex: optional 1-based sheet index to load a specific sheet
-    window.openRA2025ColumnMapper = async function(file, sheetIndex) {
-        const modal = document.getElementById('ra2025ColumnMapperModal');
-        modal.style.display = 'flex';
-        
-        try {
-            // Parse the Excel file for preview
-            ra2025ZipData = await JSZip.loadAsync(file);
-            
-            // Get shared strings
-            const strXml = await ra2025ZipData.file("xl/sharedStrings.xml")?.async("text") || "";
-            ra2025Strings = parseRA2025SharedStrings(strXml);
-            
-            const parser = new DOMParser();
-            if (sheetIndex) {
-                // Load the specific sheet requested
-                const path = `xl/worksheets/sheet${sheetIndex}.xml`;
-                const sheetFile = ra2025ZipData.file(path);
-                if (sheetFile) {
-                    const xml = await sheetFile.async("text");
-                    ra2025SheetDoc = parser.parseFromString(xml, "text/xml");
-                }
-            } else {
-                // Find first sheet with data
-                for (let i = 1; i <= 50; i++) {
-                    const path = `xl/worksheets/sheet${i}.xml`;
-                    const sheetFile = ra2025ZipData.file(path);
-                    if (sheetFile) {
-                        const xml = await sheetFile.async("text");
-                        ra2025SheetDoc = parser.parseFromString(xml, "text/xml");
-                        
-                        // Check if sheet has data
-                        const rows = ra2025SheetDoc.getElementsByTagName("row");
-                        if (rows.length > 5) break;
-                    }
-                }
-            }
-            
-            // Extract all row data
-            extractAllRows();
-            
-            // Render preview
-            updateRA2025Preview();
-            
-            // Try to auto-detect columns and pre-fill inputs
-            tryAutoFillMapping();
-            
-        } catch (e) {
-            console.error('Error loading preview:', e);
-            document.getElementById('ra2025MappingStatus').textContent = '❌ Error loading file: ' + e.message;
-            document.getElementById('ra2025MappingStatus').style.color = '#dc2626';
+    let ra2025ColumnMap = {};
+
+    const RA2025_MAP_FIELDS = [
+        {
+            key: 'taskDesc',
+            label: 'Task/Step Description',
+            required: true,
+            keywords: ['task description', 'job step', 'description', 'tache', 'tache description', 'beschreibung', 'aciklama', 'step', 'etape', 'schritt', 'adim']
+        },
+        {
+            key: 'taskId',
+            label: 'Task ID / Step No',
+            required: false,
+            keywords: ['task id', 'step no', 'id', 'no', 'nr', 'numero', 'nummer', 'numara']
+        },
+        {
+            key: 'hazardGroup',
+            label: 'Hazard Group',
+            required: false,
+            keywords: ['hazard group', 'hazard category', 'groupe', 'gefahrengruppe', 'tehlike grubu', 'categorie', 'kategorie']
+        },
+        {
+            key: 'hazardDetail',
+            label: 'Hazard Detail/List',
+            required: false,
+            keywords: ['hazard detail', 'hazard list', 'detail', 'gefahrendetail', 'tehlike', 'danger list', 'liste des dangers']
+        },
+        {
+            key: 'consequence',
+            label: 'Risk/Consequence',
+            required: false,
+            keywords: ['consequence', 'risk', 'risque', 'risiko', 'sonuc', 'injury', 'blessure', 'verletzung']
+        },
+        {
+            key: 'source',
+            label: 'Hazard Source',
+            required: false,
+            keywords: ['source', 'quelle', 'kaynak', 'hazard source']
+        },
+        {
+            key: 'currentControl',
+            label: 'Current Control',
+            required: false,
+            keywords: ['current control', 'control', 'controle', 'kontrolle', 'kontrol', 'counter measure', 'countermeasure', 'massnahme']
+        },
+        {
+            key: 'routine',
+            label: 'Routine / Non-Routine',
+            required: false,
+            keywords: ['routine', 'non-routine', 'non routine', 'emergency situation', 'condition mode', 'work mode', 'routine/non-routine']
+        },
+        {
+            key: 'frequency',
+            label: 'Frequency',
+            required: false,
+            keywords: ['frequency', 'frequency (f)', 'frequency f', 'frequence', 'haufigkeit', 'siklik', 'freq', 'freq.']
+        },
+        {
+            key: 'severity',
+            label: 'Severity',
+            required: false,
+            keywords: ['severity', 'severity (s)', 'severity s', 'gravite', 'schweregrad', 'siddet', 'sev', 'sev.']
+        },
+        {
+            key: 'likelihood',
+            label: 'Likelihood',
+            required: false,
+            keywords: ['likelihood', 'likelihood (l)', 'likelihood l', 'probability', 'probability of occurrence', 'probabilite', 'wahrscheinlichkeit', 'olasilik', 'vraisemblance']
+        },
+        {
+            key: 'riskScore',
+            label: 'Risk Score',
+            required: false,
+            keywords: ['risk score', 'score', 'risikobewertung', 'risk skoru', 'note de risque']
+        },
+        {
+            key: 'newControl',
+            label: 'New/Proposed Control',
+            required: false,
+            keywords: ['new control', 'proposed', 'nouveau', 'neue', 'yeni', 'action']
+        },
+        {
+            key: 'hierarchy',
+            label: 'Hierarchy Level',
+            required: false,
+            keywords: ['hierarchy', 'level', 'hierarchie', 'hiyerarsi', 'niveau', 'ladder']
         }
-    };
-    
+    ];
+
+    function resetRA2025ColumnMap() {
+        ra2025ColumnMap = {};
+        RA2025_MAP_FIELDS.forEach(field => {
+            ra2025ColumnMap[field.key] = '';
+        });
+    }
+
+    function normalizeColLetter(value) {
+        return String(value || '').toUpperCase().replace(/[^A-Z]/g, '').slice(0, 3);
+    }
+
+    function truncateText(value, maxLen) {
+        const text = String(value || '');
+        return text.length > maxLen ? text.slice(0, maxLen) + '...' : text;
+    }
+
+    function escapeHtml(value) {
+        return String(value || '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+    function setStatusMessage(message, isError) {
+        const statusEl = document.getElementById('ra2025MappingStatus');
+        if (!statusEl) return;
+        statusEl.textContent = message;
+        if (isError) {
+            statusEl.style.color = '#b91c1c';
+            statusEl.style.background = '#fef2f2';
+            statusEl.style.borderColor = '#fecaca';
+        } else {
+            statusEl.style.color = '#166534';
+            statusEl.style.background = '#f0fdf4';
+            statusEl.style.borderColor = '#86efac';
+        }
+    }
+
+    function setParseButtonBusy(isBusy, label) {
+        const parseBtn = document.getElementById('ra2025ParseLoadBtn');
+        if (!parseBtn) return;
+        parseBtn.disabled = !!isBusy;
+        parseBtn.textContent = label || '✓ Parse & Load to Table';
+    }
+
+    let ra2025PreviewScrollSyncLock = false;
+    let ra2025PreviewScrollActiveTimer = null;
+    let ra2025PreviewSyncFrame1 = 0;
+    let ra2025PreviewSyncFrame2 = 0;
+    let ra2025PreviewSyncTimerFast = null;
+    let ra2025PreviewSyncTimerSlow = null;
+    let ra2025BodyOverflowBeforeModal = '';
+
+    function setRA2025ModalBodyLock(isLocked) {
+        if (isLocked) {
+            if (document.body.dataset.ra2025BodyLocked === '1') return;
+            ra2025BodyOverflowBeforeModal = document.body.style.overflow;
+            document.body.style.overflow = 'hidden';
+            document.body.dataset.ra2025BodyLocked = '1';
+            return;
+        }
+
+        if (document.body.dataset.ra2025BodyLocked === '1') {
+            document.body.style.overflow = ra2025BodyOverflowBeforeModal || '';
+            delete document.body.dataset.ra2025BodyLocked;
+        }
+    }
+
+    function markRA2025PreviewScrollActive() {
+        const previewViewport = document.getElementById('ra2025PreviewViewport');
+        if (!previewViewport) return;
+
+        previewViewport.classList.add('preview-scroll-active');
+        if (ra2025PreviewScrollActiveTimer) {
+            clearTimeout(ra2025PreviewScrollActiveTimer);
+        }
+
+        ra2025PreviewScrollActiveTimer = setTimeout(() => {
+            previewViewport.classList.remove('preview-scroll-active');
+        }, 900);
+    }
+
+    function bindRA2025PreviewScrollSync() {
+        const previewContainer = document.getElementById('ra2025PreviewContainer');
+        const previewViewport = document.getElementById('ra2025PreviewViewport');
+        const scrollHost = document.getElementById('ra2025PreviewScrollHost');
+        const scrollHostY = document.getElementById('ra2025PreviewScrollHostY');
+        if (!previewContainer || !previewViewport || !scrollHost || !scrollHostY) return;
+        if (previewContainer.dataset.syncBound === '1') return;
+
+        previewContainer.dataset.syncBound = '1';
+
+        previewContainer.addEventListener('scroll', () => {
+            if (ra2025PreviewScrollSyncLock) return;
+            ra2025PreviewScrollSyncLock = true;
+            scrollHost.scrollLeft = previewContainer.scrollLeft;
+            scrollHostY.scrollTop = previewContainer.scrollTop;
+            ra2025PreviewScrollSyncLock = false;
+            markRA2025PreviewScrollActive();
+        });
+
+        scrollHost.addEventListener('scroll', () => {
+            if (ra2025PreviewScrollSyncLock) return;
+            ra2025PreviewScrollSyncLock = true;
+            previewContainer.scrollLeft = scrollHost.scrollLeft;
+            ra2025PreviewScrollSyncLock = false;
+            markRA2025PreviewScrollActive();
+        });
+
+        scrollHostY.addEventListener('scroll', () => {
+            if (ra2025PreviewScrollSyncLock) return;
+            ra2025PreviewScrollSyncLock = true;
+            previewContainer.scrollTop = scrollHostY.scrollTop;
+            ra2025PreviewScrollSyncLock = false;
+            markRA2025PreviewScrollActive();
+        });
+
+        previewViewport.addEventListener('mouseenter', () => {
+            markRA2025PreviewScrollActive();
+            scheduleRA2025PreviewScrollSync(true);
+        });
+
+        previewViewport.addEventListener('wheel', event => {
+            if (event.defaultPrevented) return;
+
+            if (event.target && event.target.closest('#ra2025PreviewScrollHost, #ra2025PreviewScrollHostY')) {
+                event.stopPropagation();
+                markRA2025PreviewScrollActive();
+                return;
+            }
+
+            handlePreviewWheelScroll(event, previewContainer);
+        }, { passive: false });
+
+        window.addEventListener('resize', () => {
+            scheduleRA2025PreviewScrollSync(true);
+        });
+    }
+
+    function syncRA2025PreviewScrollHost(keepScrollLeft) {
+        const previewContainer = document.getElementById('ra2025PreviewContainer');
+        const scrollHost = document.getElementById('ra2025PreviewScrollHost');
+        const scrollContent = document.getElementById('ra2025PreviewScrollContent');
+        const scrollHostY = document.getElementById('ra2025PreviewScrollHostY');
+        const scrollContentY = document.getElementById('ra2025PreviewScrollContentY');
+        const previewTable = document.getElementById('ra2025PreviewTable');
+        if (!previewContainer || !scrollHost || !scrollContent || !scrollHostY || !scrollContentY || !previewTable) return;
+
+        const targetWidth = Math.max(
+            previewTable.scrollWidth,
+            previewContainer.scrollWidth,
+            previewContainer.clientWidth + 1
+        );
+        const targetHeight = Math.max(
+            previewTable.scrollHeight,
+            previewContainer.scrollHeight,
+            previewContainer.clientHeight + 1
+        );
+
+        const hasHorizontalOverflow = (previewTable.scrollWidth - previewContainer.clientWidth) > 1;
+        const hasVerticalOverflow = (previewTable.scrollHeight - previewContainer.clientHeight) > 1;
+
+        // Add a tiny nudge when overflow exists so browsers consistently expose the custom rail.
+        scrollContent.style.width = `${targetWidth + (hasHorizontalOverflow ? 2 : 0)}px`;
+        scrollContentY.style.height = `${targetHeight + (hasVerticalOverflow ? 2 : 0)}px`;
+
+        if (keepScrollLeft) {
+            ra2025PreviewScrollSyncLock = true;
+            scrollHost.scrollLeft = previewContainer.scrollLeft;
+            scrollHostY.scrollTop = previewContainer.scrollTop;
+            ra2025PreviewScrollSyncLock = false;
+        }
+    }
+
+    function scheduleRA2025PreviewScrollSync(keepScrollLeft) {
+        syncRA2025PreviewScrollHost(keepScrollLeft);
+
+        if (ra2025PreviewSyncFrame1) cancelAnimationFrame(ra2025PreviewSyncFrame1);
+        if (ra2025PreviewSyncFrame2) cancelAnimationFrame(ra2025PreviewSyncFrame2);
+        if (ra2025PreviewSyncTimerFast) clearTimeout(ra2025PreviewSyncTimerFast);
+        if (ra2025PreviewSyncTimerSlow) clearTimeout(ra2025PreviewSyncTimerSlow);
+
+        ra2025PreviewSyncFrame1 = requestAnimationFrame(() => {
+            syncRA2025PreviewScrollHost(keepScrollLeft);
+            ra2025PreviewSyncFrame1 = 0;
+
+            ra2025PreviewSyncFrame2 = requestAnimationFrame(() => {
+                syncRA2025PreviewScrollHost(keepScrollLeft);
+                ra2025PreviewSyncFrame2 = 0;
+            });
+        });
+
+        ra2025PreviewSyncTimerFast = setTimeout(() => {
+            syncRA2025PreviewScrollHost(keepScrollLeft);
+            ra2025PreviewSyncTimerFast = null;
+        }, 80);
+
+        ra2025PreviewSyncTimerSlow = setTimeout(() => {
+            syncRA2025PreviewScrollHost(keepScrollLeft);
+            ra2025PreviewSyncTimerSlow = null;
+        }, 220);
+    }
+
+    function handlePreviewWheelScroll(event, container) {
+        if (!container) return;
+
+        const hasHorizontalOverflow = (container.scrollWidth - container.clientWidth) > 1;
+        const hasVerticalOverflow = (container.scrollHeight - container.clientHeight) > 1;
+        if (!hasHorizontalOverflow && !hasVerticalOverflow) return;
+
+        const deltaX = Number(event.deltaX || 0);
+        const deltaY = Number(event.deltaY || 0);
+        let consumed = false;
+
+        if (event.shiftKey && hasHorizontalOverflow) {
+            container.scrollLeft += deltaY + deltaX;
+            consumed = (deltaX !== 0 || deltaY !== 0);
+        } else {
+            if (hasVerticalOverflow && deltaY !== 0) {
+                container.scrollTop += deltaY;
+                consumed = true;
+            } else if (hasHorizontalOverflow && deltaY !== 0) {
+                container.scrollLeft += deltaY;
+                consumed = true;
+            }
+
+            if (hasHorizontalOverflow && deltaX !== 0) {
+                container.scrollLeft += deltaX;
+                consumed = true;
+            }
+        }
+
+        if (!consumed) return;
+
+        event.preventDefault();
+        event.stopPropagation();
+        markRA2025PreviewScrollActive();
+    }
+
+    function enablePreviewPanScroll(container) {
+        if (!container || container.dataset.previewPanBound === '1') return;
+        container.dataset.previewPanBound = '1';
+
+        let isPanning = false;
+        let startX = 0;
+        let startY = 0;
+        let startLeft = 0;
+        let startTop = 0;
+        let activePointerId = null;
+
+        const isInteractiveTarget = target => {
+            return !!(target && target.closest && target.closest('select, input, textarea, button, a, label'));
+        };
+
+        const endPan = event => {
+            if (!isPanning) return;
+            isPanning = false;
+            container.classList.remove('preview-panning');
+            if (
+                activePointerId !== null &&
+                typeof container.hasPointerCapture === 'function' &&
+                container.hasPointerCapture(activePointerId)
+            ) {
+                try {
+                    container.releasePointerCapture(activePointerId);
+                } catch (_err) {}
+            }
+            activePointerId = null;
+        };
+
+        container.addEventListener('pointerdown', event => {
+            if (event.button !== 0) return;
+            if (isInteractiveTarget(event.target)) return;
+
+            const canScroll = container.scrollWidth > container.clientWidth || container.scrollHeight > container.clientHeight;
+            if (!canScroll) return;
+
+            isPanning = true;
+            activePointerId = event.pointerId;
+            startX = event.clientX;
+            startY = event.clientY;
+            startLeft = container.scrollLeft;
+            startTop = container.scrollTop;
+            container.classList.add('preview-panning');
+
+            if (typeof container.setPointerCapture === 'function') {
+                try {
+                    container.setPointerCapture(activePointerId);
+                } catch (_err) {}
+            }
+
+            event.preventDefault();
+        });
+
+        container.addEventListener('pointermove', event => {
+            if (!isPanning) return;
+            const deltaX = event.clientX - startX;
+            const deltaY = event.clientY - startY;
+            container.scrollLeft = startLeft - deltaX;
+            container.scrollTop = startTop - deltaY;
+        });
+
+        container.addEventListener('pointerup', endPan);
+        container.addEventListener('pointercancel', endPan);
+        container.addEventListener('mouseleave', event => {
+            if (isPanning && event.buttons === 0) {
+                endPan(event);
+            }
+        });
+
+        container.addEventListener('wheel', event => {
+            handlePreviewWheelScroll(event, container);
+        }, { passive: false });
+    }
+
+    window.enablePreviewPanScroll = enablePreviewPanScroll;
+
+    function getFieldLabel(fieldKey) {
+        const match = RA2025_MAP_FIELDS.find(field => field.key === fieldKey);
+        return match ? match.label : fieldKey;
+    }
+
+    function clearColumnMapping(col) {
+        const normalizedCol = normalizeColLetter(col);
+        if (!normalizedCol) return;
+        Object.keys(ra2025ColumnMap).forEach(key => {
+            if (ra2025ColumnMap[key] === normalizedCol) {
+                ra2025ColumnMap[key] = '';
+            }
+        });
+    }
+
+    function setFieldMapping(fieldKey, col) {
+        if (!Object.prototype.hasOwnProperty.call(ra2025ColumnMap, fieldKey)) return;
+
+        const normalizedCol = normalizeColLetter(col);
+        if (!normalizedCol) {
+            ra2025ColumnMap[fieldKey] = '';
+            return;
+        }
+
+        clearColumnMapping(normalizedCol);
+        ra2025ColumnMap[fieldKey] = normalizedCol;
+    }
+
+    function getMappedFieldForColumn(col) {
+        const normalizedCol = normalizeColLetter(col);
+        if (!normalizedCol) return '';
+        const entry = Object.entries(ra2025ColumnMap).find(([, mappedCol]) => mappedCol === normalizedCol);
+        return entry ? entry[0] : '';
+    }
+
+    function isColumnMapped(col) {
+        const normalizedCol = normalizeColLetter(col);
+        if (!normalizedCol) return false;
+        return Object.values(ra2025ColumnMap).includes(normalizedCol);
+    }
+
+    function getCurrentMapping() {
+        const mapping = {};
+        Object.keys(ra2025ColumnMap).forEach(key => {
+            mapping[key] = normalizeColLetter(ra2025ColumnMap[key]);
+        });
+        return mapping;
+    }
+
     function parseRA2025SharedStrings(xml) {
         if (!xml) return [];
         const parser = new DOMParser();
-        const doc = parser.parseFromString(xml, "text/xml");
-        return Array.from(doc.getElementsByTagName("si")).map(si => {
-            return Array.from(si.getElementsByTagName("t")).map(t => t.textContent).join("");
+        const doc = parser.parseFromString(xml, 'text/xml');
+        return Array.from(doc.getElementsByTagName('si')).map(si => {
+            return Array.from(si.getElementsByTagName('t')).map(t => t.textContent).join('');
         });
     }
-    
+
     function getCellText(cell) {
-        const type = cell.getAttribute("t");
-        const vNode = cell.getElementsByTagName("v")[0];
+        const type = cell.getAttribute('t');
+
+        if (type === 'inlineStr') {
+            const isNode = cell.getElementsByTagName('is')[0];
+            if (!isNode) return '';
+            return Array.from(isNode.getElementsByTagName('t')).map(t => t.textContent).join('');
+        }
+
+        const vNode = cell.getElementsByTagName('v')[0];
         if (!vNode) return '';
-        
-        if (type === "s") {
+
+        if (type === 's') {
             const idx = parseInt(vNode.textContent, 10);
             return ra2025Strings[idx] || '';
         }
+
         return vNode.textContent || '';
     }
-    
+
     function extractAllRows() {
         ra2025AllRows = [];
-        const rows = ra2025SheetDoc.getElementsByTagName("row");
-        
-        // Find max column
-        let maxCol = 0;
-        for (let row of rows) {
-            const cells = row.getElementsByTagName("c");
-            for (let cell of cells) {
-                const ref = cell.getAttribute("r") || '';
-                const colMatch = ref.match(/^([A-Z]+)/);
-                if (colMatch) {
-                    const colIdx = colLetterToIndex(colMatch[1]);
-                    if (colIdx > maxCol) maxCol = colIdx;
-                }
-            }
-        }
-        
-        // Extract data
-        for (let row of rows) {
-            const rowNum = parseInt(row.getAttribute("r"));
+        if (!ra2025SheetDoc) return;
+
+        const rows = ra2025SheetDoc.getElementsByTagName('row');
+        for (const row of rows) {
+            const rowNum = parseInt(row.getAttribute('r'), 10);
+            if (!Number.isFinite(rowNum)) continue;
+
             const rowData = { _rowNum: rowNum };
-            
-            // Initialize all columns
-            for (let c = 0; c <= Math.min(maxCol, 20); c++) {
-                rowData[indexToColLetter(c)] = '';
-            }
-            
-            // Fill in actual values
-            const cells = row.getElementsByTagName("c");
-            for (let cell of cells) {
-                const ref = cell.getAttribute("r") || '';
+            const cells = row.getElementsByTagName('c');
+            for (const cell of cells) {
+                const ref = cell.getAttribute('r') || '';
                 const colMatch = ref.match(/^([A-Z]+)/);
-                if (colMatch) {
-                    rowData[colMatch[1]] = getCellText(cell);
-                }
+                if (!colMatch) continue;
+                rowData[colMatch[1]] = getCellText(cell);
             }
-            
+
             ra2025AllRows.push(rowData);
         }
     }
-    
+
     function colLetterToIndex(col) {
         let index = 0;
-        for (let i = 0; i < col.length; i++) {
-            index = index * 26 + (col.charCodeAt(i) - 64);
+        const safeCol = normalizeColLetter(col);
+        for (let i = 0; i < safeCol.length; i++) {
+            index = index * 26 + (safeCol.charCodeAt(i) - 64);
         }
         return index - 1;
     }
-    
+
     function indexToColLetter(idx) {
         let letter = '';
-        idx++;
-        while (idx > 0) {
-            const rem = (idx - 1) % 26;
+        let value = idx + 1;
+        while (value > 0) {
+            const rem = (value - 1) % 26;
             letter = String.fromCharCode(65 + rem) + letter;
-            idx = Math.floor((idx - 1) / 26);
+            value = Math.floor((value - 1) / 26);
         }
         return letter;
     }
-    
-    // Update preview table
+
+    function getPreviewColumns() {
+        const colSet = new Set();
+
+        ra2025AllRows.forEach(row => {
+            Object.keys(row).forEach(key => {
+                if (key !== '_rowNum' && /^[A-Z]{1,3}$/.test(key)) {
+                    colSet.add(key);
+                }
+            });
+        });
+
+        const cols = Array.from(colSet).sort((a, b) => colLetterToIndex(a) - colLetterToIndex(b));
+        if (cols.length === 0) {
+            for (let c = 0; c < 16; c++) {
+                cols.push(indexToColLetter(c));
+            }
+        }
+
+        return cols;
+    }
+
+    function getHeaderRowData() {
+        const headerRow = parseInt(document.getElementById('ra2025HeaderRow')?.value, 10) || 14;
+        return ra2025AllRows.find(row => row._rowNum === headerRow) || null;
+    }
+
+    function buildMapOptions(selectedField) {
+        const options = ['<option value="">Unmapped</option>'];
+        RA2025_MAP_FIELDS.forEach(field => {
+            const selected = selectedField === field.key ? ' selected' : '';
+            const requiredTag = field.required ? ' *' : '';
+            options.push(`<option value="${field.key}"${selected}>${escapeHtml(field.label + requiredTag)}</option>`);
+        });
+        return options.join('');
+    }
+
+    function renderMappingFeedback(headerData) {
+        const feedbackEl = document.getElementById('ra2025MapFeedbackList');
+        const countsEl = document.getElementById('ra2025MapCounts');
+        if (!feedbackEl) return;
+
+        let mappedCount = 0;
+        const rowsHtml = RA2025_MAP_FIELDS.map(field => {
+            const col = normalizeColLetter(ra2025ColumnMap[field.key]);
+            const mapped = !!col;
+            if (mapped) mappedCount++;
+
+            const headerText = mapped ? (headerData && headerData[col] ? String(headerData[col]) : '') : '';
+            const details = mapped
+                ? `Column ${col}${headerText ? ` - ${truncateText(headerText, 36)}` : ''}`
+                : 'Pending';
+
+            return `
+                <div class="ra2025-feedback-row ${mapped ? 'mapped' : 'pending'}">
+                    <span class="ra2025-feedback-label">${escapeHtml(field.label)}${field.required ? '<span class="ra2025-feedback-required">Required</span>' : ''}</span>
+                    <span class="ra2025-feedback-value">${escapeHtml(details)}</span>
+                </div>
+            `;
+        }).join('');
+
+        feedbackEl.innerHTML = rowsHtml;
+        if (countsEl) {
+            countsEl.textContent = `${mappedCount}/${RA2025_MAP_FIELDS.length} mapped`;
+        }
+    }
+
+    function tryAutoFillMapping() {
+        const headerData = getHeaderRowData();
+        if (!headerData) return;
+
+        const cols = getPreviewColumns();
+        cols.forEach(col => {
+            const headerText = String(headerData[col] || '').toLowerCase().trim();
+            if (!headerText) return;
+
+            RA2025_MAP_FIELDS.forEach(field => {
+                if (ra2025ColumnMap[field.key]) return;
+                if (field.keywords.some(keyword => headerText.includes(keyword))) {
+                    setFieldMapping(field.key, col);
+                }
+            });
+        });
+    }
+
+    function applyMappingDefaults(mappingDefaults, overwriteExisting) {
+        if (!mappingDefaults || typeof mappingDefaults !== 'object') return 0;
+
+        let appliedCount = 0;
+        RA2025_MAP_FIELDS.forEach(field => {
+            const mappedCol = normalizeColLetter(mappingDefaults[field.key]);
+            if (!mappedCol) return;
+            if (!overwriteExisting && ra2025ColumnMap[field.key]) return;
+
+            setFieldMapping(field.key, mappedCol);
+            appliedCount++;
+        });
+
+        return appliedCount;
+    }
+
+    function isSameMappingSource(candidate, sourceFileName, selectedSheetIndex) {
+        if (!candidate || typeof candidate !== 'object') return false;
+
+        const candidateFile = String(candidate.sourceFile || '').trim();
+        const targetFile = String(sourceFileName || '').trim();
+        if (targetFile && candidateFile && candidateFile !== targetFile) {
+            return false;
+        }
+
+        const targetSheet = Number(selectedSheetIndex || 0);
+        const candidateSheet = Number(candidate.selectedSheetIndex || 0);
+        if (targetSheet && candidateSheet && targetSheet !== candidateSheet) {
+            return false;
+        }
+
+        return true;
+    }
+
+    function getStoredMappingDefaults(sourceFileName, selectedSheetIndex) {
+        const diagnostics = window.ra2025LastParseDiagnostics;
+        if (diagnostics && diagnostics.mappedColumns && isSameMappingSource(diagnostics, sourceFileName, selectedSheetIndex)) {
+            return {
+                ...diagnostics.mappedColumns,
+                headerRow: diagnostics.headerRow,
+                dataStartRow: diagnostics.dataStartRow,
+                routineDefault: diagnostics.routineDefault
+            };
+        }
+
+        const workflowMeta = window.goehsWorkflowContext && window.goehsWorkflowContext.metadata
+            ? window.goehsWorkflowContext.metadata
+            : null;
+
+        if (workflowMeta && workflowMeta.mappedColumns && isSameMappingSource(workflowMeta, sourceFileName, selectedSheetIndex)) {
+            return {
+                ...workflowMeta.mappedColumns,
+                headerRow: workflowMeta.headerRow,
+                dataStartRow: workflowMeta.dataStartRow,
+                routineDefault: workflowMeta.routineDefault
+            };
+        }
+
+        return null;
+    }
+
+    function detectMappingDefaultsFromSheet() {
+        if (!ra2025SheetDoc) return null;
+
+        const detector = typeof window.detectRA2025Columns === 'function'
+            ? window.detectRA2025Columns
+            : (typeof detectRA2025Columns === 'function' ? detectRA2025Columns : null);
+
+        if (!detector) return null;
+
+        try {
+            return detector(ra2025SheetDoc, ra2025Strings) || null;
+        } catch (error) {
+            console.warn('RA2025 mapping defaults detection failed:', error);
+            return null;
+        }
+    }
+
+    function updateMappingStatus(headerData) {
+        renderMappingFeedback(headerData);
+
+        const requiredTotal = RA2025_MAP_FIELDS.filter(field => field.required).length;
+        const requiredMapped = RA2025_MAP_FIELDS.filter(field => field.required && ra2025ColumnMap[field.key]).length;
+        const mappedCount = Object.values(ra2025ColumnMap).filter(Boolean).length;
+
+        if (requiredMapped < requiredTotal) {
+            setStatusMessage('Map at least Task/Step Description to continue.', true);
+            return;
+        }
+
+        setStatusMessage(`Ready to parse: ${mappedCount}/${RA2025_MAP_FIELDS.length} fields mapped.`, false);
+    }
+
+    window.handleRA2025HeaderMapping = function(selectEl) {
+        if (!selectEl) return;
+
+        const col = normalizeColLetter(selectEl.getAttribute('data-col'));
+        const fieldKey = String(selectEl.value || '');
+        if (!col) return;
+
+        if (!fieldKey) {
+            clearColumnMapping(col);
+        } else {
+            setFieldMapping(fieldKey, col);
+        }
+
+        updateRA2025Preview();
+    };
+
     window.updateRA2025Preview = function() {
-        const headerRow = parseInt(document.getElementById('ra2025HeaderRow').value) || 14;
-        const dataStart = parseInt(document.getElementById('ra2025DataStartRow').value) || 15;
-        
+        const headerRow = parseInt(document.getElementById('ra2025HeaderRow')?.value, 10) || 14;
+        const dataStart = parseInt(document.getElementById('ra2025DataStartRow')?.value, 10) || 15;
         const thead = document.getElementById('ra2025PreviewHead');
         const tbody = document.getElementById('ra2025PreviewBody');
-        
-        // Find header row
-        const headerData = ra2025AllRows.find(r => r._rowNum === headerRow);
-        
-        // Get columns (A through P)
-        const cols = [];
-        for (let c = 0; c < 16; c++) {
-            cols.push(indexToColLetter(c));
+        const previewContainer = document.getElementById('ra2025PreviewContainer');
+
+        if (!thead || !tbody) return;
+        if (previewContainer) {
+            enablePreviewPanScroll(previewContainer);
         }
-        
-        // Render header
-        let headerHtml = '<tr>';
+        bindRA2025PreviewScrollSync();
+
+        const headerData = ra2025AllRows.find(row => row._rowNum === headerRow) || null;
+        const cols = getPreviewColumns();
+
+        let headerHtml = '<tr class="ra2025-map-row"><th>Map to</th>';
         cols.forEach(col => {
-            const headerText = headerData ? (headerData[col] || col) : col;
-            const isMapped = isColumnMapped(col);
-            headerHtml += `<th onclick="selectColumnForMapping('${col}')" 
-                              class="${isMapped ? 'selected-col' : ''}" 
-                              title="Click to map column ${col}">${col}: ${headerText.substring(0, 20)}</th>`;
+            const selectedField = getMappedFieldForColumn(col);
+            const mappedClass = selectedField ? 'selected-col' : '';
+            headerHtml += `<th class="${mappedClass}"><select class="ra2025-header-map-select" data-col="${col}" onchange="handleRA2025HeaderMapping(this)">${buildMapOptions(selectedField)}</select></th>`;
+        });
+        headerHtml += '</tr>';
+
+        headerHtml += `<tr><th>Header (row ${headerRow})</th>`;
+        cols.forEach(col => {
+            const headerText = headerData && headerData[col] ? String(headerData[col]) : col;
+            const mappedField = getMappedFieldForColumn(col);
+            const mappedLabel = mappedField ? getFieldLabel(mappedField) : '';
+            const mappedClass = mappedField ? 'selected-col' : '';
+            const badge = mappedLabel ? `<span class="ra2025-map-badge">${escapeHtml(mappedLabel)}</span>` : '';
+
+            headerHtml += `<th class="${mappedClass}" title="${escapeHtml(headerText)}"><span class="ra2025-header-col">${escapeHtml(col)}</span><span class="ra2025-header-title">${escapeHtml(truncateText(headerText, 42))}</span>${badge}</th>`;
         });
         headerHtml += '</tr>';
         thead.innerHTML = headerHtml;
-        
-        // Render data rows (show rows from dataStart to dataStart+20)
+
+        const dataRows = ra2025AllRows.filter(row => row._rowNum >= dataStart && row._rowNum < dataStart + 30);
         let bodyHtml = '';
-        const dataRows = ra2025AllRows.filter(r => r._rowNum >= dataStart && r._rowNum < dataStart + 25);
-        
+
         dataRows.forEach(row => {
-            bodyHtml += '<tr>';
+            bodyHtml += `<tr><td class="ra2025-row-label">Row ${row._rowNum}</td>`;
             cols.forEach(col => {
                 const value = row[col] || '';
-                const isMapped = isColumnMapped(col);
-                bodyHtml += `<td class="${isMapped ? 'ra2025-col-mapped' : ''}" title="${value}">${value.substring(0, 30)}</td>`;
+                const mappedClass = isColumnMapped(col) ? 'ra2025-col-mapped' : '';
+                bodyHtml += `<td class="${mappedClass}" title="${escapeHtml(value)}">${escapeHtml(truncateText(value, 48))}</td>`;
             });
             bodyHtml += '</tr>';
         });
-        
-        tbody.innerHTML = bodyHtml || '<tr><td colspan="16" style="text-align:center; padding:20px; color:#94a3b8;">No data found in selected rows</td></tr>';
-        
-        // Update status
-        updateMappingStatus();
-    };
-    
-    function isColumnMapped(col) {
-        const inputs = document.querySelectorAll('.ra2025-col-input');
-        for (let input of inputs) {
-            if (input.value.toUpperCase() === col) return true;
+
+        if (!bodyHtml) {
+            bodyHtml = `<tr><td colspan="${cols.length + 1}" style="text-align:center; padding:20px; color:#94a3b8;">No data found in selected rows</td></tr>`;
         }
-        return false;
-    }
-    
-    // Click on column header to map it
-    window.selectColumnForMapping = function(col) {
-        // Find active input or use Task Description as default
-        const activeInput = document.querySelector('.ra2025-col-input:focus') || 
-                           document.getElementById('ra2025ColTaskDesc');
-        
-        if (activeInput) {
-            activeInput.value = col;
-            activeInput.classList.add('mapped');
-            updateRA2025Preview();
-        }
+
+        tbody.innerHTML = bodyHtml;
+        updateMappingStatus(headerData);
+        scheduleRA2025PreviewScrollSync(true);
     };
-    
-    // Try to auto-fill mapping based on header row keywords
-    function tryAutoFillMapping() {
-        const headerRow = parseInt(document.getElementById('ra2025HeaderRow').value) || 14;
-        const headerData = ra2025AllRows.find(r => r._rowNum === headerRow);
-        if (!headerData) return;
-        
-        const mappings = {
-            'ra2025ColTaskId': ['task id', 'id', 'no', 'nr', '#', 'numéro', 'nummer', 'numara'],
-            'ra2025ColTaskDesc': ['task description', 'description', 'job step', 'tâche', 'beschreibung', 'açıklama', 'step', 'étape', 'schritt', 'adım'],
-            'ra2025ColHazardGroup': ['hazard group', 'groupe', 'gefahrengruppe', 'tehlike grubu', 'category', 'catégorie', 'kategorie'],
-            'ra2025ColHazardDetail': ['hazard detail', 'hazard list', 'détail', 'gefahrendetail', 'tehlike', 'type', 'typ'],
-            'ra2025ColConsequence': ['consequence', 'risk', 'risque', 'risiko', 'sonuç', 'conséquence'],
-            'ra2025ColSource': ['source', 'quelle', 'kaynak', 'hazard source'],
-            'ra2025ColControl': ['current control', 'control', 'contrôle', 'kontrolle', 'kontrol', 'counter measure', 'maßnahme'],
-            'ra2025ColSeverity': ['severity', 'gravité', 'schweregrad', 'şiddet', 'sev'],
-            'ra2025ColLikelihood': ['likelihood', 'probabilité', 'wahrscheinlichkeit', 'olasılık', 'like', 'prob'],
-            'ra2025ColRiskScore': ['risk score', 'score', 'risikobewertung', 'puan', 'note'],
-            'ra2025ColNewControl': ['new control', 'proposed', 'nouveau', 'neue', 'yeni'],
-            'ra2025ColHierarchy': ['hierarchy', 'level', 'hiérarchie', 'hierarchie', 'hiyerarşi', 'niveau']
-        };
-        
-        // Check each column against keywords
-        for (let c = 0; c < 20; c++) {
-            const col = indexToColLetter(c);
-            const headerText = (headerData[col] || '').toLowerCase();
-            if (!headerText) continue;
-            
-            for (const [inputId, keywords] of Object.entries(mappings)) {
-                if (keywords.some(kw => headerText.includes(kw))) {
-                    const input = document.getElementById(inputId);
-                    if (input && !input.value) {
-                        input.value = col;
-                        input.classList.add('mapped');
-                    }
-                }
+
+    function nearestScaleValue(inputValue, allowedValues, fallback) {
+        if (!Number.isFinite(inputValue) || !Array.isArray(allowedValues) || allowedValues.length === 0) {
+            return fallback;
+        }
+
+        let nearest = allowedValues[0];
+        let minDiff = Math.abs(inputValue - nearest);
+        for (let i = 1; i < allowedValues.length; i++) {
+            const current = allowedValues[i];
+            const diff = Math.abs(inputValue - current);
+            if (diff < minDiff) {
+                nearest = current;
+                minDiff = diff;
             }
         }
-        
-        updateRA2025Preview();
+        return nearest;
     }
-    
-    function updateMappingStatus() {
-        const taskDescCol = document.getElementById('ra2025ColTaskDesc').value;
-        const statusEl = document.getElementById('ra2025MappingStatus');
-        
-        if (!taskDescCol) {
-            statusEl.textContent = '�� ️ Please map at least the Task Description column to continue.';
-            statusEl.style.color = '#dc2626';
-        } else {
-            // Count mapped fields
-            const mapped = document.querySelectorAll('.ra2025-col-input').length;
-            let filledCount = 0;
-            document.querySelectorAll('.ra2025-col-input').forEach(inp => {
-                if (inp.value) filledCount++;
-            });
-            statusEl.textContent = `✓ ${filledCount}/${mapped} columns mapped. Ready to parse.`;
-            statusEl.style.color = '#059669';
-        }
+
+    function extractNumericValue(rawValue) {
+        if (rawValue === null || rawValue === undefined) return null;
+        if (typeof rawValue === 'number') return Number.isFinite(rawValue) ? rawValue : null;
+
+        const normalized = String(rawValue || '').replace(/(\d),(\d)/g, '$1.$2');
+        const match = normalized.match(/-?\d+(?:\.\d+)?/);
+        if (!match) return null;
+
+        const parsed = parseFloat(match[0]);
+        return Number.isFinite(parsed) ? parsed : null;
     }
-    
-    // Add event listeners to inputs
-    document.querySelectorAll('.ra2025-col-input').forEach(input => {
-        input.addEventListener('input', function() {
-            this.value = this.value.toUpperCase();
-            if (this.value) {
-                this.classList.add('mapped');
-            } else {
-                this.classList.remove('mapped');
-            }
-            updateRA2025Preview();
-        });
-        input.addEventListener('focus', function() {
-            ra2025SelectedField = this;
-        });
-    });
-    
-    window.closeRA2025ColumnMapper = function() {
-        document.getElementById('ra2025ColumnMapperModal').style.display = 'none';
-        window.ra2025PendingFile = null;
-    };
-    
-    window.tryAutoDetectRA2025 = async function() {
-        if (!window.ra2025PendingFile) return;
-        
-        try {
-            document.getElementById('ra2025MappingStatus').textContent = '🔄 Re-trying auto-detection...';
-            const data = await parseRA2025Template(window.ra2025PendingFile, null, window.ra2025SelectedSheetIndex || null);
-            
-            if (data.risk_items && data.risk_items.length > 0) {
-                closeRA2025ColumnMapper();
-                
-                // Success - load data
-                window.directGoehsContext = data.process_context;
-                const workflowSource = (window.GOEHS_WORKFLOW_SOURCES && window.GOEHS_WORKFLOW_SOURCES.RA2025_SINGLE) || 'RA2025_SINGLE';
-                if (typeof window.setGoehsWorkflowContext === 'function') {
-                    window.setGoehsWorkflowContext(workflowSource, {
-                        workflow: 'ra2025_manual_mapper_autodetect_retry',
-                        sourceFile: window.ra2025PendingFile ? window.ra2025PendingFile.name : null,
-                        selectedSheetIndex: window.ra2025SelectedSheetIndex || null,
-                        sheetName: data.sheet_name || null,
-                        detectedLanguage: data.detectedLang || null,
-                        riskItemCount: data.risk_items.length,
-                        processContext: data.process_context || null
-                    });
-                } else {
-                    window.goehsWorkflowContext = {
-                        source: workflowSource,
-                        setAt: new Date().toISOString(),
-                        metadata: {
-                            workflow: 'ra2025_manual_mapper_autodetect_retry',
-                            sourceFile: window.ra2025PendingFile ? window.ra2025PendingFile.name : null,
-                            selectedSheetIndex: window.ra2025SelectedSheetIndex || null,
-                            sheetName: data.sheet_name || null,
-                            detectedLanguage: data.detectedLang || null,
-                            riskItemCount: data.risk_items.length,
-                            processContext: data.process_context || null
-                        }
-                    };
-                }
-                const tableData = convertRA2025ToTableFormat(data.risk_items);
-                
-                if (window.buildTableFromData) {
-                    window.buildTableFromData(tableData);
-                }
-                
-                if (window.initializeDashboard) {
-                    window.initializeDashboard();
-                }
-                
-                document.getElementById('dashboard-container').style.display = 'block';
-                if (window.switchTab) window.switchTab('rich-media');
-                
-                showDirectGoehsAlert(`✅ Auto-detected! Loaded ${data.risk_items.length} risk items.`, 'success');
-            } else {
-                document.getElementById('ra2025MappingStatus').textContent = '�� ️ Still no data found. Please map columns manually.';
-                document.getElementById('ra2025MappingStatus').style.color = '#dc2626';
-            }
-        } catch (e) {
-            document.getElementById('ra2025MappingStatus').textContent = '�� ️ Auto-detection failed: ' + e.message;
-            document.getElementById('ra2025MappingStatus').style.color = '#dc2626';
+
+    function parseFrequency(rawValue) {
+        const parser = window.RA2025SmartScaleParser;
+        if (parser && typeof parser.parseFrequency === 'function') {
+            return parser.parseFrequency(rawValue);
         }
-    };
-    
-    window.parseWithManualMapping = function() {
-        const taskDescCol = document.getElementById('ra2025ColTaskDesc').value;
-        
-        if (!taskDescCol) {
-            document.getElementById('ra2025MappingStatus').textContent = '❌ Task Description column is required!';
-            document.getElementById('ra2025MappingStatus').style.color = '#dc2626';
-            document.getElementById('ra2025ColTaskDesc').focus();
-            return;
+        const numeric = extractNumericValue(rawValue);
+        return nearestScaleValue(numeric, [1, 1.25, 1.5, 1.75, 2], 1);
+    }
+
+    function parseSeverity(rawValue) {
+        const parser = window.RA2025SmartScaleParser;
+        if (parser && typeof parser.parseSeverity === 'function') {
+            return parser.parseSeverity(rawValue);
         }
-        
-        const dataStartRow = parseInt(document.getElementById('ra2025DataStartRow').value) || 15;
-        
-        // Get column mappings
-        const cols = {
-            taskId: document.getElementById('ra2025ColTaskId').value || 'A',
-            taskDesc: taskDescCol,
-            hazardGroup: document.getElementById('ra2025ColHazardGroup').value || '',
-            hazardDetail: document.getElementById('ra2025ColHazardDetail').value || '',
-            consequence: document.getElementById('ra2025ColConsequence').value || '',
-            source: document.getElementById('ra2025ColSource').value || '',
-            currentControl: document.getElementById('ra2025ColControl').value || '',
-            severity: document.getElementById('ra2025ColSeverity').value || '',
-            likelihood: document.getElementById('ra2025ColLikelihood').value || '',
-            riskScore: document.getElementById('ra2025ColRiskScore').value || '',
-            newControl: document.getElementById('ra2025ColNewControl').value || '',
-            hierarchy: document.getElementById('ra2025ColHierarchy').value || ''
-        };
-        
-        // Parse data using manual mapping
+        const numeric = extractNumericValue(rawValue);
+        return nearestScaleValue(numeric, [1, 3, 5, 7, 9, 10], 5);
+    }
+
+    function parseLikelihood(rawValue) {
+        const parser = window.RA2025SmartScaleParser;
+        if (parser && typeof parser.parseLikelihood === 'function') {
+            return parser.parseLikelihood(rawValue);
+        }
+        const numeric = extractNumericValue(rawValue);
+        return nearestScaleValue(numeric, [1, 3, 5, 8, 10], 3);
+    }
+
+    function parseRiskScoreValue(rawValue) {
+        const parser = window.RA2025SmartScaleParser;
+        if (parser && typeof parser.parseRiskScore === 'function') {
+            return parser.parseRiskScore(rawValue);
+        }
+        const numeric = extractNumericValue(rawValue);
+        return Number.isFinite(numeric) && numeric > 0 ? numeric : null;
+    }
+
+    function normalizeRoutineType(rawValue, fallbackMode) {
+        const fallback = ['Routine', 'Non-Routine', 'Emergency Situation'].includes(fallbackMode)
+            ? fallbackMode
+            : 'Routine';
+
+        const value = String(rawValue || '').trim().toLowerCase();
+        if (!value) return fallback;
+
+        if (
+            value.includes('emergency') ||
+            value.includes('urgence') ||
+            value.includes('notfall') ||
+            value.includes('acil')
+        ) {
+            return 'Emergency Situation';
+        }
+
+        if (
+            value.includes('non-routine') ||
+            value.includes('non routine') ||
+            value.includes('nonroutine')
+        ) {
+            return 'Non-Routine';
+        }
+
+        if (value.includes('routine')) {
+            return 'Routine';
+        }
+
+        return fallback;
+    }
+
+    function parseRiskItemsFromPreviewRows(cols, dataStartRow, routineDefaultMode) {
         const riskItems = [];
-        const dataRows = ra2025AllRows.filter(r => r._rowNum >= dataStartRow);
-        
+        const dataRows = ra2025AllRows.filter(row => row._rowNum >= dataStartRow);
+        const taskIdCol = cols.taskId || 'A';
+        const defaultRoutine = normalizeRoutineType('', routineDefaultMode);
+        const lastScaleValues = {
+            frequency: null,
+            severity: null,
+            likelihood: null
+        };
+
         for (const row of dataRows) {
-            const taskDesc = row[cols.taskDesc] || '';
-            if (!taskDesc) continue;
-            
-            // Stop conditions
-            const taskIdVal = (row[cols.taskId] || '').toLowerCase();
-            if (taskIdVal.includes('total') || taskIdVal.includes('insert') || taskIdVal.includes('somme') || taskIdVal.includes('gesamt')) {
+            const taskDesc = String(row[cols.taskDesc] || '').trim();
+            const hazardGroup = String(row[cols.hazardGroup] || '').trim();
+            const hazardDetail = String(row[cols.hazardDetail] || '').trim();
+            const rawRoutineMode = cols.routine ? row[cols.routine] : '';
+            const routineType = normalizeRoutineType(rawRoutineMode, defaultRoutine);
+
+            if (!taskDesc && !hazardGroup && !hazardDetail) continue;
+
+            const stopText = `${String(row[taskIdCol] || '').toLowerCase()} ${taskDesc.toLowerCase()}`;
+            if (stopText.includes('total') || stopText.includes('insert row') || stopText.includes('insert') || stopText.includes('somme') || stopText.includes('gesamt') || stopText.includes('toplam')) {
                 break;
             }
-            
-            const severity = parseInt(row[cols.severity]) || 5;
-            const likelihood = parseInt(row[cols.likelihood]) || 3;
-            const riskScore = cols.riskScore ? (parseFloat(row[cols.riskScore]) || (severity * likelihood)) : (severity * likelihood);
-            
+
+            const rawFrequency = row[cols.frequency];
+            const rawSeverity = row[cols.severity];
+            const rawLikelihood = row[cols.likelihood];
+
+            const isFrequencyBlank = String(rawFrequency ?? '').trim() === '';
+            const isSeverityBlank = String(rawSeverity ?? '').trim() === '';
+            const isLikelihoodBlank = String(rawLikelihood ?? '').trim() === '';
+
+            let frequency = parseFrequency(rawFrequency);
+            let severity = parseSeverity(rawSeverity);
+            let likelihood = parseLikelihood(rawLikelihood);
+
+            if (isFrequencyBlank && Number.isFinite(lastScaleValues.frequency)) {
+                frequency = lastScaleValues.frequency;
+            } else if (Number.isFinite(frequency)) {
+                lastScaleValues.frequency = frequency;
+            }
+
+            if (isSeverityBlank && Number.isFinite(lastScaleValues.severity)) {
+                severity = lastScaleValues.severity;
+            } else if (Number.isFinite(severity)) {
+                lastScaleValues.severity = severity;
+            }
+
+            if (isLikelihoodBlank && Number.isFinite(lastScaleValues.likelihood)) {
+                likelihood = lastScaleValues.likelihood;
+            } else if (Number.isFinite(likelihood)) {
+                lastScaleValues.likelihood = likelihood;
+            }
+
+            const parsedRiskScore = cols.riskScore ? parseRiskScoreValue(row[cols.riskScore]) : null;
+            const riskScore = Number.isFinite(parsedRiskScore)
+                ? parsedRiskScore
+                : (frequency * severity * likelihood);
+
             let riskLevel = 'LOW';
             if (riskScore >= 50) riskLevel = 'HIGH';
             else if (riskScore >= 20) riskLevel = 'MEDIUM';
-            
+
             riskItems.push({
                 row_index: row._rowNum,
                 task_name: taskDesc,
+                routine_type: routineType,
                 hazard_classification: {
-                    group: row[cols.hazardGroup] || '',
-                    type: row[cols.hazardDetail] || ''
+                    group: hazardGroup,
+                    type: hazardDetail
                 },
                 risk_scenario: {
                     source: row[cols.source] || '',
                     consequence: row[cols.consequence] || ''
                 },
                 assessment_pre_control: {
+                    frequency: frequency,
                     severity: severity,
                     likelihood: likelihood,
                     calculated_score: riskScore,
@@ -11670,71 +12340,429 @@ downloadBtn.addEventListener('click', async () => {
                 }
             });
         }
-        
-        if (riskItems.length === 0) {
-            document.getElementById('ra2025MappingStatus').textContent = '❌ No data found! Check your column mappings and data start row.';
-            document.getElementById('ra2025MappingStatus').style.color = '#dc2626';
-            return;
+
+        return riskItems;
+    }
+
+    function getPreviewCellValue(colLetter, rowNum) {
+        const targetCol = normalizeColLetter(colLetter);
+        const targetRow = parseInt(rowNum, 10);
+        if (!targetCol || !Number.isFinite(targetRow)) return '';
+
+        const row = ra2025AllRows.find(item => item._rowNum === targetRow);
+        if (!row) return '';
+        return String(row[targetCol] || '').trim();
+    }
+
+    function deriveProcessContextFromPreviewRows() {
+        let creationDate = '';
+        for (let r = 10; r <= 16; r++) {
+            const value = getPreviewCellValue('C', r);
+            if (value && (value.includes('-') || value.includes('/'))) {
+                creationDate = value;
+                break;
+            }
         }
-        
-        // Store raw data for potential remapping
-        window.ra2025RawRiskItems = riskItems;
-        window.ra2025LoadedFile = window.ra2025PendingFile;
-        const mappedColumns = Object.fromEntries(Object.entries(cols).filter(([, val]) => !!val));
-        const workflowSource = (window.GOEHS_WORKFLOW_SOURCES && window.GOEHS_WORKFLOW_SOURCES.RA2025_SINGLE) || 'RA2025_SINGLE';
-        if (typeof window.setGoehsWorkflowContext === 'function') {
-            window.setGoehsWorkflowContext(workflowSource, {
-                workflow: 'ra2025_manual_mapping',
-                sourceFile: window.ra2025PendingFile ? window.ra2025PendingFile.name : null,
-                selectedSheetIndex: window.ra2025SelectedSheetIndex || null,
-                dataStartRow: dataStartRow,
-                riskItemCount: riskItems.length,
-                mappedColumns: mappedColumns
+
+        if (!creationDate) {
+            creationDate = new Date().toISOString().split('T')[0];
+        }
+
+        return {
+            plant_id: getPreviewCellValue('B', 2),
+            ra_reference: getPreviewCellValue('B', 3),
+            department_id: getPreviewCellValue('B', 4),
+            area_hpu: getPreviewCellValue('B', 5),
+            workstation_id: getPreviewCellValue('B', 6),
+            assessment_date: creationDate
+        };
+    }
+
+    function captureRA2025ParseSample(cols, parsedItems, dataStartRow) {
+        const maxRows = 8;
+        const rowIndexMap = new Map();
+        parsedItems.forEach(item => {
+            const idx = Number(item && item.row_index);
+            if (Number.isFinite(idx)) {
+                rowIndexMap.set(idx, item);
+            }
+        });
+
+        const sample = [];
+        const previewRows = ra2025AllRows.filter(row => row._rowNum >= dataStartRow);
+        for (const row of previewRows) {
+            const rowNum = Number(row._rowNum);
+            const parsed = rowIndexMap.get(rowNum);
+            if (!parsed) continue;
+
+            sample.push({
+                row: rowNum,
+                rawRoutine: cols.routine ? String(row[cols.routine] || '') : '',
+                parsedRoutine: parsed.routine_type || 'Routine',
+                rawFrequency: cols.frequency ? String(row[cols.frequency] || '') : '',
+                parsedFrequency: parsed.assessment_pre_control?.frequency,
+                rawSeverity: cols.severity ? String(row[cols.severity] || '') : '',
+                parsedSeverity: parsed.assessment_pre_control?.severity,
+                rawLikelihood: cols.likelihood ? String(row[cols.likelihood] || '') : '',
+                parsedLikelihood: parsed.assessment_pre_control?.likelihood,
+                riskScore: parsed.assessment_pre_control?.calculated_score
             });
-        } else {
-            window.goehsWorkflowContext = {
-                source: workflowSource,
-                setAt: new Date().toISOString(),
-                metadata: {
-                    workflow: 'ra2025_manual_mapping',
-                    sourceFile: window.ra2025PendingFile ? window.ra2025PendingFile.name : null,
-                    selectedSheetIndex: window.ra2025SelectedSheetIndex || null,
-                    dataStartRow: dataStartRow,
-                    riskItemCount: riskItems.length,
-                    mappedColumns: mappedColumns
-                }
-            };
+
+            if (sample.length >= maxRows) break;
         }
-        
-        // Close modal
-        closeRA2025ColumnMapper();
-        
-        // Convert and load to table
+
+        return sample;
+    }
+
+    function loadRA2025RowsToMainTable(riskItems) {
+        if (!Array.isArray(riskItems) || riskItems.length === 0) {
+            throw new Error('No parsed rows available to load.');
+        }
+
         const tableData = convertRA2025ToTableFormat(riskItems);
-        
-        if (window.buildTableFromData) {
-            window.buildTableFromData(tableData);
+        if (!window.buildTableFromData) {
+            throw new Error('buildTableFromData is not available.');
         }
-        
+
+        const tableContainer = document.getElementById('table-container');
+        if (tableContainer) {
+            tableContainer.innerHTML = '';
+        }
+
+        window.buildTableFromData(Array.isArray(tableData) ? [...tableData] : tableData);
+
         if (window.initializeDashboard) {
             window.initializeDashboard();
         }
-        
-        document.getElementById('dashboard-container').style.display = 'block';
-        if (window.switchTab) window.switchTab('rich-media');
-        
-        // Show the Remap Columns button
+
+        const dashboard = document.getElementById('dashboard-container');
+        if (dashboard) {
+            dashboard.style.display = 'block';
+        }
+
+        if (window.switchTab) {
+            window.switchTab('rich-media');
+        }
+
         const remapBtn = document.getElementById('remapColumnsBtn');
         if (remapBtn) remapBtn.classList.remove('rab-hidden');
-        
+
         setTimeout(() => {
             const table = document.querySelector('#table-container table');
-            if (table) table.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }, 300);
-        
-        showDirectGoehsAlert(`✅ Manually mapped & loaded ${riskItems.length} risk items. Review the table below.`, 'success');
+            if (table) {
+                table.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        }, 250);
+    }
+
+    // Open the column mapper modal and load preview
+    // sheetIndex: optional 1-based sheet index to load a specific sheet
+    window.openRA2025ColumnMapper = async function(file, sheetIndex) {
+        const modal = document.getElementById('ra2025ColumnMapperModal');
+        if (!modal) return;
+
+        modal.style.display = 'flex';
+        setRA2025ModalBodyLock(true);
+        enablePreviewPanScroll(document.getElementById('ra2025PreviewContainer'));
+        bindRA2025PreviewScrollSync();
+        scheduleRA2025PreviewScrollSync(true);
+        resetRA2025ColumnMap();
+
+        if (file) {
+            window.ra2025PendingFile = file;
+        }
+
+        const sourceFile = file || window.ra2025PendingFile || window.ra2025LoadedFile;
+        if (!sourceFile) {
+            setStatusMessage('No source file found. Please upload a file again.', true);
+            return;
+        }
+
+        setStatusMessage('Loading sheet preview...', false);
+
+        try {
+            ra2025ZipData = await JSZip.loadAsync(sourceFile);
+
+            const strXml = await ra2025ZipData.file('xl/sharedStrings.xml')?.async('text') || '';
+            ra2025Strings = parseRA2025SharedStrings(strXml);
+
+            const parser = new DOMParser();
+            let selectedSheetIndex = sheetIndex ? parseInt(sheetIndex, 10) : null;
+            let selectedSheetDoc = null;
+
+            if (selectedSheetIndex) {
+                const path = `xl/worksheets/sheet${selectedSheetIndex}.xml`;
+                const sheetFile = ra2025ZipData.file(path);
+                if (sheetFile) {
+                    const xml = await sheetFile.async('text');
+                    selectedSheetDoc = parser.parseFromString(xml, 'text/xml');
+                }
+            }
+
+            if (!selectedSheetDoc) {
+                for (let i = 1; i <= 50; i++) {
+                    const path = `xl/worksheets/sheet${i}.xml`;
+                    const sheetFile = ra2025ZipData.file(path);
+                    if (!sheetFile) continue;
+
+                    const xml = await sheetFile.async('text');
+                    const doc = parser.parseFromString(xml, 'text/xml');
+                    const rows = doc.getElementsByTagName('row');
+
+                    if (!selectedSheetDoc) {
+                        selectedSheetDoc = doc;
+                        selectedSheetIndex = i;
+                    }
+
+                    if (rows.length > 5) {
+                        selectedSheetDoc = doc;
+                        selectedSheetIndex = i;
+                        break;
+                    }
+                }
+            }
+
+            if (!selectedSheetDoc) {
+                throw new Error('No worksheet data found in this file.');
+            }
+
+            ra2025SheetDoc = selectedSheetDoc;
+            window.ra2025SelectedSheetIndex = selectedSheetIndex || null;
+
+            const langHintEl = document.getElementById('ra2025DetectedLang');
+            if (langHintEl) {
+                const sheetLabel = selectedSheetIndex ? `Sheet ${selectedSheetIndex}` : 'Detected sheet';
+                langHintEl.innerHTML = `<span class="text-xs bg-blue-100 text-blue-800 px-3 py-1 rounded-full">${sheetLabel} loaded • Multi-language support: EN, FR, DE, TR</span>`;
+            }
+
+            extractAllRows();
+
+            const headerRowInput = document.getElementById('ra2025HeaderRow');
+            const dataStartRowInput = document.getElementById('ra2025DataStartRow');
+            const defaultRoutineInput = document.getElementById('ra2025DefaultRoutineType');
+            const sourceFileName = sourceFile ? sourceFile.name : '';
+
+            const storedDefaults = getStoredMappingDefaults(sourceFileName, selectedSheetIndex || null);
+            if (storedDefaults) {
+                const storedHeaderRow = parseInt(storedDefaults.headerRow, 10);
+                const storedDataStart = parseInt(storedDefaults.dataStartRow, 10);
+                if (headerRowInput && Number.isFinite(storedHeaderRow)) {
+                    headerRowInput.value = String(storedHeaderRow);
+                }
+                if (dataStartRowInput && Number.isFinite(storedDataStart)) {
+                    dataStartRowInput.value = String(storedDataStart);
+                }
+                if (defaultRoutineInput && ['Routine', 'Non-Routine', 'Emergency Situation'].includes(storedDefaults.routineDefault)) {
+                    defaultRoutineInput.value = storedDefaults.routineDefault;
+                }
+                applyMappingDefaults(storedDefaults, true);
+            }
+
+            const detectedDefaults = detectMappingDefaultsFromSheet();
+            if (detectedDefaults) {
+                const detectedHeaderRow = parseInt(detectedDefaults.headerRow, 10);
+                if (headerRowInput && Number.isFinite(detectedHeaderRow) && (!storedDefaults || !parseInt(storedDefaults.headerRow, 10))) {
+                    headerRowInput.value = String(detectedHeaderRow);
+                }
+                if (dataStartRowInput && Number.isFinite(detectedHeaderRow) && (!storedDefaults || !parseInt(storedDefaults.dataStartRow, 10))) {
+                    dataStartRowInput.value = String(detectedHeaderRow + 1);
+                }
+
+                applyMappingDefaults(detectedDefaults, false);
+            }
+
+            tryAutoFillMapping();
+            updateRA2025Preview();
+
+        } catch (e) {
+            console.error('Error loading preview:', e);
+            setStatusMessage('Error loading file preview: ' + e.message, true);
+        }
+    };
+
+    // Compatibility helper (no longer primary UX)
+    window.selectColumnForMapping = function(col) {
+        setFieldMapping('taskDesc', col);
+        updateRA2025Preview();
     };
     
+    window.closeRA2025ColumnMapper = function() {
+        document.getElementById('ra2025ColumnMapperModal').style.display = 'none';
+        setRA2025ModalBodyLock(false);
+        window.ra2025PendingFile = null;
+    };
+    
+    window.tryAutoDetectRA2025 = async function() {
+        const sourceFile = window.ra2025PendingFile || window.ra2025LoadedFile;
+        if (!sourceFile) {
+            setStatusMessage('No source file available for auto-detect.', true);
+            return;
+        }
+
+        try {
+            setStatusMessage('Re-trying auto-detection with default parser...', false);
+            const data = await parseRA2025Template(sourceFile, null, window.ra2025SelectedSheetIndex || null);
+
+            if (data.risk_items && data.risk_items.length > 0) {
+                window.directGoehsContext = data.process_context;
+                window.ra2025RawRiskItems = data.risk_items;
+                window.ra2025LoadedFile = sourceFile;
+
+                const workflowSource = (window.GOEHS_WORKFLOW_SOURCES && window.GOEHS_WORKFLOW_SOURCES.RA2025_SINGLE) || 'RA2025_SINGLE';
+                if (typeof window.setGoehsWorkflowContext === 'function') {
+                    window.setGoehsWorkflowContext(workflowSource, {
+                        workflow: 'ra2025_manual_mapper_autodetect_retry',
+                        sourceFile: sourceFile ? sourceFile.name : null,
+                        selectedSheetIndex: window.ra2025SelectedSheetIndex || null,
+                        sheetName: data.sheet_name || null,
+                        detectedLanguage: data.detectedLang || null,
+                        riskItemCount: data.risk_items.length,
+                        processContext: data.process_context || null
+                    });
+                } else {
+                    window.goehsWorkflowContext = {
+                        source: workflowSource,
+                        setAt: new Date().toISOString(),
+                        metadata: {
+                            workflow: 'ra2025_manual_mapper_autodetect_retry',
+                            sourceFile: sourceFile ? sourceFile.name : null,
+                            selectedSheetIndex: window.ra2025SelectedSheetIndex || null,
+                            sheetName: data.sheet_name || null,
+                            detectedLanguage: data.detectedLang || null,
+                            riskItemCount: data.risk_items.length,
+                            processContext: data.process_context || null
+                        }
+                    };
+                }
+
+                loadRA2025RowsToMainTable(data.risk_items);
+                closeRA2025ColumnMapper();
+                showDirectGoehsAlert(`✅ Auto-detected! Loaded ${data.risk_items.length} risk items.`, 'success');
+            } else {
+                setStatusMessage('Still no data found. Please map columns manually.', true);
+            }
+        } catch (e) {
+            setStatusMessage('Auto-detection failed: ' + e.message, true);
+        }
+    };
+    
+    window.parseWithManualMapping = async function() {
+        const cols = getCurrentMapping();
+        const taskDescCol = cols.taskDesc;
+
+        if (!taskDescCol) {
+            setStatusMessage('Task/Step Description mapping is required.', true);
+            return;
+        }
+
+        const sourceFile = window.ra2025PendingFile || window.ra2025LoadedFile;
+        if (!sourceFile) {
+            setStatusMessage('No source file available. Please reopen mapper from uploaded file.', true);
+            return;
+        }
+
+        const headerRow = parseInt(document.getElementById('ra2025HeaderRow')?.value, 10) || 14;
+        const dataStartRow = parseInt(document.getElementById('ra2025DataStartRow').value) || 15;
+        const routineDefaultMode = document.getElementById('ra2025DefaultRoutineType')?.value || 'Routine';
+
+        setParseButtonBusy(true, 'Parsing...');
+        setStatusMessage('Parsing mapped preview rows...', false);
+
+        try {
+            let parsedItems = parseRiskItemsFromPreviewRows(cols, dataStartRow, routineDefaultMode);
+            let parsedContext = window.directGoehsContext || deriveProcessContextFromPreviewRows();
+            let parseEngine = 'preview_rows_mapper';
+
+            if (parsedItems.length === 0 && typeof parseRA2025Template === 'function') {
+                const parseResult = await parseRA2025Template(
+                    sourceFile,
+                    {
+                        ...cols,
+                        headerRow: headerRow,
+                        dataStartRow: dataStartRow,
+                        routineDefault: routineDefaultMode
+                    },
+                    window.ra2025SelectedSheetIndex || null
+                );
+
+                parsedItems = Array.isArray(parseResult?.risk_items) ? parseResult.risk_items : [];
+                parsedContext = parseResult?.process_context || parsedContext;
+                parseEngine = 'template_fallback';
+            }
+
+            if (parsedItems.length === 0) {
+                setStatusMessage('No rows parsed. Check mapping and row start values.', true);
+                return;
+            }
+
+            window.ra2025RawRiskItems = parsedItems;
+            window.ra2025LoadedFile = sourceFile;
+            if (parsedContext) {
+                window.directGoehsContext = parsedContext;
+            }
+
+            const mappedColumns = Object.fromEntries(Object.entries(cols).filter(([, val]) => !!val));
+            const parseSample = captureRA2025ParseSample(cols, parsedItems, dataStartRow);
+            window.ra2025LastParseDiagnostics = {
+                createdAt: new Date().toISOString(),
+                parseEngine: parseEngine,
+                sourceFile: sourceFile ? sourceFile.name : null,
+                selectedSheetIndex: window.ra2025SelectedSheetIndex || null,
+                headerRow: headerRow,
+                dataStartRow: dataStartRow,
+                routineDefault: routineDefaultMode,
+                mappedColumns: mappedColumns,
+                sampleRows: parseSample
+            };
+
+            if (parseSample.length > 0) {
+                console.log('RA2025 parse diagnostics:', window.ra2025LastParseDiagnostics);
+                console.table(parseSample);
+            }
+
+            const workflowSource = (window.GOEHS_WORKFLOW_SOURCES && window.GOEHS_WORKFLOW_SOURCES.RA2025_SINGLE) || 'RA2025_SINGLE';
+            if (typeof window.setGoehsWorkflowContext === 'function') {
+                window.setGoehsWorkflowContext(workflowSource, {
+                    workflow: 'ra2025_manual_mapping',
+                    parseEngine: parseEngine,
+                    sourceFile: sourceFile ? sourceFile.name : null,
+                    selectedSheetIndex: window.ra2025SelectedSheetIndex || null,
+                    headerRow: headerRow,
+                    dataStartRow: dataStartRow,
+                    routineDefault: routineDefaultMode,
+                    riskItemCount: parsedItems.length,
+                    mappedColumns: mappedColumns
+                });
+            } else {
+                window.goehsWorkflowContext = {
+                    source: workflowSource,
+                    setAt: new Date().toISOString(),
+                    metadata: {
+                        workflow: 'ra2025_manual_mapping',
+                        parseEngine: parseEngine,
+                        sourceFile: sourceFile ? sourceFile.name : null,
+                        selectedSheetIndex: window.ra2025SelectedSheetIndex || null,
+                        headerRow: headerRow,
+                        dataStartRow: dataStartRow,
+                        routineDefault: routineDefaultMode,
+                        riskItemCount: parsedItems.length,
+                        mappedColumns: mappedColumns
+                    }
+                };
+            }
+
+            loadRA2025RowsToMainTable(parsedItems);
+            closeRA2025ColumnMapper();
+            showDirectGoehsAlert(`✅ Manually mapped and loaded ${parsedItems.length} risk items into the main table.`, 'success');
+        } catch (e) {
+            console.error('Manual RA2025 parsing failed:', e);
+            setStatusMessage('Manual parsing failed: ' + e.message, true);
+        } finally {
+            setParseButtonBusy(false, '✓ Parse & Load to Table');
+        }
+    };
+
+    resetRA2025ColumnMap();
 })();
 </script>
 
@@ -16672,7 +17700,7 @@ ${JSON.stringify(payload, null, 2)}`;
             previewHTML = `
             <div style="margin-bottom:8px;">
                 <div class="text-xs font-bold text-slate-700 mb-1">📊 Excel Sheet Preview <span style="font-weight:400;color:#64748b;">(first ${preview.rows.length} rows — scroll to see more)</span></div>
-                <div class="bcm-preview-wrap" id="bcm-preview-wrap-${fId}">
+                <div class="bcm-preview-wrap preview-pan-container" id="bcm-preview-wrap-${fId}">
                     <table class="bcm-preview-table" id="bcm-preview-table-${fId}">
                         <thead><tr>
                             <th style="position:sticky;left:0;z-index:2;">Row</th>
@@ -16765,6 +17793,11 @@ ${JSON.stringify(payload, null, 2)}`;
         // Initial highlights
         highlightBatchPreviewHeader(fileIdx);
         highlightBatchPreviewCols(fileIdx);
+
+        const previewWrap = document.getElementById(`bcm-preview-wrap-${fId}`);
+        if (previewWrap && typeof window.enablePreviewPanScroll === 'function') {
+            window.enablePreviewPanScroll(previewWrap);
+        }
     }
 
     // Highlight the header row in the preview table

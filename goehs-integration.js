@@ -473,7 +473,9 @@ function convertRA2025ToTableFormat(riskItems) {
             'Hazard Source': item.risk_scenario.source || '',
             'Current Control': item.mitigation_plan.current_controls || '',
             'Countermeasure_Ladder': countermeasureLadder,
-            'Routine/Non-Routine/Emergency Situation': 'Routine',
+            'Routine/Non-Routine/Emergency Situation': parseGoehsConditionMode(
+                item.routine_type || item.routineType || item.condition_mode || item.mode || 'Routine'
+            ),
             'Frequency': item.assessment_pre_control.frequency || 1, // Use extracted frequency, default to 1
             'Severity': item.assessment_pre_control.severity || 5,
             'Likelihood': item.assessment_pre_control.likelihood || 3,
@@ -601,7 +603,7 @@ async function parseRA2025Template(file, columnOverrides, sheetIndex) {
     
     // Build a clean detectedColumns map (field → column letter) for the mapper UI
     const detectedColumns = {};
-    const _dcFields = ['taskId','taskDesc','hazardGroup','hazardDetail','consequence','source','currentControl','frequency','severity','likelihood','riskScore','newControl','hierarchy'];
+    const _dcFields = ['taskId','taskDesc','hazardGroup','hazardDetail','consequence','source','currentControl','routine','frequency','severity','likelihood','riskScore','newControl','hierarchy'];
     _dcFields.forEach(f => { if (detectionResult[f]) detectedColumns[f] = detectionResult[f]; });
     if (detectionResult.headerRow) detectedColumns.headerRow = detectionResult.headerRow;
     
@@ -708,9 +710,10 @@ const RA2025_KEYWORDS = {
         consequence: ['consequence', 'conséquence', 'konsequenz', 'sonuç', 'injury', 'blessure', 'verletzung', 'illness', 'maladie', 'risk/consequence', 'risque/conséquence', 'injury/illness', 'blessure/maladie', 'verletzung/krankheit'],
         source: ['source', 'quelle', 'kaynak', 'origen', 'hazard source', 'source du danger'],
         currentControl: ['current control', 'contrôle actuel', 'aktuelle kontrolle', 'mevcut kontrol', 'control actual', 'counter measure', 'countermeasure', 'maßnahme', 'mesure existante'],
-        frequency: ['frequency', 'fréquence', 'häufigkeit', 'sıklık', 'frecuencia', 'freq'],
-        severity: ['severity', 'gravité', 'schweregrad', 'şiddet', 'severidad', 'sev'],
-        likelihood: ['likelihood', 'probabilité', 'wahrscheinlichkeit', 'olasılık', 'probabilidad', 'like', 'vraisemblance'],
+        routine: ['routine', 'non-routine', 'non routine', 'emergency situation', 'condition mode', 'work mode', 'mode de travail', 'mode de condition', 'routine/non-routine', 'routine/non routine'],
+        frequency: ['frequency', 'frequency (f)', 'frequency f', 'fréquence', 'häufigkeit', 'sıklık', 'frecuencia', 'freq', 'freq.'],
+        severity: ['severity', 'severity (s)', 'severity s', 'gravité', 'schweregrad', 'şiddet', 'severidad', 'sev', 'sev.'],
+        likelihood: ['likelihood', 'likelihood (l)', 'likelihood l', 'probability', 'probability of occurrence', 'probability of happen', 'probabilité', 'wahrscheinlichkeit', 'olasılık', 'probabilidad', 'vraisemblance'],
         riskScore: ['risk score', 'score de risque', 'risikobewertung', 'risk skoru', 'puntuación', 'note de risque', 'score', 'initial risk'],
         newControl: ['new control', 'nouveau contrôle', 'neue kontrolle', 'yeni kontrol', 'proposed', 'mesure proposée', 'action'],
         hierarchy: ['hierarchy', 'hiérarchie', 'hierarchie', 'hiyerarşi', 'level', 'niveau', 'ladder', 'échelle']
@@ -829,10 +832,167 @@ function parseZoneA(doc, strings) {
     };
 }
 
+const RA2025_FREQUENCY_VALUES = [1, 1.25, 1.5, 1.75, 2];
+const RA2025_SEVERITY_VALUES = [1, 3, 5, 7, 9, 10];
+const RA2025_LIKELIHOOD_VALUES = [1, 3, 5, 8, 10];
+
+const RA2025_FSL_KEYWORDS = {
+    frequency: [
+        { value: 2, keywords: ['permanent', 'continuous', 'constant', 'always', 'daily', 'every day', 'everyday', 'all day', 'permanent exposure', 'en permanence', 'toujours', 'surekli', 'dauerhaft', 'standig', 'stets'] },
+        { value: 1.75, keywords: ['frequent', 'frequently', 'often', 'souvent', 'haeufig', 'sik', '1-3 days', '1 to 3 days', '1-3 days/wk', '1-3 day/wk'] },
+        { value: 1.5, keywords: ['intermediate', 'intermediaire', 'intermittent', 'medium', 'middle', 'mittel', '2-8', '2 to 8', '2-8 hours', '2 to 8 hours', '2-8 hrs', '2 to 8 hrs'] },
+        { value: 1.25, keywords: ['occasional', 'occasionally', 'occasion', 'occasionnel', 'occasionnelle', 'gelegentlich', 'ara sira', 'sometimes', 'sporadic', 'sporadically'] },
+        { value: 1, keywords: ['rarely', 'rare', 'seldom', 'infrequent', 'rarement', 'selten', 'nadiren', '<30 min', 'under 30 min', 'less than 30 min'] }
+    ],
+    severity: [
+        { value: 10, keywords: ['fatality', 'fatal', 'death', 'deces', 'mortal', 'olum', 'totlich', 'potential of fatality', 'potential fatality'] },
+        { value: 9, keywords: ['sia', 'serious injury', 'serious incident', 'severe injury', 'blessure grave', 'schwere verletzung', 'ciddi yaralanma', 'potential of sia'] },
+        { value: 7, keywords: ['dart', 'days away', 'restricted work', 'restricted duty', 'job transfer', 'lost time', 'arbeitseinschrankung', 'potential of dart'] },
+        { value: 5, keywords: ['medical treatment', 'medical treat', 'traitement medical', 'medizinische behandlung', 'tibbi tedavi', 'recordable', 'potential of medical treatment'] },
+        { value: 3, keywords: ['first aid', 'premiers soins', 'erste hilfe', 'ilk yardim', 'potential of first aid'] },
+        { value: 1, keywords: ['no injury', 'without injury', 'aucune blessure', 'keine verletzung', 'yaralanma yok', 'potential of no injury', 'no potential of injury', 'no potential injury'] }
+    ],
+    likelihood: [
+        { value: 10, keywords: ['very likely', 'almost certain', 'certain', 'highly likely', 'very likely to happen', 'almost certain to happen', 'tres probable', 'sehr wahrscheinlich', 'cok olasi'] },
+        { value: 8, keywords: ['likely', 'probable', 'likely to happen', 'vraisemblable', 'wahrscheinlich', 'muhtemel'] },
+        { value: 5, keywords: ['possible', 'possible to happen', 'might happen', 'can happen', 'could happen', 'peut arriver', 'moglich', 'olasi'] },
+        { value: 3, keywords: ['very unlikely', 'very unlikely to happen', 'unlikely', 'improbable', 'sehr unwahrscheinlich', 'pek olasi degil'] },
+        { value: 1, keywords: ['almost impossible', 'almost impossible to happen', 'impossible', 'very remote', 'extremely unlikely', 'quasi impossible', 'fast unmoglich', 'imkansiz'] }
+    ]
+};
+
+function normalizeRA2025FuzzyText(value) {
+    const fallback = String(value || '').toLowerCase();
+    try {
+        return fallback
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .replace(/ı/g, 'i')
+            .replace(/ß/g, 'ss')
+            .replace(/æ/g, 'ae')
+            .replace(/œ/g, 'oe')
+            .replace(/[^a-z0-9.\-\s]/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim();
+    } catch (_e) {
+        return fallback.replace(/\s+/g, ' ').trim();
+    }
+}
+
+function extractNumericFromMixedText(value) {
+    if (value === null || value === undefined) return null;
+    if (typeof value === 'number') return Number.isFinite(value) ? value : null;
+
+    const text = String(value).trim();
+    if (!text) return null;
+    const normalized = text.replace(/(\d),(\d)/g, '$1.$2');
+    const match = normalized.match(/-?\d+(?:\.\d+)?/);
+    if (!match) return null;
+
+    const parsed = parseFloat(match[0]);
+    return Number.isFinite(parsed) ? parsed : null;
+}
+
+function nearestScaleValue(inputValue, allowedValues, fallback) {
+    if (!Number.isFinite(inputValue) || !Array.isArray(allowedValues) || allowedValues.length === 0) {
+        return fallback;
+    }
+
+    let nearest = allowedValues[0];
+    let minDiff = Math.abs(inputValue - nearest);
+    for (let i = 1; i < allowedValues.length; i++) {
+        const current = allowedValues[i];
+        const diff = Math.abs(inputValue - current);
+        if (diff < minDiff) {
+            nearest = current;
+            minDiff = diff;
+        }
+    }
+    return nearest;
+}
+
+function escapeRegexText(value) {
+    return String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function containsKeyword(normalizedText, keyword) {
+    const needle = normalizeRA2025FuzzyText(keyword);
+    if (!needle) return false;
+    const pattern = new RegExp(`(^|[^a-z0-9])${escapeRegexText(needle)}([^a-z0-9]|$)`);
+    return pattern.test(normalizedText);
+}
+
+function matchScaleByKeywords(rawValue, table) {
+    const normalized = normalizeRA2025FuzzyText(rawValue);
+    if (!normalized) return null;
+
+    for (const item of table) {
+        if (!item || !Array.isArray(item.keywords)) continue;
+        for (const keyword of item.keywords) {
+            if (containsKeyword(normalized, keyword)) return item.value;
+        }
+    }
+    return null;
+}
+
+function parseFrequencySmart(rawValue) {
+    const keywordMatch = matchScaleByKeywords(rawValue, RA2025_FSL_KEYWORDS.frequency);
+    if (Number.isFinite(keywordMatch)) return keywordMatch;
+
+    const numeric = extractNumericFromMixedText(rawValue);
+    if (Number.isFinite(numeric)) {
+        return nearestScaleValue(numeric, RA2025_FREQUENCY_VALUES, 1);
+    }
+
+    return 1;
+}
+
+function parseSeveritySmart(rawValue) {
+    const keywordMatch = matchScaleByKeywords(rawValue, RA2025_FSL_KEYWORDS.severity);
+    if (Number.isFinite(keywordMatch)) return keywordMatch;
+
+    const numeric = extractNumericFromMixedText(rawValue);
+    if (Number.isFinite(numeric)) {
+        return nearestScaleValue(numeric, RA2025_SEVERITY_VALUES, 5);
+    }
+
+    return 5;
+}
+
+function parseLikelihoodSmart(rawValue) {
+    const keywordMatch = matchScaleByKeywords(rawValue, RA2025_FSL_KEYWORDS.likelihood);
+    if (Number.isFinite(keywordMatch)) return keywordMatch;
+
+    const numeric = extractNumericFromMixedText(rawValue);
+    if (Number.isFinite(numeric)) {
+        return nearestScaleValue(numeric, RA2025_LIKELIHOOD_VALUES, 3);
+    }
+
+    return 3;
+}
+
+function parseRiskScoreSmart(rawValue) {
+    const numeric = extractNumericFromMixedText(rawValue);
+    return Number.isFinite(numeric) && numeric > 0 ? numeric : null;
+}
+
+window.RA2025SmartScaleParser = Object.freeze({
+    parseFrequency: parseFrequencySmart,
+    parseSeverity: parseSeveritySmart,
+    parseLikelihood: parseLikelihoodSmart,
+    parseRiskScore: parseRiskScoreSmart,
+    normalizeText: normalizeRA2025FuzzyText
+});
+
 // Parse Zone B: Risk Line Items (Row 14 = headers, Row 15+ = data)
 function parseZoneB(doc, strings, columnOverrides) {
     const riskItems = [];
     const rows = doc.getElementsByTagName("row");
+    const lastScaleValues = {
+        frequency: null,
+        severity: null,
+        likelihood: null
+    };
     
     // First, detect column mapping from header row (typically row 14)
     const columnMap = detectRA2025Columns(doc, strings);
@@ -842,7 +1002,7 @@ function parseZoneB(doc, strings, columnOverrides) {
     if (columnOverrides) {
         console.log('🗺️ Applying column overrides:', columnOverrides);
         for (const [key, val] of Object.entries(columnOverrides)) {
-            if (key !== 'headerRow' && key !== 'dataStartRow' && val) {
+            if (key !== 'headerRow' && key !== 'dataStartRow' && key !== 'routineDefault' && val) {
                 columnMap[key] = val;
             }
         }
@@ -858,6 +1018,7 @@ function parseZoneB(doc, strings, columnOverrides) {
         consequence: columnMap.consequence || 'E',
         source: columnMap.source || 'G',
         currentControl: columnMap.currentControl || 'H',
+        routine: columnMap.routine || '',
         frequency: columnMap.frequency || 'I',
         severity: columnMap.severity || 'K',
         likelihood: columnMap.likelihood || 'L',
@@ -865,6 +1026,10 @@ function parseZoneB(doc, strings, columnOverrides) {
         newControl: columnMap.newControl || 'N',
         hierarchy: columnMap.hierarchy || 'O'
     };
+
+    const routineDefault = parseGoehsConditionMode(
+        (columnOverrides && columnOverrides.routineDefault) || 'Routine'
+    );
     
     // Find data start row (row after header) — use override if provided
     const dataStartRow = (columnOverrides && columnOverrides.dataStartRow) ? columnOverrides.dataStartRow : (columnMap.headerRow || 14) + 1;
@@ -904,13 +1069,41 @@ function parseZoneB(doc, strings, columnOverrides) {
         const consequence = rowData[cols.consequence] || '';
         const source = rowData[cols.source] || '';
         const currentControls = rowData[cols.currentControl] || '';
-        // Parse frequency as float (keys are 1, 1.25, 1.5, 1.75, 2) — extract number from text if needed
-        let rawFreq = rowData[cols.frequency] || '';
-        let frequency = parseFloat(rawFreq);
-        if (isNaN(frequency)) { const m = String(rawFreq).match(/[\d.]+/); frequency = m ? parseFloat(m[0]) : 1; }
-        const severity = parseInt(rowData[cols.severity]) || 5;
-        const likelihood = parseInt(rowData[cols.likelihood]) || 3;
-        const riskScore = parseFloat(rowData[cols.riskScore]) || (frequency * severity * likelihood);
+        const rawRoutineMode = cols.routine ? rowData[cols.routine] : '';
+        const routineType = rawRoutineMode ? parseGoehsConditionMode(rawRoutineMode) : routineDefault;
+
+        const rawFrequency = rowData[cols.frequency];
+        const rawSeverity = rowData[cols.severity];
+        const rawLikelihood = rowData[cols.likelihood];
+
+        const isFrequencyBlank = String(rawFrequency ?? '').trim() === '';
+        const isSeverityBlank = String(rawSeverity ?? '').trim() === '';
+        const isLikelihoodBlank = String(rawLikelihood ?? '').trim() === '';
+
+        let frequency = parseFrequencySmart(rawFrequency);
+        let severity = parseSeveritySmart(rawSeverity);
+        let likelihood = parseLikelihoodSmart(rawLikelihood);
+
+        if (isFrequencyBlank && Number.isFinite(lastScaleValues.frequency)) {
+            frequency = lastScaleValues.frequency;
+        } else if (Number.isFinite(frequency)) {
+            lastScaleValues.frequency = frequency;
+        }
+
+        if (isSeverityBlank && Number.isFinite(lastScaleValues.severity)) {
+            severity = lastScaleValues.severity;
+        } else if (Number.isFinite(severity)) {
+            lastScaleValues.severity = severity;
+        }
+
+        if (isLikelihoodBlank && Number.isFinite(lastScaleValues.likelihood)) {
+            likelihood = lastScaleValues.likelihood;
+        } else if (Number.isFinite(likelihood)) {
+            lastScaleValues.likelihood = likelihood;
+        }
+
+        const parsedRiskScore = parseRiskScoreSmart(rowData[cols.riskScore]);
+        const riskScore = Number.isFinite(parsedRiskScore) ? parsedRiskScore : (frequency * severity * likelihood);
         const newControl = rowData[cols.newControl] || '';
         const hierarchyLevel = rowData[cols.hierarchy] || '';
         
@@ -922,6 +1115,7 @@ function parseZoneB(doc, strings, columnOverrides) {
         riskItems.push({
             row_index: rowNum,
             task_name: taskDesc,
+            routine_type: routineType,
             hazard_classification: {
                 group: hazardGroup,
                 type: hazardDetail
@@ -949,98 +1143,237 @@ function parseZoneB(doc, strings, columnOverrides) {
 }
 
 // Detect column letters from header row (multi-language)
+function scoreRA2025HeaderKeyword(normalizedText, keyword) {
+    const needle = normalizeRA2025FuzzyText(keyword);
+    if (!needle) return 0;
+
+    const boundaryPattern = new RegExp(`(^|[^a-z0-9])${escapeRegexText(needle)}([^a-z0-9]|$)`);
+    if (normalizedText === needle) return 6;
+    if (boundaryPattern.test(normalizedText)) {
+        if (needle.length <= 2) return 1;
+        if (needle.length <= 4) return 2;
+        return 4;
+    }
+
+    // Allow a weak fallback only for longer keywords.
+    if (needle.length >= 6 && normalizedText.includes(needle)) {
+        return 1;
+    }
+
+    return 0;
+}
+
+function scoreRA2025HeaderField(normalizedText, field) {
+    const keywords = RA2025_KEYWORDS.columnKeywords[field] || [];
+    let bestScore = 0;
+    for (const keyword of keywords) {
+        const score = scoreRA2025HeaderKeyword(normalizedText, keyword);
+        if (score > bestScore) {
+            bestScore = score;
+        }
+    }
+    return bestScore;
+}
+
+function findRA2025ColumnByKeywords(rows, strings, keywords, preferredHeaderRow) {
+    if (!Array.isArray(keywords) || keywords.length === 0) return '';
+
+    let best = null;
+
+    const scanRange = (startRow, endRow, bonus) => {
+        for (const row of rows) {
+            const rowNum = parseInt(row.getAttribute("r"), 10);
+            if (!Number.isFinite(rowNum) || rowNum < startRow || rowNum > endRow) continue;
+
+            const cells = row.getElementsByTagName("c");
+            for (const cell of cells) {
+                const ref = cell.getAttribute("r") || '';
+                const colMatch = ref.match(/^([A-Z]+)/);
+                if (!colMatch) continue;
+
+                const text = getCellTextRA2025(cell, strings);
+                const normalizedText = normalizeRA2025FuzzyText(text);
+                if (!normalizedText) continue;
+
+                let baseScore = 0;
+                for (const keyword of keywords) {
+                    const score = scoreRA2025HeaderKeyword(normalizedText, keyword);
+                    if (score > baseScore) {
+                        baseScore = score;
+                    }
+                }
+
+                if (baseScore <= 0) continue;
+                const weightedScore = baseScore + bonus;
+                const distance = Math.abs(rowNum - preferredHeaderRow);
+
+                if (!best || weightedScore > best.score || (weightedScore === best.score && distance < best.distance)) {
+                    best = {
+                        col: colMatch[1],
+                        score: weightedScore,
+                        distance: distance
+                    };
+                }
+            }
+        }
+    };
+
+    const nearStart = Math.max(5, preferredHeaderRow - 3);
+    const nearEnd = preferredHeaderRow + 3;
+    scanRange(nearStart, nearEnd, 2);
+    if (!best) {
+        scanRange(5, 60, 0);
+    }
+
+    return best ? best.col : '';
+}
+
+// Detect column letters from header row (multi-language)
 function detectRA2025Columns(doc, strings) {
     const rows = doc.getElementsByTagName("row");
     const mapping = {};
     let headerRow = 14; // Default
-    
+
     // Language-specific keyword sets for detection scoring
     const LANG_KEYWORDS = {
-        fr: ['tâche', 'description de la tâche', 'groupe de danger', 'groupe de risque', 'détail du risque', 'liste des dangers', 'conséquence', 'contrôle actuel', 'fréquence', 'gravité', 'probabilité', 'score de risque', 'hiérarchie', 'mesure', 'risque', 'blessure', 'étape', 'département', 'usine', 'poste de travail'],
-        de: ['beschreibung', 'aufgabe', 'gefahrengruppe', 'gefahrendetail', 'gefahrenliste', 'konsequenz', 'kontrolle', 'häufigkeit', 'schweregrad', 'wahrscheinlichkeit', 'risikobewertung', 'hierarchie', 'maßnahme', 'verletzung', 'arbeitsschritt', 'abteilung', 'werk', 'arbeitsplatz'],
-        en: ['task description', 'hazard group', 'hazard detail', 'consequence', 'current control', 'frequency', 'severity', 'likelihood', 'risk score', 'hierarchy', 'injury', 'department', 'plant', 'workstation']
+        fr: ['tâche', 'description de la tâche', 'groupe de danger', 'groupe de risque', 'détail du risque', 'liste des dangers', 'conséquence', 'contrôle actuel', 'fréquence', 'gravité', 'probabilité', 'score de risque', 'hiérarchie', 'mesure', 'risque', 'blessure', 'étape', 'département', 'usine', 'poste de travail', 'routine', 'non-routine', 'situation d urgence'],
+        de: ['beschreibung', 'aufgabe', 'gefahrengruppe', 'gefahrendetail', 'gefahrenliste', 'konsequenz', 'kontrolle', 'häufigkeit', 'schweregrad', 'wahrscheinlichkeit', 'risikobewertung', 'hierarchie', 'maßnahme', 'verletzung', 'arbeitsschritt', 'abteilung', 'werk', 'arbeitsplatz', 'routine', 'nicht-routine', 'notfall'],
+        en: ['task description', 'hazard group', 'hazard detail', 'consequence', 'current control', 'frequency', 'severity', 'likelihood', 'risk score', 'hierarchy', 'injury', 'department', 'plant', 'workstation', 'routine', 'non-routine', 'emergency situation']
     };
-    let langScores = { en: 0, fr: 0, de: 0 };
-    
-    // Search rows 5-40 for header row (wider range handles varied template layouts)
-    for (let row of rows) {
-        const rowNum = parseInt(row.getAttribute("r"));
-        if (rowNum < 5 || rowNum > 40) continue;
-        
+    const langScores = { en: 0, fr: 0, de: 0 };
+
+    const orderedFields = ['riskScore', 'taskId', 'taskDesc', 'hazardGroup', 'hazardDetail', 'consequence', 'source', 'currentControl', 'routine', 'frequency', 'severity', 'likelihood', 'newControl', 'hierarchy'];
+
+    let bestCandidate = {
+        rowNum: headerRow,
+        score: -1,
+        fieldMatches: {}
+    };
+
+    // Search rows 5-50 and score each row as a potential header row.
+    for (const row of rows) {
+        const rowNum = parseInt(row.getAttribute("r"), 10);
+        if (!Number.isFinite(rowNum) || rowNum < 5 || rowNum > 50) continue;
+
         const cells = row.getElementsByTagName("c");
-        let matchesInRow = 0;
-        const tempMap = {};
-        
-        for (let cell of cells) {
+        const fieldMatches = {};
+
+        for (const cell of cells) {
             const ref = cell.getAttribute("r") || '';
             const colMatch = ref.match(/^([A-Z]+)/);
             if (!colMatch) continue;
-            
+
             const colLetter = colMatch[1];
-            const text = getCellTextRA2025(cell, strings).toLowerCase().trim();
-            if (!text) continue;
-            
-            // Score language matches for auto-detection
+            const rawText = getCellTextRA2025(cell, strings);
+            const normalizedText = normalizeRA2025FuzzyText(rawText);
+            if (!normalizedText) continue;
+
+            // Score language matches for auto-detection.
             for (const [lang, kws] of Object.entries(LANG_KEYWORDS)) {
                 for (const kw of kws) {
-                    if (text.includes(kw)) langScores[lang]++;
+                    if (normalizedText.includes(normalizeRA2025FuzzyText(kw))) {
+                        langScores[lang]++;
+                    }
                 }
             }
-            
-            // Check each keyword category - prioritize more specific matches
-            const orderedFields = ['riskScore', 'taskId', 'taskDesc', 'hazardGroup', 'hazardDetail', 'consequence', 'source', 'currentControl', 'frequency', 'severity', 'likelihood', 'newControl', 'hierarchy'];
-            
-            let matched = false;
+
+            // Detect the best field candidate for this cell.
+            let bestField = '';
+            let bestFieldScore = 0;
             for (const field of orderedFields) {
-                if (matched) break;
-                const keywords = RA2025_KEYWORDS.columnKeywords[field];
-                if (keywords && keywords.some(kw => text.includes(kw))) {
-                    if (!tempMap[field]) {
-                        tempMap[field] = colLetter;
-                        matchesInRow++;
-                        matched = true;
+                const fieldScore = scoreRA2025HeaderField(normalizedText, field);
+                if (fieldScore > bestFieldScore) {
+                    bestField = field;
+                    bestFieldScore = fieldScore;
+                }
+            }
+
+            if (!bestField || bestFieldScore <= 0) continue;
+            if (!fieldMatches[bestField] || bestFieldScore > fieldMatches[bestField].score) {
+                fieldMatches[bestField] = {
+                    col: colLetter,
+                    score: bestFieldScore
+                };
+            }
+        }
+
+        const matchedFields = Object.keys(fieldMatches);
+        if (matchedFields.length < 2) continue;
+
+        const rowBaseScore = matchedFields.reduce((sum, field) => sum + (fieldMatches[field].score || 0), 0);
+        const hasTaskDesc = !!fieldMatches.taskDesc;
+        const fslMatches = ['frequency', 'severity', 'likelihood'].reduce((count, field) => count + (fieldMatches[field] ? 1 : 0), 0);
+        const rowScore = rowBaseScore
+            + matchedFields.length
+            + (hasTaskDesc ? 4 : 0)
+            + (fslMatches * 3)
+            + (fslMatches === 3 ? 6 : 0);
+
+        if (rowScore > bestCandidate.score) {
+            bestCandidate = {
+                rowNum: rowNum,
+                score: rowScore,
+                fieldMatches: fieldMatches
+            };
+        }
+    }
+
+    if (bestCandidate.score > 0) {
+        Object.keys(bestCandidate.fieldMatches).forEach(field => {
+            mapping[field] = bestCandidate.fieldMatches[field].col;
+        });
+        headerRow = bestCandidate.rowNum;
+        mapping.headerRow = headerRow;
+        console.log(`📊 RA2025 Column Detection - Best header row ${headerRow}:`, mapping);
+    } else {
+        mapping.headerRow = headerRow;
+    }
+
+    // Ensure core risk-scale columns are found using explicit keyword search.
+    // This directly addresses templates where F/S/L labels are formatted differently.
+    const criticalScaleFields = ['frequency', 'severity', 'likelihood'];
+    for (const field of criticalScaleFields) {
+        if (mapping[field]) continue;
+        const fallbackCol = findRA2025ColumnByKeywords(rows, strings, RA2025_KEYWORDS.columnKeywords[field], headerRow);
+        if (fallbackCol) {
+            mapping[field] = fallbackCol;
+        }
+    }
+
+    // Also scan header area (rows 1-10) for language clues.
+    for (const row of rows) {
+        const rowNum = parseInt(row.getAttribute("r"), 10);
+        if (!Number.isFinite(rowNum) || rowNum > 10) break;
+
+        const cells = row.getElementsByTagName("c");
+        for (const cell of cells) {
+            const rawText = getCellTextRA2025(cell, strings);
+            const normalizedText = normalizeRA2025FuzzyText(rawText);
+            if (!normalizedText) continue;
+
+            for (const [lang, kws] of Object.entries(LANG_KEYWORDS)) {
+                for (const kw of kws) {
+                    if (normalizedText.includes(normalizeRA2025FuzzyText(kw))) {
+                        langScores[lang]++;
                     }
                 }
             }
         }
-        
-        // If we found 2+ matches in this row, it's likely the header row
-        if (matchesInRow >= 2) {
-            Object.assign(mapping, tempMap);
-            mapping.headerRow = rowNum;
-            headerRow = rowNum;
-            console.log(`📊 RA2025 Column Detection - Row ${rowNum}:`, tempMap);
-            break;
-        }
     }
-    
-    // Also scan header area (rows 1-10) for language clues
-    for (let row of rows) {
-        const rowNum = parseInt(row.getAttribute("r"));
-        if (rowNum > 10) break;
-        const cells = row.getElementsByTagName("c");
-        for (let cell of cells) {
-            const text = getCellTextRA2025(cell, strings).toLowerCase().trim();
-            if (!text) continue;
-            for (const [lang, kws] of Object.entries(LANG_KEYWORDS)) {
-                for (const kw of kws) {
-                    if (text.includes(kw)) langScores[lang]++;
-                }
-            }
-        }
-    }
-    
+
     // Determine detected language (only FR/DE if clearly dominant, otherwise EN)
     const maxLang = Object.entries(langScores).sort((a, b) => b[1] - a[1])[0];
     if (maxLang[1] > 0 && maxLang[0] !== 'en' && maxLang[1] >= langScores.en + 2) {
         mapping.detectedLang = maxLang[0];
-    } else if (maxLang[0] === 'en' || langScores.en >= langScores.fr && langScores.en >= langScores.de) {
+    } else if (maxLang[0] === 'en' || (langScores.en >= langScores.fr && langScores.en >= langScores.de)) {
         mapping.detectedLang = 'en';
     } else {
         mapping.detectedLang = maxLang[0];
     }
+
     console.log(`🌐 Language detection scores:`, langScores, `→ ${mapping.detectedLang}`);
-    
+    console.log('🧭 Final RA2025 auto-mapping:', mapping);
+
     return mapping;
 }
 
