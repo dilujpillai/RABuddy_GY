@@ -2757,7 +2757,7 @@
                     <!-- Video player (left/center) -->
                     <div class="fullscreen-video-pane min-h-[240px] sm:min-h-[300px] xl:min-h-0 rounded-2xl border border-white/10 bg-black/35 backdrop-blur-sm overflow-visible">
                         <div id="videoWrapperContainer" class="relative w-full h-full flex items-center justify-center">
-                            <video id="fullscreenVideoPlayer" class="block w-auto h-auto max-w-full max-h-full shadow-2xl" controls></video>
+                            <video id="fullscreenVideoPlayer" class="block w-auto h-auto max-w-full max-h-full shadow-2xl"></video>
                             <!-- Flash overlay for capture feedback -->
                             <div id="captureFlashOverlay" class="absolute inset-0 bg-white pointer-events-none opacity-0 rounded-xl transition-opacity duration-150" style="z-index:5;"></div>
                             <div id="videoCaptureActions" class="absolute flex items-center" style="z-index:10;">
@@ -2796,6 +2796,16 @@
                             <div class="flex items-center justify-between text-[11px] text-slate-300 mt-1">
                                 <span id="fullscreenSeekCurrent">00:00</span>
                                 <span id="fullscreenSeekDuration">00:00</span>
+                            </div>
+                            <div class="flex items-center gap-2 mt-2">
+                                <button id="fullscreenPlayPauseBtn" class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-indigo-500 hover:bg-indigo-600 text-white transition-colors" title="Play/Pause (or press Space)">
+                                    <svg id="fullscreenPlayIcon" xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="currentColor" viewBox="0 0 24 24" style="display:none;">
+                                        <path d="M8 5v14l11-7z"/>
+                                    </svg>
+                                    <svg id="fullscreenPauseIcon" xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="currentColor" viewBox="0 0 24 24">
+                                        <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z"/>
+                                    </svg>
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -9050,6 +9060,7 @@ window.LIKELIHOOD_SCALE = LIKELIHOOD_SCALE;
             if (!player) return;
 
             const seekBar = document.getElementById('fullscreenSeekBar');
+            const playPauseBtn = document.getElementById('fullscreenPlayPauseBtn');
 
             if (player._captureClickHandler) {
                 player.removeEventListener('click', player._captureClickHandler);
@@ -9079,6 +9090,11 @@ window.LIKELIHOOD_SCALE = LIKELIHOOD_SCALE;
                 player.removeEventListener('loadedmetadata', player._seekBarLoadedMetadataHandler);
                 player._seekBarLoadedMetadataHandler = null;
             }
+            if (player._playPauseHandler) {
+                player.removeEventListener('play', player._playPauseHandler);
+                player.removeEventListener('pause', player._playPauseHandler);
+                player._playPauseHandler = null;
+            }
             if (player._warmupTimer) {
                 clearTimeout(player._warmupTimer);
                 player._warmupTimer = null;
@@ -9098,6 +9114,9 @@ window.LIKELIHOOD_SCALE = LIKELIHOOD_SCALE;
             const seekBar = document.getElementById('fullscreenSeekBar');
             const currentLabel = document.getElementById('fullscreenSeekCurrent');
             const durationLabel = document.getElementById('fullscreenSeekDuration');
+            const playPauseBtn = document.getElementById('fullscreenPlayPauseBtn');
+            const playIcon = document.getElementById('fullscreenPlayIcon');
+            const pauseIcon = document.getElementById('fullscreenPauseIcon');
             if (!seekBar || !currentLabel || !durationLabel) return;
 
             const updateLabels = () => {
@@ -9105,6 +9124,18 @@ window.LIKELIHOOD_SCALE = LIKELIHOOD_SCALE;
                 const current = Number.isFinite(player.currentTime) ? player.currentTime : 0;
                 currentLabel.textContent = formatVideoTime(current);
                 durationLabel.textContent = formatVideoTime(duration);
+            };
+
+            const updatePlayPauseIcon = () => {
+                if (playIcon && pauseIcon) {
+                    if (player.paused) {
+                        playIcon.style.display = 'block';
+                        pauseIcon.style.display = 'none';
+                    } else {
+                        playIcon.style.display = 'none';
+                        pauseIcon.style.display = 'block';
+                    }
+                }
             };
 
             const syncFromPlayer = () => {
@@ -9115,6 +9146,7 @@ window.LIKELIHOOD_SCALE = LIKELIHOOD_SCALE;
                     seekBar.value = String(Math.round(ratio * 1000));
                 }
                 updateLabels();
+                updatePlayPauseIcon();
             };
 
             const onInput = () => {
@@ -9129,13 +9161,26 @@ window.LIKELIHOOD_SCALE = LIKELIHOOD_SCALE;
                 syncFromPlayer();
             };
 
+            const onPlayPauseClick = () => {
+                if (player.paused) {
+                    player.play();
+                } else {
+                    player.pause();
+                }
+                updatePlayPauseIcon();
+            };
+
             player._seekBarInputHandler = onInput;
             player._seekBarTimeUpdateHandler = syncFromPlayer;
             player._seekBarLoadedMetadataHandler = onLoaded;
+            player._playPauseHandler = updatePlayPauseIcon;
 
             seekBar.addEventListener('input', onInput);
             player.addEventListener('timeupdate', syncFromPlayer);
             player.addEventListener('loadedmetadata', onLoaded);
+            player.addEventListener('play', updatePlayPauseIcon);
+            player.addEventListener('pause', updatePlayPauseIcon);
+            if (playPauseBtn) playPauseBtn.addEventListener('click', onPlayPauseClick);
             syncFromPlayer();
         }
 
