@@ -2753,8 +2753,8 @@
 
             <!-- Main content area -->
             <div class="fullscreen-modal-main flex-1 min-h-0 p-3 sm:p-4 lg:p-5">
-                <div class="fullscreen-layout h-full grid grid-cols-1 grid-rows-[minmax(0,1fr)_auto] xl:grid-cols-[minmax(0,1fr)_320px] xl:grid-rows-1 gap-3 sm:gap-4">
-                    <!-- Video player (left/center) -->
+                <div class="fullscreen-layout h-full grid grid-cols-1 grid-rows-[minmax(0,1fr)_auto_auto] xl:grid-cols-[minmax(0,1fr)_320px] xl:grid-rows-[minmax(0,1fr)_auto] gap-3 sm:gap-4">
+                    <!-- Video player (left/center) - VIDEO ONLY -->
                     <div class="fullscreen-video-pane min-h-[240px] sm:min-h-[300px] xl:min-h-0 rounded-2xl border border-white/10 bg-black/35 backdrop-blur-sm overflow-visible">
                         <div id="videoWrapperContainer" class="relative w-full h-full flex items-center justify-center">
                             <video id="fullscreenVideoPlayer" class="block w-auto h-auto max-w-full max-h-full shadow-2xl"></video>
@@ -2791,29 +2791,29 @@
                             </div>
                             <style>@keyframes warmup-spin{to{transform:rotate(360deg)}}</style>
                         </div>
-                        <div id="fullscreenSeekContainer" class="px-3 pb-3 pt-3 border-t border-white/10 bg-black/45">
-                            <div class="flex items-center gap-2 mb-2">
-                                <button id="fullscreenPlayPauseBtn" class="inline-flex items-center justify-center w-12 h-12 rounded-full bg-indigo-500 hover:bg-indigo-600 active:scale-95 text-white transition-all shadow-lg" title="Play/Pause (or press Space)">
-                                    <svg id="fullscreenPlayIcon" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="currentColor" viewBox="0 0 24 24" style="display:none; margin-left:2px;">
-                                        <path d="M8 5v14l11-7z"/>
-                                    </svg>
-                                    <svg id="fullscreenPauseIcon" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="currentColor" viewBox="0 0 24 24">
-                                        <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z"/>
-                                    </svg>
-                                </button>
-                                <div class="flex-1">
-                                    <input id="fullscreenSeekBar" type="range" min="0" max="1000" value="0" class="w-full accent-indigo-500 cursor-pointer">
-                                    <div class="flex items-center justify-between text-[11px] text-slate-300 mt-1.5">
-                                        <span id="fullscreenSeekCurrent">00:00</span>
-                                        <span id="fullscreenSeekDuration">00:00</span>
-                                    </div>
-                                </div>
+                    </div>
+
+                    <!-- SEEK CONTROLS - DEDICATED ROW (SEPARATE FROM VIDEO) -->
+                    <div id="fullscreenSeekContainer" class="col-span-1 xl:col-span-1 px-3 py-3 border-t border-white/10 bg-black/60 rounded-xl flex items-center gap-3">
+                        <button id="fullscreenPlayPauseBtn" class="inline-flex items-center justify-center flex-shrink-0 w-14 h-14 rounded-full bg-indigo-500 hover:bg-indigo-600 active:scale-95 text-white transition-all shadow-lg" title="Play/Pause (or press Space)">
+                            <svg id="fullscreenPlayIcon" xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="currentColor" viewBox="0 0 24 24" style="display:none; margin-left:2px;">
+                                <path d="M8 5v14l11-7z"/>
+                            </svg>
+                            <svg id="fullscreenPauseIcon" xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z"/>
+                            </svg>
+                        </button>
+                        <div class="flex-1 min-w-0">
+                            <input id="fullscreenSeekBar" type="range" min="0" max="1000" value="0" class="w-full accent-indigo-500 cursor-pointer">
+                            <div class="flex items-center justify-between text-xs text-slate-300 mt-2">
+                                <span id="fullscreenSeekCurrent">00:00</span>
+                                <span id="fullscreenSeekDuration">00:00</span>
                             </div>
                         </div>
                     </div>
 
                     <!-- Thumbnail panel (right) -->
-                    <div class="fullscreen-thumb-pane min-h-0 max-h-[30vh] xl:max-h-none bg-white/[0.97] backdrop-blur-xl rounded-2xl shadow-2xl border border-slate-200/80 flex flex-col overflow-hidden">
+                    <div class="fullscreen-thumb-pane col-span-1 xl:col-span-1 xl:row-span-2 min-h-0 max-h-[30vh] xl:max-h-none bg-white/[0.97] backdrop-blur-xl rounded-2xl shadow-2xl border border-slate-200/80 flex flex-col overflow-hidden">
                         <div class="px-4 py-3 border-b border-slate-100 bg-slate-50/80">
                             <h3 class="text-slate-800 font-semibold text-sm uppercase tracking-wide">Captured Frames (<span id="frameCount">0</span>)</h3>
                         </div>
