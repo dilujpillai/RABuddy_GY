@@ -2791,21 +2791,23 @@
                             </div>
                             <style>@keyframes warmup-spin{to{transform:rotate(360deg)}}</style>
                         </div>
-                        <div id="fullscreenSeekContainer" class="px-3 pb-2 pt-2 border-t border-white/10 bg-black/45">
-                            <input id="fullscreenSeekBar" type="range" min="0" max="1000" value="0" class="w-full accent-indigo-500 cursor-pointer">
-                            <div class="flex items-center justify-between text-[11px] text-slate-300 mt-1">
-                                <span id="fullscreenSeekCurrent">00:00</span>
-                                <span id="fullscreenSeekDuration">00:00</span>
-                            </div>
-                            <div class="flex items-center gap-2 mt-2">
-                                <button id="fullscreenPlayPauseBtn" class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-indigo-500 hover:bg-indigo-600 text-white transition-colors" title="Play/Pause (or press Space)">
-                                    <svg id="fullscreenPlayIcon" xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="currentColor" viewBox="0 0 24 24" style="display:none;">
+                        <div id="fullscreenSeekContainer" class="px-3 pb-3 pt-3 border-t border-white/10 bg-black/45">
+                            <div class="flex items-center gap-2 mb-2">
+                                <button id="fullscreenPlayPauseBtn" class="inline-flex items-center justify-center w-12 h-12 rounded-full bg-indigo-500 hover:bg-indigo-600 active:scale-95 text-white transition-all shadow-lg" title="Play/Pause (or press Space)">
+                                    <svg id="fullscreenPlayIcon" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="currentColor" viewBox="0 0 24 24" style="display:none; margin-left:2px;">
                                         <path d="M8 5v14l11-7z"/>
                                     </svg>
-                                    <svg id="fullscreenPauseIcon" xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="currentColor" viewBox="0 0 24 24">
+                                    <svg id="fullscreenPauseIcon" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="currentColor" viewBox="0 0 24 24">
                                         <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z"/>
                                     </svg>
                                 </button>
+                                <div class="flex-1">
+                                    <input id="fullscreenSeekBar" type="range" min="0" max="1000" value="0" class="w-full accent-indigo-500 cursor-pointer">
+                                    <div class="flex items-center justify-between text-[11px] text-slate-300 mt-1.5">
+                                        <span id="fullscreenSeekCurrent">00:00</span>
+                                        <span id="fullscreenSeekDuration">00:00</span>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
