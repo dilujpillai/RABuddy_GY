@@ -2757,7 +2757,7 @@
                     <!-- Video pane (with proper sizing to prevent zoom) -->
                     <div class="fullscreen-video-pane min-h-[240px] sm:min-h-[300px] xl:min-h-0 flex-1 rounded-2xl border border-white/10 bg-black/35 backdrop-blur-sm overflow-hidden flex flex-col xl:row-span-1 xl:col-start-1">
                         <div id="videoWrapperContainer" class="relative w-full h-full flex items-center justify-center">
-                            <video id="fullscreenVideoPlayer" class="object-contain w-full h-full max-h-full shadow-2xl" style="aspect-ratio: auto;"></video>
+                            <video id="fullscreenVideoPlayer" class="object-contain w-full h-full max-h-full shadow-2xl" style="aspect-ratio: auto;" muted></video>
                             <!-- Flash overlay for capture feedback -->
                             <div id="captureFlashOverlay" class="absolute inset-0 bg-white pointer-events-none opacity-0 rounded-xl transition-opacity duration-150" style="z-index:5;"></div>
                             <!-- Paused state hint overlay -->
@@ -2796,6 +2796,14 @@
                             </svg>
                             <svg id="fullscreenPauseIcon" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="currentColor" viewBox="0 0 24 24">
                                 <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z"/>
+                            </svg>
+                        </button>
+                        <button id="fullscreenMuteBtn" class="inline-flex items-center justify-center flex-shrink-0 w-12 h-12 rounded-full bg-slate-600 hover:bg-slate-700 active:scale-95 text-white transition-all shadow-lg" title="Mute/Unmute (or press M)">
+                            <svg id="fullscreenSoundOnIcon" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="currentColor" viewBox="0 0 24 24" style="display:none;">
+                                <path d="M13.5 4.06c0-1.336-1.616-2.256-2.73-1.72l-5.464 3.11A2 2 0 004 9.561v4.882a2 2 0 001.306 1.869l5.464 3.11c1.114.536 2.73-.384 2.73-1.72V4.06zM15.5 12c0-1.25.756-2.322 1.832-2.82v5.64c-1.076-.498-1.832-1.57-1.832-2.82zm2.858-4.995c2.926-1.874 6.84-1.031 8.154 2.076.13.27.245.55.3.839v.003c.118.618.18 1.26.18 1.92 0 .66-.062 1.301-.18 1.92-.055.289-.17.569-.3.839-1.315 3.107-5.229 3.95-8.154 2.076M17.5 12c0-1.25-.756-2.322-1.832-2.82V14.82c1.076-.498 1.832-1.57 1.832-2.82z"/>
+                            </svg>
+                            <svg id="fullscreenSoundMutedIcon" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M13.5 4.06c0-1.336-1.616-2.256-2.73-1.72l-5.464 3.11A2 2 0 004 9.561v4.882a2 2 0 001.306 1.869l5.464 3.11c1.114.536 2.73-.384 2.73-1.72V4.06zM16.338 16.338L19.414 19.414m2.828-2.828l-3.076-3.076m0-2.828l3.074 3.076M9.172 9.172L6.098 6.098m-2.828 2.828l3.074 3.076"/>
                             </svg>
                         </button>
                         <div class="flex-1 min-w-0">
@@ -9131,6 +9139,9 @@ window.LIKELIHOOD_SCALE = LIKELIHOOD_SCALE;
             const playPauseBtn = document.getElementById('fullscreenPlayPauseBtn');
             const playIcon = document.getElementById('fullscreenPlayIcon');
             const pauseIcon = document.getElementById('fullscreenPauseIcon');
+            const muteBtn = document.getElementById('fullscreenMuteBtn');
+            const soundOnIcon = document.getElementById('fullscreenSoundOnIcon');
+            const soundMutedIcon = document.getElementById('fullscreenSoundMutedIcon');
             if (!seekBar || !currentLabel || !durationLabel) return;
 
             const updateLabels = () => {
@@ -9148,6 +9159,18 @@ window.LIKELIHOOD_SCALE = LIKELIHOOD_SCALE;
                     } else {
                         playIcon.style.display = 'none';
                         pauseIcon.style.display = 'block';
+                    }
+                }
+            };
+
+            const updateMuteIcon = () => {
+                if (soundOnIcon && soundMutedIcon) {
+                    if (player.muted) {
+                        soundMutedIcon.style.display = 'block';
+                        soundOnIcon.style.display = 'none';
+                    } else {
+                        soundOnIcon.style.display = 'block';
+                        soundMutedIcon.style.display = 'none';
                     }
                 }
             };
@@ -9173,6 +9196,7 @@ window.LIKELIHOOD_SCALE = LIKELIHOOD_SCALE;
 
             const onLoaded = () => {
                 syncFromPlayer();
+                updateMuteIcon();
             };
 
             const onPlayPauseClick = () => {
@@ -9184,17 +9208,25 @@ window.LIKELIHOOD_SCALE = LIKELIHOOD_SCALE;
                 updatePlayPauseIcon();
             };
 
+            const onMuteClick = () => {
+                player.muted = !player.muted;
+                updateMuteIcon();
+            };
+
             player._seekBarInputHandler = onInput;
             player._seekBarTimeUpdateHandler = syncFromPlayer;
             player._seekBarLoadedMetadataHandler = onLoaded;
             player._playPauseHandler = updatePlayPauseIcon;
+            player._muteHandler = updateMuteIcon;
 
             seekBar.addEventListener('input', onInput);
             player.addEventListener('timeupdate', syncFromPlayer);
             player.addEventListener('loadedmetadata', onLoaded);
             player.addEventListener('play', updatePlayPauseIcon);
             player.addEventListener('pause', updatePlayPauseIcon);
+            player.addEventListener('volumechange', updateMuteIcon);
             if (playPauseBtn) playPauseBtn.addEventListener('click', onPlayPauseClick);
+            if (muteBtn) muteBtn.addEventListener('click', onMuteClick);
             syncFromPlayer();
         }
 
@@ -9272,7 +9304,7 @@ window.LIKELIHOOD_SCALE = LIKELIHOOD_SCALE;
             player.addEventListener('play', player._playHandler);
             setupFullscreenSeekBar(player);
 
-            // Add keyboard listeners: C = capture frame, SPACE = play/pause, ESC = close
+            // Add keyboard listeners: C = capture frame, SPACE = play/pause, M = mute/unmute, ESC = close
             fullscreenSpacebarListener = (e) => {
                 if (gifDownloadMenuOpen) {
                     if (e.key === 'Escape') {
@@ -9291,6 +9323,12 @@ window.LIKELIHOOD_SCALE = LIKELIHOOD_SCALE;
                 if (e.code === 'KeyG' || e.key === 'g' || e.key === 'G') {
                     e.preventDefault();
                     captureFullscreenGifClip();
+                }
+                // 'M' key to toggle mute/unmute
+                if (e.code === 'KeyM' || e.key === 'm' || e.key === 'M') {
+                    e.preventDefault();
+                    const p = document.getElementById('fullscreenVideoPlayer');
+                    p.muted = !p.muted;
                 }
                 // SPACE: toggle play/pause and prevent page scroll
                 if (e.code === 'Space' || e.key === ' ') {
