@@ -2759,7 +2759,7 @@
                         <!-- Video player (left/center) - VIDEO ONLY -->
                         <div class="fullscreen-video-pane min-h-[240px] sm:min-h-[300px] xl:min-h-[360px] rounded-2xl border border-white/10 bg-black/35 backdrop-blur-sm overflow-hidden flex flex-col">
                             <div id="videoWrapperContainer" class="relative flex-1 w-full flex items-center justify-center">
-                            <video id="fullscreenVideoPlayer" class="block w-auto h-auto max-w-full max-h-full shadow-2xl"></video>
+                            <video id="fullscreenVideoPlayer" class="object-contain w-full h-full max-w-full max-h-full shadow-2xl" style="aspect-ratio: auto;"></video>
                             <!-- Flash overlay for capture feedback -->
                             <div id="captureFlashOverlay" class="absolute inset-0 bg-white pointer-events-none opacity-0 rounded-xl transition-opacity duration-150" style="z-index:5;"></div>
                             <div id="videoCaptureActions" class="absolute flex items-center" style="z-index:10;">
