@@ -8891,25 +8891,38 @@ window.LIKELIHOOD_SCALE = LIKELIHOOD_SCALE;
                 const gifBlob = bestAttempt.gifBlob;
                 const gifBytes = gifBlob.size;
 
+                // Convert GIF blob to base64 for JSON storage (allows future reload)
+                const gifBase64 = await new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = () => resolve(reader.result);
+                    reader.onerror = reject;
+                    reader.readAsDataURL(gifBlob);
+                });
+
                 const zip = new JSZip();
                 const now = new Date();
                 const sizeSuffix = targetBytes ? `${Math.round(targetBytes / 1024)}kb` : 'fullsize';
                 const gifFileName = `clip_${now.getTime()}_${sizeSuffix}.gif`;
 
                 zip.file(gifFileName, gifBlob);
+                // Export JSON with base64-encoded GIF data for project reload (matches image export structure)
                 zip.file('gif_export_info.json', JSON.stringify({
+                    fileName: gifFileName,
+                    base64: gifBase64,
                     exportedAt: now.toISOString(),
                     modeLabel,
                     frameCount: clip.frameIds.length,
                     frameDelayMs: clip.frameDelayMs || 160,
-                    gifDimensions: `${bestAttempt.gifSize.width}x${bestAttempt.gifSize.height}`,
+                    gifWidth: bestAttempt.gifSize.width,
+                    gifHeight: bestAttempt.gifSize.height,
                     gifQuality: bestAttempt.quality,
                     actualBytes: gifBytes,
                     actualSizeLabel: formatBytes(gifBytes),
                     targetBytes: targetBytes,
                     targetSizeLabel: targetBytes ? formatBytes(targetBytes) : null,
                     targetMet: fullSize ? null : (gifBytes <= targetBytes),
-                    notes: 'Clip GIF exported from lightbox.'
+                    exportSource: 'lightbox_clip',
+                    notes: 'Clip GIF exported from lightbox. Base64 data included for project reload.'
                 }, null, 2));
 
                 const packedBlob = await zip.generateAsync({
@@ -10034,6 +10047,14 @@ window.LIKELIHOOD_SCALE = LIKELIHOOD_SCALE;
                     targetBytes: fullSize ? undefined : resolvedTargetBytes
                 });
 
+                // Convert GIF blob to base64 for JSON storage (allows future reload)
+                const gifBase64 = await new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = () => resolve(reader.result);
+                    reader.onerror = reject;
+                    reader.readAsDataURL(gifResult.gifBlob);
+                });
+
                 const zip = new JSZip();
                 const now = new Date();
                 const sizeSuffix = fullSize
@@ -10043,7 +10064,10 @@ window.LIKELIHOOD_SCALE = LIKELIHOOD_SCALE;
                     .replace(/\.gif$/i, `_${sizeSuffix}.gif`);
 
                 zip.file(gifFileName, gifResult.gifBlob);
+                // Export JSON with base64-encoded GIF data for project reload (matches image export structure)
                 zip.file('gif_export_info.json', JSON.stringify({
+                    fileName: gifFileName,
+                    base64: gifBase64,
                     sourceVideo: fullscreenVideoCurrentFile || null,
                     exportedAt: now.toISOString(),
                     modeLabel,
@@ -10052,17 +10076,18 @@ window.LIKELIHOOD_SCALE = LIKELIHOOD_SCALE;
                     frameCount: gifResult.frameCount,
                     frameDelayMs: gifResult.frameDelayMs,
                     approximateFps: Number((1000 / gifResult.frameDelayMs).toFixed(2)),
-                    width: gifResult.gifSize.width,
-                    height: gifResult.gifSize.height,
+                    gifWidth: gifResult.gifSize.width,
+                    gifHeight: gifResult.gifSize.height,
                     qualitySetting: gifResult.quality,
                     targetBytes: fullSize ? null : gifResult.targetBytes,
                     targetSizeLabel: fullSize ? null : formatBytes(gifResult.targetBytes),
                     actualBytes: gifResult.gifBytes,
                     actualSizeLabel: formatBytes(gifResult.gifBytes),
                     targetMet: fullSize ? null : gifResult.targetMet,
+                    exportSource: 'fullscreen_video_capture',
                     notes: fullSize
-                        ? 'Full-size 3-second GIF generated locally from fullscreen capture modal.'
-                        : 'Bandwidth-optimized 3-second GIF generated locally with a 250KB target.'
+                        ? 'Full-size 3-second GIF generated locally from fullscreen capture modal. Base64 data included for project reload.'
+                        : 'Bandwidth-optimized 3-second GIF generated locally. Base64 data included for project reload.'
                 }, null, 2));
 
                 const packedBlob = await zip.generateAsync({
