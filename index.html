@@ -8216,6 +8216,7 @@ window.LIKELIHOOD_SCALE = LIKELIHOOD_SCALE;
         let imageResults = [];
         const clipCollections = new Map(); // clipId -> { id, name, frameIds, frameDelayMs, previewMode }
         const frameToClipMap = new Map(); // frameId -> clipId
+        const clipPlayState = new Map(); // taskId -> boolean (true = playing GIF, false = paused on frame)
 
         const lightboxClipPanel = document.getElementById('lightboxClipPanel');
         const lightboxClipFrames = document.getElementById('lightboxClipFrames');
@@ -8595,16 +8596,35 @@ window.LIKELIHOOD_SCALE = LIKELIHOOD_SCALE;
 
             if (lightboxClipPlayPauseBtn) {
                 lightboxClipPlayPauseBtn.onclick = async () => {
-                    try {
-                        await rebuildClipPreviewFromFrames(taskId);
-                    } catch (e) {
-                        console.warn('Could not rebuild GIF preview from clip frames:', e);
-                    }
-                    showLightboxImage(taskId, { forceClipPreview: true });
-                    // Update icon to show pause (since preview is now playing)
-                    if (lightboxClipPlayIcon && lightboxClipPauseIcon) {
-                        lightboxClipPlayIcon.style.display = 'none';
-                        lightboxClipPauseIcon.style.display = 'block';
+                    const isCurrentlyPlaying = clipPlayState.get(taskId) === true;
+                    
+                    if (isCurrentlyPlaying) {
+                        // PAUSE: Show the first frame, stop animation
+                        const clip = clipCollections.get(taskId);
+                        if (clip && clip.frameIds.length > 0) {
+                            const firstFrameId = clip.frameIds[0];
+                            showLightboxImage(firstFrameId, { parentTaskId: taskId, forceFrameView: true });
+                            clipPlayState.set(taskId, false);
+                            // Show play icon
+                            if (lightboxClipPlayIcon && lightboxClipPauseIcon) {
+                                lightboxClipPlayIcon.style.display = 'block';
+                                lightboxClipPauseIcon.style.display = 'none';
+                            }
+                        }
+                    } else {
+                        // PLAY: Show animated GIF
+                        try {
+                            await rebuildClipPreviewFromFrames(taskId);
+                        } catch (e) {
+                            console.warn('Could not rebuild GIF preview from clip frames:', e);
+                        }
+                        showLightboxImage(taskId, { forceClipPreview: true });
+                        clipPlayState.set(taskId, true);
+                        // Show pause icon
+                        if (lightboxClipPlayIcon && lightboxClipPauseIcon) {
+                            lightboxClipPlayIcon.style.display = 'none';
+                            lightboxClipPauseIcon.style.display = 'block';
+                        }
                     }
                 };
             }
@@ -8654,7 +8674,16 @@ window.LIKELIHOOD_SCALE = LIKELIHOOD_SCALE;
                     <img src="${frameImg.src}" alt="Clip frame ${idx + 1}" class="w-14 h-14 object-cover">
                     <span class="absolute bottom-0 left-0 right-0 bg-black/65 text-white text-[10px] font-semibold leading-none py-1">${idx + 1}</span>
                 `;
-                btn.onclick = () => showLightboxImage(frameId, { parentTaskId: taskId, forceFrameView: true });
+                btn.onclick = () => {
+                    // Pause playback when frame is clicked
+                    clipPlayState.set(taskId, false);
+                    // Update icon to show play (since we're paused now)
+                    if (lightboxClipPlayIcon && lightboxClipPauseIcon) {
+                        lightboxClipPlayIcon.style.display = 'block';
+                        lightboxClipPauseIcon.style.display = 'none';
+                    }
+                    showLightboxImage(frameId, { parentTaskId: taskId, forceFrameView: true });
+                };
                 lightboxClipFrames.appendChild(btn);
             });
         }
@@ -8744,7 +8773,7 @@ window.LIKELIHOOD_SCALE = LIKELIHOOD_SCALE;
             if (menu) menu.classList.add('hidden');
             
             const clip = clipCollections.get(taskId);
-            if (!clip || !clip.previewBlob) {
+            if (!clip || !clip.frameIds || clip.frameIds.length === 0) {
                 showCustomAlert('Could not find GIF data. Try playing the preview first.', 'error');
                 return;
             }
@@ -8752,16 +8781,19 @@ window.LIKELIHOOD_SCALE = LIKELIHOOD_SCALE;
             const btn = document.getElementById('lightboxDownloadGifBtn');
             const originalButtonText = btn ? btn.textContent : 'Download ▾';
             
-            let targetBytes, modeLabel;
+            let qualityLevel, modeLabel, targetBytes;
             if (preset === 'balanced500') {
-                targetBytes = 500 * 1024;
+                qualityLevel = 28;
                 modeLabel = 'Balanced';
+                targetBytes = 500 * 1024;
             } else if (preset === 'fullsize') {
-                targetBytes = null;
+                qualityLevel = GIF_CAPTURE_QUALITY;
                 modeLabel = 'Full Size';
+                targetBytes = null;
             } else {
-                targetBytes = 250 * 1024;
+                qualityLevel = 36; // More compression for optimized
                 modeLabel = 'Optimized';
+                targetBytes = 250 * 1024;
             }
 
             try {
@@ -8770,39 +8802,69 @@ window.LIKELIHOOD_SCALE = LIKELIHOOD_SCALE;
                     btn.textContent = modeLabel + '...';
                 }
 
-                // Create optimized GIF from clip frames if needed
-                let gifBlob = clip.previewBlob;
-                let gifBytes = gifBlob.size;
+                // Rebuild GIF with appropriate quality for this preset
+                let gifBlob = null;
+                let gifBytes = 0;
                 
-                if (targetBytes && gifBytes > targetBytes) {
-                    // Need to optimize - rebuild GIF with lower quality/size
-                    try {
-                        const frameCanvas = document.createElement('canvas');
-                        const baseW = 320, baseH = 240;
-                        frameCanvas.width = baseW;
-                        frameCanvas.height = baseH;
-                        const frameCtx = frameCanvas.getContext('2d');
-                        
-                        const gifEncoder = new GIFEncoder();
-                        gifEncoder.setDelay(clip.frameDelayMs || 160);
-                        gifEncoder.setSize(baseW, baseH);
-                        gifEncoder.setQuality(10);
-                        gifEncoder.render();
-                        
-                        for (const frameId of clip.frameIds) {
-                            const frameImg = getClipFrameImage(frameId);
-                            if (!frameImg) continue;
-                            await waitForImage(frameImg);
-                            frameCtx.clearRect(0, 0, baseW, baseH);
-                            frameCtx.drawImage(frameImg, 0, 0, baseW, baseH);
-                            gifEncoder.addFrame(frameCanvas, { copy: true, delay: clip.frameDelayMs || 160 });
-                        }
-                        
-                        gifBlob = await renderGifToBlob(gifEncoder);
-                        if (gifBlob) gifBytes = gifBlob.size;
-                    } catch (e) {
-                        console.warn('Could not optimize GIF, using original:', e);
+                try {
+                    const firstFrameId = clip.frameIds[0];
+                    const firstFrameImg = getClipFrameImage(firstFrameId);
+                    if (!firstFrameImg) {
+                        showCustomAlert('Could not load clip frames.', 'error');
+                        return;
                     }
+
+                    const waitForImage = (img) => new Promise((resolve) => {
+                        if (img.complete && img.naturalWidth) {
+                            resolve(true);
+                            return;
+                        }
+                        const done = () => {
+                            img.removeEventListener('load', done);
+                            img.removeEventListener('error', done);
+                            resolve(true);
+                        };
+                        img.addEventListener('load', done);
+                        img.addEventListener('error', done);
+                    });
+
+                    await waitForImage(firstFrameImg);
+
+                    const baseW = firstFrameImg.naturalWidth || 320;
+                    const baseH = firstFrameImg.naturalHeight || 240;
+
+                    const gifEncoder = new GIF({
+                        workers: 2,
+                        quality: qualityLevel,
+                        width: baseW,
+                        height: baseH,
+                        workerScript: GIF_CAPTURE_WORKER_URL
+                    });
+
+                    const frameCanvas = document.createElement('canvas');
+                    frameCanvas.width = baseW;
+                    frameCanvas.height = baseH;
+                    const frameCtx = frameCanvas.getContext('2d');
+                    if (!frameCtx) throw new Error('Could not create canvas context');
+
+                    for (const frameId of clip.frameIds) {
+                        const frameImg = getClipFrameImage(frameId);
+                        if (!frameImg) continue;
+                        await waitForImage(frameImg);
+                        frameCtx.clearRect(0, 0, baseW, baseH);
+                        frameCtx.drawImage(frameImg, 0, 0, baseW, baseH);
+                        gifEncoder.addFrame(frameCanvas, {
+                            copy: true,
+                            delay: Math.max(60, Number(clip.frameDelayMs) || 160)
+                        });
+                    }
+
+                    gifBlob = await renderGifToBlob(gifEncoder);
+                    if (gifBlob) gifBytes = gifBlob.size;
+                } catch (e) {
+                    console.error('Error rebuilding GIF for download:', e);
+                    showCustomAlert('Failed to optimize GIF. ' + e.message, 'error');
+                    return;
                 }
 
                 const zip = new JSZip();
