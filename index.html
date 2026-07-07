@@ -8781,19 +8781,22 @@ window.LIKELIHOOD_SCALE = LIKELIHOOD_SCALE;
             const btn = document.getElementById('lightboxDownloadGifBtn');
             const originalButtonText = btn ? btn.textContent : 'Download ▾';
             
-            let qualityLevel, modeLabel, targetBytes;
+            let modeLabel, targetBytes, qualitySteps, fullSize;
             if (preset === 'balanced500') {
-                qualityLevel = 28;
                 modeLabel = 'Balanced';
                 targetBytes = 500 * 1024;
+                qualitySteps = [GIF_CAPTURE_QUALITY, 28];
+                fullSize = false;
             } else if (preset === 'fullsize') {
-                qualityLevel = GIF_CAPTURE_QUALITY;
                 modeLabel = 'Full Size';
                 targetBytes = null;
+                qualitySteps = [GIF_CAPTURE_QUALITY];
+                fullSize = true;
             } else {
-                qualityLevel = 36; // More compression for optimized
                 modeLabel = 'Optimized';
                 targetBytes = 250 * 1024;
+                qualitySteps = [GIF_CAPTURE_QUALITY, 28, 36];
+                fullSize = false;
             }
 
             try {
@@ -8802,70 +8805,91 @@ window.LIKELIHOOD_SCALE = LIKELIHOOD_SCALE;
                     btn.textContent = modeLabel + '...';
                 }
 
-                // Rebuild GIF with appropriate quality for this preset
-                let gifBlob = null;
-                let gifBytes = 0;
-                
-                try {
-                    const firstFrameId = clip.frameIds[0];
-                    const firstFrameImg = getClipFrameImage(firstFrameId);
-                    if (!firstFrameImg) {
-                        showCustomAlert('Could not load clip frames.', 'error');
-                        return;
-                    }
-
-                    const waitForImage = (img) => new Promise((resolve) => {
-                        if (img.complete && img.naturalWidth) {
-                            resolve(true);
-                            return;
-                        }
-                        const done = () => {
-                            img.removeEventListener('load', done);
-                            img.removeEventListener('error', done);
-                            resolve(true);
-                        };
-                        img.addEventListener('load', done);
-                        img.addEventListener('error', done);
-                    });
-
-                    await waitForImage(firstFrameImg);
-
-                    const baseW = firstFrameImg.naturalWidth || 320;
-                    const baseH = firstFrameImg.naturalHeight || 240;
-
-                    const gifEncoder = new GIF({
-                        workers: 2,
-                        quality: qualityLevel,
-                        width: baseW,
-                        height: baseH,
-                        workerScript: GIF_CAPTURE_WORKER_URL
-                    });
-
-                    const frameCanvas = document.createElement('canvas');
-                    frameCanvas.width = baseW;
-                    frameCanvas.height = baseH;
-                    const frameCtx = frameCanvas.getContext('2d');
-                    if (!frameCtx) throw new Error('Could not create canvas context');
-
-                    for (const frameId of clip.frameIds) {
-                        const frameImg = getClipFrameImage(frameId);
-                        if (!frameImg) continue;
-                        await waitForImage(frameImg);
-                        frameCtx.clearRect(0, 0, baseW, baseH);
-                        frameCtx.drawImage(frameImg, 0, 0, baseW, baseH);
-                        gifEncoder.addFrame(frameCanvas, {
-                            copy: true,
-                            delay: Math.max(60, Number(clip.frameDelayMs) || 160)
-                        });
-                    }
-
-                    gifBlob = await renderGifToBlob(gifEncoder);
-                    if (gifBlob) gifBytes = gifBlob.size;
-                } catch (e) {
-                    console.error('Error rebuilding GIF for download:', e);
-                    showCustomAlert('Failed to optimize GIF. ' + e.message, 'error');
+                // Get frame dimensions
+                const firstFrameId = clip.frameIds[0];
+                const firstFrameImg = getClipFrameImage(firstFrameId);
+                if (!firstFrameImg) {
+                    showCustomAlert('Could not load clip frames.', 'error');
                     return;
                 }
+
+                const waitForImage = (img) => new Promise((resolve) => {
+                    if (img.complete && img.naturalWidth) {
+                        resolve(true);
+                        return;
+                    }
+                    const done = () => {
+                        img.removeEventListener('load', done);
+                        img.removeEventListener('error', done);
+                        resolve(true);
+                    };
+                    img.addEventListener('load', done);
+                    img.addEventListener('error', done);
+                });
+
+                await waitForImage(firstFrameImg);
+                const frameW = firstFrameImg.naturalWidth || 320;
+                const frameH = firstFrameImg.naturalHeight || 240;
+
+                // Build size candidates
+                const gifSizes = fullSize
+                    ? [getGifCaptureDimensions(frameW, frameH, frameW)]
+                    : buildOptimizedGifSizeCandidates(frameW, frameH);
+
+                let bestAttempt = null;
+                let foundTargetMatch = false;
+
+                // Try combinations of size and quality until we find one that meets target
+                for (const gifSize of gifSizes) {
+                    for (const quality of qualitySteps) {
+                        const frameCanvas = document.createElement('canvas');
+                        frameCanvas.width = gifSize.width;
+                        frameCanvas.height = gifSize.height;
+                        const frameCtx = frameCanvas.getContext('2d');
+                        if (!frameCtx) throw new Error('Could not create canvas context');
+
+                        const gifEncoder = new GIF({
+                            workers: 2,
+                            quality,
+                            width: gifSize.width,
+                            height: gifSize.height,
+                            workerScript: GIF_CAPTURE_WORKER_URL
+                        });
+
+                        for (const frameId of clip.frameIds) {
+                            const frameImg = getClipFrameImage(frameId);
+                            if (!frameImg) continue;
+                            await waitForImage(frameImg);
+                            frameCtx.clearRect(0, 0, gifSize.width, gifSize.height);
+                            frameCtx.drawImage(frameImg, 0, 0, gifSize.width, gifSize.height);
+                            gifEncoder.addFrame(frameCanvas, {
+                                copy: true,
+                                delay: Math.max(60, Number(clip.frameDelayMs) || 160)
+                            });
+                        }
+
+                        const gifBlob = await renderGifToBlob(gifEncoder);
+                        const attempt = { gifBlob, gifSize, quality };
+
+                        if (!bestAttempt || gifBlob.size < bestAttempt.gifBlob.size) {
+                            bestAttempt = attempt;
+                        }
+
+                        if (fullSize || gifBlob.size <= targetBytes) {
+                            foundTargetMatch = true;
+                            bestAttempt = attempt;
+                            break; // Found acceptable size, use this one
+                        }
+                    }
+                    if (foundTargetMatch) break;
+                }
+
+                if (!bestAttempt) {
+                    throw new Error('Could not generate GIF from this clip.');
+                }
+
+                const gifBlob = bestAttempt.gifBlob;
+                const gifBytes = gifBlob.size;
 
                 const zip = new JSZip();
                 const now = new Date();
@@ -8878,10 +8902,13 @@ window.LIKELIHOOD_SCALE = LIKELIHOOD_SCALE;
                     modeLabel,
                     frameCount: clip.frameIds.length,
                     frameDelayMs: clip.frameDelayMs || 160,
+                    gifDimensions: `${bestAttempt.gifSize.width}x${bestAttempt.gifSize.height}`,
+                    gifQuality: bestAttempt.quality,
                     actualBytes: gifBytes,
                     actualSizeLabel: formatBytes(gifBytes),
                     targetBytes: targetBytes,
                     targetSizeLabel: targetBytes ? formatBytes(targetBytes) : null,
+                    targetMet: fullSize ? null : (gifBytes <= targetBytes),
                     notes: 'Clip GIF exported from lightbox.'
                 }, null, 2));
 
@@ -8900,10 +8927,10 @@ window.LIKELIHOOD_SCALE = LIKELIHOOD_SCALE;
                 document.body.removeChild(link);
                 setTimeout(() => URL.revokeObjectURL(url), 1500);
                 
-                showCustomAlert(`${modeLabel} GIF downloaded successfully!`, 'success');
+                showCustomAlert(`${modeLabel} GIF (${formatBytes(gifBytes)}) downloaded successfully!`, 'success');
             } catch (e) {
                 console.error('Error downloading GIF:', e);
-                showCustomAlert('Failed to download GIF. Check console for details.', 'error');
+                showCustomAlert('Failed to download GIF. ' + e.message, 'error');
             } finally {
                 if (btn) {
                     btn.disabled = false;
