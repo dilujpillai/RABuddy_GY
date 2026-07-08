@@ -7219,8 +7219,12 @@ async function downloadProjectZip(options = {}) {
 
             try {
                 projectData.clipData = await collectClipProjectData();
+                console.log('✅ ZIP Export: Successfully collected', projectData.clipData.length, 'clips');
+                if (projectData.clipData.length === 0 && clipCollections.size > 0) {
+                    console.error('⚠️  WARNING: clipCollections has', clipCollections.size, 'clips but collect returned 0!');
+                }
             } catch (clipZipError) {
-                console.warn('Could not persist clip metadata in ZIP project JSON:', clipZipError);
+                console.error('❌ ZIP Export: Failed to collect clip data:', clipZipError);
             }
 
             const base64ByImgId = {};
@@ -8304,31 +8308,76 @@ window.LIKELIHOOD_SCALE = LIKELIHOOD_SCALE;
 
         async function collectClipProjectData() {
             const clipData = [];
+            console.log('🔄 Collecting clip project data from', clipCollections.size, 'clips');
+            
             for (const [clipId, clip] of clipCollections.entries()) {
                 const frameItems = [];
                 const frameIds = Array.isArray(clip.frameIds) ? clip.frameIds : [];
+                console.log(`  📁 Processing clip "${clipId}" with ${frameIds.length} frames`);
+                
                 for (const frameId of frameIds) {
                     const frameImg = getClipFrameImage(frameId);
-                    if (!frameImg || !frameImg.src) continue;
+                    if (!frameImg) {
+                        console.warn(`    ⚠️  Frame image element not found: ${frameId}`);
+                        continue;
+                    }
+                    if (!frameImg.src) {
+                        console.warn(`    ⚠️  Frame has no src: ${frameId}`);
+                        continue;
+                    }
+                    
                     try {
+                        // Ensure image is loaded before fetching
+                        await new Promise((resolve) => {
+                            if (frameImg.complete && frameImg.naturalWidth > 0) {
+                                resolve();
+                                return;
+                            }
+                            const timeout = setTimeout(resolve, 1000);
+                            frameImg.addEventListener('load', () => {
+                                clearTimeout(timeout);
+                                resolve();
+                            }, { once: true });
+                        });
+                        
                         const frameBlob = await fetch(frameImg.src).then(res => res.blob());
+                        if (!frameBlob || frameBlob.size === 0) {
+                            console.warn(`    ⚠️  Frame blob is empty: ${frameId}`);
+                            continue;
+                        }
+                        
                         const frameBase64 = await blobToDataUrl(frameBlob);
+                        if (!frameBase64 || frameBase64.length < 100) {
+                            console.warn(`    ⚠️  Frame base64 invalid: ${frameId}`);
+                            continue;
+                        }
+                        
                         frameItems.push({
                             id: frameId,
                             name: window.originalFileNames.get(frameId) || `${clipId}_frame.jpg`,
                             base64: frameBase64
                         });
+                        console.log(`    ✅ Frame collected: ${frameId} (${frameBlob.size} bytes)`);
                     } catch (e) {
-                        console.warn('Could not serialize clip frame for project save:', frameId, e);
+                        console.warn(`    ❌ Could not serialize clip frame ${frameId}:`, e.message);
                     }
                 }
-                clipData.push({
-                    id: clipId,
-                    name: clip.name || (window.originalFileNames.get(clipId) || `${clipId}.gif`),
-                    frameDelayMs: Math.max(60, Number(clip.frameDelayMs) || 160),
-                    frames: frameItems
-                });
+                
+                if (frameItems.length > 0) {
+                    clipData.push({
+                        id: clipId,
+                        name: clip.name || (window.originalFileNames.get(clipId) || `${clipId}.gif`),
+                        frameDelayMs: Math.max(60, Number(clip.frameDelayMs) || 160),
+                        frames: frameItems,
+                        metadata: clip.metadata || {}
+                    });
+                    console.log(`  ✅ Clip "${clipId}" added with ${frameItems.length} frames`);
+                } else {
+                    console.warn(`  ⚠️  Clip "${clipId}" has no valid frames, skipping`);
+                }
             }
+            
+            console.log(`✅ Total clips collected: ${clipData.length}`);
             return clipData;
         }
 
@@ -12746,29 +12795,64 @@ async function loadProject(file) {
 
         // Restore clip metadata (if present) so GIF tasks keep editable frame-by-frame strips.
         if (Array.isArray(projectData.clipData) && projectData.clipData.length > 0) {
+            console.log('🔄 Restoring', projectData.clipData.length, 'clips from project data');
+            
             for (const clipEntry of projectData.clipData) {
                 try {
                     const clipId = clipEntry && clipEntry.id;
-                    if (!clipId) continue;
+                    if (!clipId) {
+                        console.warn('⚠️  Clip entry has no ID, skipping');
+                        continue;
+                    }
+                    
                     const clipRootImage = document.getElementById(clipId);
-                    if (!clipRootImage) continue;
+                    if (!clipRootImage) {
+                        console.warn(`⚠️  Clip root image element not found for ID: ${clipId}`);
+                        continue;
+                    }
 
                     const frameIds = [];
                     const clipFrames = Array.isArray(clipEntry.frames) ? clipEntry.frames : [];
+                    console.log(`  📁 Restoring clip "${clipId}" with ${clipFrames.length} frames`);
+                    
                     for (let i = 0; i < clipFrames.length; i++) {
                         const frame = clipFrames[i];
-                        if (!frame || !frame.base64) continue;
+                        if (!frame) {
+                            console.warn(`    ⚠️  Frame ${i} is null/undefined`);
+                            continue;
+                        }
+                        if (!frame.base64) {
+                            console.warn(`    ⚠️  Frame ${i} has no base64 data`);
+                            continue;
+                        }
 
-                        const frameBlob = await fetch(frame.base64).then(res => res.blob());
-                        const frameUrl = URL.createObjectURL(frameBlob);
-                        const fallbackFrameId = `${clipId}-frame-${String(i + 1).padStart(2, '0')}`;
-                        const frameId = frame.id || fallbackFrameId;
-                        const frameName = frame.name || `${clipId}_frame_${String(i + 1).padStart(2, '0')}.jpg`;
+                        try {
+                            const frameBlob = await fetch(frame.base64).then(res => {
+                                if (!res.ok) {
+                                    throw new Error(`Failed to fetch frame: ${res.status}`);
+                                }
+                                return res.blob();
+                            });
+                            
+                            if (!frameBlob || frameBlob.size === 0) {
+                                console.warn(`    ⚠️  Frame blob is empty: frame ${i}`);
+                                continue;
+                            }
+                            
+                            const frameUrl = URL.createObjectURL(frameBlob);
+                            const fallbackFrameId = `${clipId}-frame-${String(i + 1).padStart(2, '0')}`;
+                            const frameId = frame.id || fallbackFrameId;
+                            const frameName = frame.name || `${clipId}_frame_${String(i + 1).padStart(2, '0')}.jpg`;
 
-                        createClipFrameImage(frameId, frameUrl, clipId, frameName);
-                        frameToClipMap.set(frameId, clipId);
-                        frameIds.push(frameId);
-                        window.originalFileNames.set(frameId, frameName);
+                            createClipFrameImage(frameId, frameUrl, clipId, frameName);
+                            frameToClipMap.set(frameId, clipId);
+                            frameIds.push(frameId);
+                            window.originalFileNames.set(frameId, frameName);
+                            console.log(`    ✅ Frame restored: ${frameId}`);
+                        } catch (frameError) {
+                            console.warn(`    ❌ Could not restore frame ${i}:`, frameError.message);
+                            continue;
+                        }
                     }
 
                     if (frameIds.length > 0) {
@@ -12805,11 +12889,15 @@ async function loadProject(file) {
                                 gifHeight: gifHeight || (clipEntry.metadata && clipEntry.metadata.gifHeight) || 1080
                             }
                         });
+                        console.log(`  ✅ Clip "${clipId}" restored with ${frameIds.length} frames`);
+                    } else {
+                        console.warn(`  ⚠️  Clip "${clipId}" had ${clipFrames.length} frames in data but 0 valid frames restored`);
                     }
                 } catch (clipLoadError) {
-                    console.warn('Could not restore clip metadata:', clipLoadError);
+                    console.error('❌ Could not restore clip:', clipLoadError);
                 }
             }
+            console.log('✅ Clip restoration complete');
         }
         
         projectData.riskData.forEach(([id, data]) => {
