@@ -1026,23 +1026,7 @@
             color: #0f172a;
             margin-top: 0.1rem;
         }
-        /* Project ZIP download dropdown */
-        #projectZipMenu { min-width: 256px; }
-        .proj-zip-item {
-            width: 100%; display: flex; align-items: flex-start; justify-content: space-between;
-            gap: 0.75rem; text-align: left; padding: 0.55rem 0.7rem; border-radius: 0.65rem;
-            color: #0f172a; background: transparent; border: none; cursor: pointer;
-            transition: background-color 0.18s ease;
-        }
-        .proj-zip-item:hover { background: #f8fafc; }
-        .proj-zip-item-label { font-weight: 600; font-size: 0.8rem; line-height: 1.2; display: block; }
-        .proj-zip-item-note { font-size: 0.68rem; color: #64748b; line-height: 1.1; display: block; margin-top: 0.1rem; }
-        .proj-zip-item-badge {
-            flex-shrink: 0; font-size: 0.64rem; font-weight: 700; padding: 0.18rem 0.42rem;
-            border-radius: 999px; background: #e2e8f0; color: #0f172a; margin-top: 0.15rem;
-        }
-        .proj-zip-item-badge.badge-blue { background: #dbeafe; color: #1e40af; }
-        .proj-zip-item-badge.badge-green { background: #dcfce7; color: #166534; }
+        /* Project ZIP download (simplified button) */
         #fullscreenVideoModal .fullscreen-modal-actions .rab-btn {
             transition: transform 0.18s ease, box-shadow 0.18s ease;
         }
@@ -2587,19 +2571,7 @@
                     <div class="rab-row">
                         <button id="goehsIntegrationBtn" class="rab-btn rab-c-orange"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" /></svg>GOEHS Integration</button>
                         <button id="saveProjectBtn2" class="rab-btn rab-c-yellow" data-en-text="Save Project"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"/></svg>Save Project</button>
-                        <div id="projectZipMenuRoot" class="relative">
-                            <button id="downloadProjectZipBtn" class="rab-btn rab-c-blue" onclick="toggleProjectZipMenu(event)" aria-haspopup="true" aria-expanded="false"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>Download Project ZIP &#9662;</button>
-                            <div id="projectZipMenu" class="hidden" role="menu" style="position:absolute;left:0;top:calc(100% + 6px);z-index:200;background:rgba(255,255,255,0.98);backdrop-filter:blur(12px);border-radius:0.75rem;border:1px solid #e2e8f0;box-shadow:0 20px 40px rgba(0,0,0,0.14);padding:0.4rem;min-width:256px;">
-                                <button type="button" role="menuitem" class="proj-zip-item" onclick="downloadProjectZipFromMenu('complete')">
-                                    <span><span class="proj-zip-item-label">Complete</span><span class="proj-zip-item-note">All images at full quality + HTML report + CSVs + project file</span></span>
-                                    <span class="proj-zip-item-badge badge-blue">Full</span>
-                                </button>
-                                <button type="button" role="menuitem" class="proj-zip-item" onclick="downloadProjectZipFromMenu('optimized')">
-                                    <span><span class="proj-zip-item-label">Optimized</span><span class="proj-zip-item-note">Compressed images (max 640 px, ~55% quality) + CSVs + project file</span></span>
-                                    <span class="proj-zip-item-badge badge-green">Light</span>
-                                </button>
-                            </div>
-                        </div>
+                        <button id="downloadProjectZipBtn" class="rab-btn rab-c-blue" onclick="downloadProjectZip()" title="Download ZIP with both full-size and optimized images"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>Download Project ZIP</button>
                         <button id="translateTableBtn" class="rab-btn rab-c-slate"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129"/></svg>Translate</button>
                         <button id="remapColumnsBtn" class="rab-btn rab-c-slate rab-hidden" title="Re-map Excel columns if data wasn't imported correctly"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/></svg>Remap Columns</button>
                     </div>
@@ -7128,10 +7100,9 @@ function generateActionsCSV() {
     return csvRows.join('\n');
 }
 
-async function downloadProjectZip(options = {}) {
+async function downloadProjectZip() {
     const btn = document.getElementById('downloadProjectZipBtn');
     if (!btn) return;
-    const optimized = options.optimized === true;
     
     if (typeof JSZip === 'undefined' || typeof window.addImagesToZip === 'undefined') {
         showCustomAlert("Error: Critical download libraries (JSZip, addImagesToZip) are not available.", 'error');
@@ -7140,35 +7111,38 @@ async function downloadProjectZip(options = {}) {
 
     const originalBtnHTML = btn.innerHTML;
     btn.disabled = true;
-    btn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg> ${optimized ? 'Compressing...' : 'Zipping...'}`;
+    btn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg> Zipping...`;
     
     try {
         const zip = new JSZip();
 
-        // 1. Get image data — full quality or compressed depending on mode.
-        const { imageDataArray, fetchPromises, imageNameMap } = optimized
-            ? await addImagesToZipOptimized(zip, { maxDim: 640, quality: 0.55 })
-            : await window.addImagesToZip(zip);
+        // 1. Get FULL SIZE image data for primary folder and JSON
+        const { imageDataArray: fullImageData, fetchPromises: fullPromises, imageNameMap: fullNameMap } 
+            = await window.addImagesToZip(zip);
         
-        // 2. WAIT for all images to be fetched AND for imageDataArray to be populated
-        await Promise.all(fetchPromises);
+        // 2. Get OPTIMIZED image data for alternate folder
+        const { imageDataArray: optImageData, fetchPromises: optPromises, imageNameMap: optNameMap } 
+            = await addImagesToZipOptimized(zip, { maxDim: 640, quality: 0.55 });
+        
+        // 3. WAIT for all images to be fetched
+        await Promise.all([...fullPromises, ...optPromises]);
 
-        // 3. Pass the populated imageDataArray to the image_notes.csv function
-        const imageNotesCSV = createImageNotesCSV(imageDataArray); 
+        // 4. Pass the populated imageDataArray to the image_notes.csv function (using full size)
+        const imageNotesCSV = createImageNotesCSV(fullImageData); 
         // FIX: Prepend \uFEFF so Excel recognizes it as UTF-8
         zip.file("image_notes.csv", "\uFEFF" + imageNotesCSV);
         
-        // 4. Add the Arranged Risk Table CSV (passing the new map, excludes deleted rows)
+        // 5. Add the Arranged Risk Table CSV (passing the full size map, excludes deleted rows)
         try {
-            zip.file("arranged_risk_table.csv", "\uFEFF" + generateArrangedRiskCSV(imageNameMap)); 
+            zip.file("arranged_risk_table.csv", "\uFEFF" + generateArrangedRiskCSV(fullNameMap)); 
         } catch (e) {
             zip.file("arranged_risk_table.csv", `Error: ${e.message}`);
         }
 
-        // 5. Generate Shareable HTML Report (always include, but with optimized GIFs if requested)
+        // 6. Generate Shareable HTML Report (pointing to full size images by default)
         try {
             if (typeof window.generateShareableHTML === 'function') {
-                const shareableHTML = await window.generateShareableHTML(imageNameMap);
+                const shareableHTML = await window.generateShareableHTML(fullNameMap);
                 if (shareableHTML) {
                     zip.file("Risk_Assessment_Report.html", shareableHTML);
                     console.log("✅ Shareable HTML report added to ZIP");
@@ -7178,28 +7152,41 @@ async function downloadProjectZip(options = {}) {
             console.warn("Could not generate shareable HTML:", e);
         }
 
-        // Optimized mode: add a small info file explaining what was optimized.
-        if (optimized) {
-            zip.file("OPTIMIZED_EXPORT_INFO.txt",
-                "This is an Optimized export.\n" +
-                "Images have been resized to max 640 px and compressed to ~55% JPEG quality.\n" +
-                "GIF clip tasks are re-encoded using adaptive sizing (25% of baseline).\n" +
-                "Embedded GIF clips use the same compression as lightbox Optimized preset.\n" +
-                "The HTML report is included with optimized image links.\n"
-            );
-        }
+        // 7. Add a README explaining the dual-folder structure
+        const readmeContent = `📁 PROJECT ZIP CONTENTS
+=====================================
 
-        // 6. Add Proposed Actions CSV (Counter Measures)
-        try {
-            const actionsCSV = generateActionsCSV();
-            zip.file("proposed_actions.csv", "\uFEFF" + actionsCSV);
-            console.log("✅ Proposed actions CSV added to ZIP");
-        } catch (e) {
-            console.warn("Could not generate actions CSV:", e);
-            zip.file("proposed_actions.csv", "\uFEFF\"Error\",\"Could not generate actions CSV: " + e.message + "\"");
-        }
+This ZIP contains both FULL SIZE and OPTIMIZED versions of your images:
 
-        // 7. Add Project JSON file (with base64 for reloading)
+📂 edited_images/
+   - Full quality images (original dimensions)
+   - Full size GIFs (uncompressed)
+   - Use this for maximum quality and detail
+
+📂 edited_images_optimized/
+   - Compressed images (max 640px, ~55% JPEG quality)
+   - Optimized GIFs (adaptive sizing, ~25% of baseline)
+   - Use this for smaller file size and faster sharing
+
+FILES:
+- risk_project.json: Project data (references edited_images/ by default)
+- Risk_Assessment_Report.html: Interactive report with full-size images
+- image_notes.csv: Image descriptions, hazards, and controls
+- arranged_risk_table.csv: Risk table organized by task steps
+- proposed_actions.csv: Counter measures and controls summary
+
+USAGE:
+1. Extract all files
+2. Choose your preferred image folder (edited_images or edited_images_optimized)
+3. If using optimized, update image paths in JSON or HTML
+4. Open Risk_Assessment_Report.html in your web browser
+
+Both versions use the same GIF frame data and metadata, so your captured clips
+remain fully editable regardless of which image folder you choose.
+`;
+        zip.file("README.txt", readmeContent);
+
+        // 8. Add Project JSON file (with base64 for reloading, pointing to full size)
         try {
             const projectData = {
                 version: '1.0',
@@ -7211,7 +7198,13 @@ async function downloadProjectZip(options = {}) {
                 images: [],
                 riskData: Array.from(window.riskAssessmentData),
                 clipData: [],
-                tableData: window.extractTableData ? window.extractTableData() : null
+                tableData: window.extractTableData ? window.extractTableData() : null,
+                exportInfo: {
+                    generatedAt: new Date().toISOString(),
+                    defaultImageFolder: 'edited_images',
+                    alternateFolder: 'edited_images_optimized',
+                    note: 'JSON references edited_images (full size). Update paths if using edited_images_optimized instead.'
+                }
             };
 
             try {
@@ -7224,13 +7217,14 @@ async function downloadProjectZip(options = {}) {
                 console.error('❌ ZIP Export: Failed to collect clip data:', clipZipError);
             }
 
+            // Use FULL SIZE base64 data for JSON
             const base64ByImgId = {};
-            imageDataArray.forEach(item => {
-                // Keep embedded media payload so any exported project remains fully resumable.
+            fullImageData.forEach(item => {
                 base64ByImgId[item.imgId] = item.base64;
             });
 
-            for (const [imgId, zipFileName] of imageNameMap) {
+            // JSON points to full size folder by default
+            for (const [imgId, zipFileName] of fullNameMap) {
                 projectData.images.push({
                     id: imgId,
                     fileName: zipFileName,
@@ -7277,27 +7271,37 @@ async function downloadProjectZip(options = {}) {
             }
 
             zip.file("risk_project.json", JSON.stringify(projectData, null, 2));
-            console.log("✅ Project JSON added to ZIP");
+            console.log("✅ Project JSON added to ZIP (referencing full-size images)");
         } catch (projError) {
             console.error("Error generating project JSON:", projError);
             zip.file("ERROR_generating_project_json.txt", `Error: ${projError.message}`);
         }
 
-        // 8. Generate and Download
-        const baseName = optimized ? 'Complete_Risk_Project_Optimized' : 'Complete_Risk_Project';
+        // 9. Add Proposed Actions CSV (Counter Measures)
+        try {
+            const actionsCSV = generateActionsCSV();
+            zip.file("proposed_actions.csv", "\uFEFF" + actionsCSV);
+            console.log("✅ Proposed actions CSV added to ZIP");
+        } catch (e) {
+            console.warn("Could not generate actions CSV:", e);
+            zip.file("proposed_actions.csv", "\uFEFF\"Error\",\"Could not generate actions CSV: " + e.message + "\"");
+        }
+
+        // 10. Generate and Download
         const content = await zip.generateAsync({
             type: 'blob',
             compression: 'DEFLATE',
-            compressionOptions: { level: optimized ? 9 : 6 }
+            compressionOptions: { level: 9 }
         });
         const link = document.createElement('a');
         link.href = URL.createObjectURL(content);
-        link.download = getProjectFileName(baseName, '.zip');
+        link.download = getProjectFileName('Complete_Risk_Project', '.zip');
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
         setTimeout(() => URL.revokeObjectURL(link.href), 1000);
-        if (optimized) showCustomAlert('Optimized project ZIP downloaded — images resized to 640 px max.', 'success');
+        
+        showCustomAlert('✅ Project ZIP downloaded with both full-size and optimized images!', 'success');
 
     } catch (error) {
         console.error('Error generating project ZIP:', error);
@@ -7308,36 +7312,7 @@ async function downloadProjectZip(options = {}) {
     }
 }
 
-// --- Project ZIP dropdown menu ---
-let projectZipMenuOpen = false;
-
-function closeProjectZipMenu() {
-    const menu = document.getElementById('projectZipMenu');
-    const btn = document.getElementById('downloadProjectZipBtn');
-    if (menu) menu.classList.add('hidden');
-    if (btn) btn.setAttribute('aria-expanded', 'false');
-    projectZipMenuOpen = false;
-}
-
-function openProjectZipMenu() {
-    const menu = document.getElementById('projectZipMenu');
-    const btn = document.getElementById('downloadProjectZipBtn');
-    if (!menu || !btn) return;
-    menu.classList.remove('hidden');
-    btn.setAttribute('aria-expanded', 'true');
-    projectZipMenuOpen = true;
-}
-
-window.toggleProjectZipMenu = function(event) {
-    if (event) { event.preventDefault(); event.stopPropagation(); }
-    if (projectZipMenuOpen) { closeProjectZipMenu(); } else { openProjectZipMenu(); }
-};
-
-document.addEventListener('click', (event) => {
-    if (!projectZipMenuOpen) return;
-    const root = document.getElementById('projectZipMenuRoot');
-    if (root && !root.contains(event.target)) closeProjectZipMenu();
-});
+// --- Project ZIP download (simplified - no dropdown menu) ---
 
 // Compress a blob to JPEG at reduced dimensions for optimized export.
 async function compressImageBlob(blob, maxDim, quality) {
@@ -7674,11 +7649,6 @@ async function addImagesToZipOptimized(zip, { maxDim = 640, quality = 0.55 } = {
     }
     return { imageDataArray, fetchPromises, imageNameMap };
 }
-
-window.downloadProjectZipFromMenu = async function(preset = 'complete') {
-    closeProjectZipMenu();
-    await downloadProjectZip({ optimized: preset === 'optimized' });
-};
 
 // --- RISK EVOLUTION VISUALIZATION ---
 function generateRiskEvolutionVisualization(initialScore, currentScore, projectedScore, controlCount) {
