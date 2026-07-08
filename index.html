@@ -8959,7 +8959,7 @@ window.LIKELIHOOD_SCALE = LIKELIHOOD_SCALE;
                                 bestAttempt = { gifBlob, gifSize: scaledSize, quality };
                             }
 
-                            if (gifBlob.size <= targetBytes) {
+                            if (gifBlob.size <= calculatedTargetBytes) {
                                 foundTargetMatch = true;
                                 bestAttempt = { gifBlob, gifSize: scaledSize, quality };
                                 break;
@@ -8986,7 +8986,7 @@ window.LIKELIHOOD_SCALE = LIKELIHOOD_SCALE;
 
                 const zip = new JSZip();
                 const now = new Date();
-                const sizeSuffix = targetBytes ? `${Math.round(targetBytes / 1024)}kb` : 'fullsize';
+                const sizeSuffix = calculatedTargetBytes ? `${Math.round(calculatedTargetBytes / 1024)}kb` : 'fullsize';
                 const gifFileName = `clip_${now.getTime()}_${sizeSuffix}.gif`;
 
                 zip.file(gifFileName, gifBlob);
@@ -9003,9 +9003,9 @@ window.LIKELIHOOD_SCALE = LIKELIHOOD_SCALE;
                     gifQuality: bestAttempt.quality,
                     actualBytes: gifBytes,
                     actualSizeLabel: formatBytes(gifBytes),
-                    targetBytes: targetBytes,
-                    targetSizeLabel: targetBytes ? formatBytes(targetBytes) : null,
-                    targetMet: fullSize ? null : (gifBytes <= targetBytes),
+                    targetBytes: calculatedTargetBytes,
+                    targetSizeLabel: calculatedTargetBytes ? formatBytes(calculatedTargetBytes) : null,
+                    targetMet: fullSize ? null : (gifBytes <= calculatedTargetBytes),
                     exportSource: 'lightbox_clip',
                     notes: 'Clip GIF exported from lightbox. Base64 data included for project reload.'
                 }, null, 2));
