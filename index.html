@@ -8960,50 +8960,10 @@ window.LIKELIHOOD_SCALE = LIKELIHOOD_SCALE;
                 let bestAttempt = { gifBlob: baselineBlob, gifSize: fullResolution, quality: GIF_CAPTURE_QUALITY };
                 let foundTargetMatch = fullSize ? true : (baselineBlob.size <= calculatedTargetBytes);
 
-                // STEP 3: Try quality optimization at full resolution
-                if (!foundTargetMatch && calculatedTargetBytes) {
-                    const qualitySteps = [22, 25, 28, 30];
-                    for (const quality of qualitySteps) {
-                        const frameCanvas = document.createElement('canvas');
-                        frameCanvas.width = fullResolution.width;
-                        frameCanvas.height = fullResolution.height;
-                        const frameCtx = frameCanvas.getContext('2d');
-                        if (!frameCtx) throw new Error('Could not create canvas context');
-
-                        const gifEncoder = new GIF({
-                            workers: 2,
-                            quality,
-                            width: fullResolution.width,
-                            height: fullResolution.height,
-                            workerScript: GIF_CAPTURE_WORKER_URL
-                        });
-
-                        for (const frameId of clip.frameIds) {
-                            const frameImg = getClipFrameImage(frameId);
-                            if (!frameImg) continue;
-                            await waitForImage(frameImg);
-                            frameCtx.clearRect(0, 0, fullResolution.width, fullResolution.height);
-                            frameCtx.drawImage(frameImg, 0, 0, fullResolution.width, fullResolution.height);
-                            gifEncoder.addFrame(frameCanvas, {
-                                copy: true,
-                                delay: Math.max(60, Number(clip.frameDelayMs) || 160)
-                            });
-                        }
-
-                        const gifBlob = await renderGifToBlob(gifEncoder);
-                        const attempt = { gifBlob, gifSize: fullResolution, quality };
-
-                        if (!bestAttempt || gifBlob.size < bestAttempt.gifBlob.size) {
-                            bestAttempt = attempt;
-                        }
-
-                        if (gifBlob.size <= calculatedTargetBytes) {
-                            foundTargetMatch = true;
-                            bestAttempt = attempt;
-                            break;
-                        }
-                    }
-                }
+                // STEP 3: Skip quality optimization for compressed presets (baseline is already at quality 20 = max compression)
+                // For optimized/balanced, baseline at quality 20 is already smallest possible at full resolution
+                // Going to higher quality values (22, 25, 28, 30) only increases file size
+                // So we skip quality optimization and go straight to resolution scaling if needed
 
                 // STEP 4: If quality-only didn't hit target, try resolution scaling
                 if (!foundTargetMatch && calculatedTargetBytes && bestAttempt.gifBlob.size > calculatedTargetBytes) {
@@ -9014,45 +8974,45 @@ window.LIKELIHOOD_SCALE = LIKELIHOOD_SCALE;
                     ];
                     
                     for (const scaledSize of scaledSizes) {
-                        for (const quality of [GIF_CAPTURE_QUALITY, 25, 28, 30]) { // Use higher quality values (more compression)
-                            const frameCanvas = document.createElement('canvas');
-                            frameCanvas.width = scaledSize.width;
-                            frameCanvas.height = scaledSize.height;
-                            const frameCtx = frameCanvas.getContext('2d');
-                            if (!frameCtx) continue;
+                        // At each resolution scale, use quality 20 (maximum compression)
+                        // No need to try higher quality values as they only increase file size
+                        const quality = GIF_CAPTURE_QUALITY;
+                        const frameCanvas = document.createElement('canvas');
+                        frameCanvas.width = scaledSize.width;
+                        frameCanvas.height = scaledSize.height;
+                        const frameCtx = frameCanvas.getContext('2d');
+                        if (!frameCtx) continue;
 
-                            const gifEncoder = new GIF({
-                                workers: 2,
-                                quality,
-                                width: scaledSize.width,
-                                height: scaledSize.height,
-                                workerScript: GIF_CAPTURE_WORKER_URL
+                        const gifEncoder = new GIF({
+                            workers: 2,
+                            quality,
+                            width: scaledSize.width,
+                            height: scaledSize.height,
+                            workerScript: GIF_CAPTURE_WORKER_URL
+                        });
+
+                        for (const frameId of clip.frameIds) {
+                            const frameImg = getClipFrameImage(frameId);
+                            if (!frameImg) continue;
+                            await waitForImage(frameImg);
+                            frameCtx.clearRect(0, 0, scaledSize.width, scaledSize.height);
+                            frameCtx.drawImage(frameImg, 0, 0, scaledSize.width, scaledSize.height);
+                            gifEncoder.addFrame(frameCanvas, {
+                                copy: true,
+                                delay: Math.max(60, Number(clip.frameDelayMs) || 160)
                             });
-
-                            for (const frameId of clip.frameIds) {
-                                const frameImg = getClipFrameImage(frameId);
-                                if (!frameImg) continue;
-                                await waitForImage(frameImg);
-                                frameCtx.clearRect(0, 0, scaledSize.width, scaledSize.height);
-                                frameCtx.drawImage(frameImg, 0, 0, scaledSize.width, scaledSize.height);
-                                gifEncoder.addFrame(frameCanvas, {
-                                    copy: true,
-                                    delay: Math.max(60, Number(clip.frameDelayMs) || 160)
-                                });
-                            }
-
-                            const gifBlob = await renderGifToBlob(gifEncoder);
-                            if (!bestAttempt || gifBlob.size < bestAttempt.gifBlob.size) {
-                                bestAttempt = { gifBlob, gifSize: scaledSize, quality };
-                            }
-
-                            if (gifBlob.size <= calculatedTargetBytes) {
-                                foundTargetMatch = true;
-                                bestAttempt = { gifBlob, gifSize: scaledSize, quality };
-                                break;
-                            }
                         }
-                        if (foundTargetMatch) break;
+
+                        const gifBlob = await renderGifToBlob(gifEncoder);
+                        if (!bestAttempt || gifBlob.size < bestAttempt.gifBlob.size) {
+                            bestAttempt = { gifBlob, gifSize: scaledSize, quality };
+                        }
+
+                        if (gifBlob.size <= calculatedTargetBytes) {
+                            foundTargetMatch = true;
+                            bestAttempt = { gifBlob, gifSize: scaledSize, quality };
+                            break;
+                        }
                     }
                 }
 
@@ -9546,50 +9506,12 @@ window.LIKELIHOOD_SCALE = LIKELIHOOD_SCALE;
                     bestAttempt = { gifBlob: baselineBlob, gifSize: fullResolution, quality: GIF_CAPTURE_QUALITY };
                 }
 
-                // STEP 3: Try quality optimization at full resolution
+                // STEP 3: Skip quality optimization for compressed presets (baseline is already at quality 20 = max compression)
+                // Baseline at quality 20 is already smallest possible at full resolution
+                // Higher quality values (22, 25, 28, 30) only increase file size, so skip to resolution scaling
+
+                // STEP 4: Try resolution scaling if needed
                 let foundTargetMatch = fullSize ? true : (baselineBlob.size <= calculatedTargetBytes);
-                if (!foundTargetMatch && calculatedTargetBytes) {
-                    const qualitySteps = [22, 25, 28, 30];
-                    for (const quality of qualitySteps) {
-                        const captureCanvas = document.createElement('canvas');
-                        captureCanvas.width = fullResolution.width;
-                        captureCanvas.height = fullResolution.height;
-                        const captureContext = captureCanvas.getContext('2d');
-                        if (!captureContext) {
-                            throw new Error('Could not initialize GIF capture canvas context.');
-                        }
-
-                        const gifEncoder = new GIF({
-                            workers: 2,
-                            quality,
-                            width: fullResolution.width,
-                            height: fullResolution.height,
-                            workerScript: GIF_CAPTURE_WORKER_URL
-                        });
-
-                        for (let i = 0; i < frameCount; i++) {
-                            const targetTime = originalTime + (sampleStep * i);
-                            await seekVideoForGifCapture(player, targetTime);
-                            captureContext.drawImage(player, 0, 0, fullResolution.width, fullResolution.height);
-                            gifEncoder.addFrame(captureCanvas, { copy: true, delay: frameDelayMs });
-                        }
-
-                        const gifBlob = await renderGifToBlob(gifEncoder);
-                        const attempt = { gifBlob, gifSize: fullResolution, quality };
-
-                        if (gifBlob.size < bestAttempt.gifBlob.size) {
-                            bestAttempt = attempt;
-                        }
-
-                        if (gifBlob.size <= calculatedTargetBytes) {
-                            foundTargetMatch = true;
-                            bestAttempt = attempt;
-                            break;
-                        }
-                    }
-                }
-
-                // STEP 4: If quality-only didn't hit target, try resolution scaling
                 if (!foundTargetMatch && calculatedTargetBytes && bestAttempt.gifBlob.size > calculatedTargetBytes) {
                     const scaledSizes = [
                         getGifCaptureDimensions(player.videoWidth, player.videoHeight, player.videoWidth * 0.75), // 75% resolution
@@ -9598,40 +9520,40 @@ window.LIKELIHOOD_SCALE = LIKELIHOOD_SCALE;
                     ];
                     
                     for (const scaledSize of scaledSizes) {
-                        for (const quality of [GIF_CAPTURE_QUALITY, 25, 28, 30]) {
-                            const captureCanvas = document.createElement('canvas');
-                            captureCanvas.width = scaledSize.width;
-                            captureCanvas.height = scaledSize.height;
-                            const captureContext = captureCanvas.getContext('2d');
-                            if (!captureContext) continue;
+                        // At each resolution scale, use quality 20 (maximum compression)
+                        // No need to try higher quality values as they only increase file size
+                        const quality = GIF_CAPTURE_QUALITY;
+                        const captureCanvas = document.createElement('canvas');
+                        captureCanvas.width = scaledSize.width;
+                        captureCanvas.height = scaledSize.height;
+                        const captureContext = captureCanvas.getContext('2d');
+                        if (!captureContext) continue;
 
-                            const gifEncoder = new GIF({
-                                workers: 2,
-                                quality,
-                                width: scaledSize.width,
-                                height: scaledSize.height,
-                                workerScript: GIF_CAPTURE_WORKER_URL
-                            });
+                        const gifEncoder = new GIF({
+                            workers: 2,
+                            quality,
+                            width: scaledSize.width,
+                            height: scaledSize.height,
+                            workerScript: GIF_CAPTURE_WORKER_URL
+                        });
 
-                            for (let i = 0; i < frameCount; i++) {
-                                const targetTime = originalTime + (sampleStep * i);
-                                await seekVideoForGifCapture(player, targetTime);
-                                captureContext.drawImage(player, 0, 0, scaledSize.width, scaledSize.height);
-                                gifEncoder.addFrame(captureCanvas, { copy: true, delay: frameDelayMs });
-                            }
-
-                            const gifBlob = await renderGifToBlob(gifEncoder);
-                            if (gifBlob.size < bestAttempt.gifBlob.size) {
-                                bestAttempt = { gifBlob, gifSize: scaledSize, quality };
-                            }
-
-                            if (gifBlob.size <= calculatedTargetBytes) {
-                                foundTargetMatch = true;
-                                bestAttempt = { gifBlob, gifSize: scaledSize, quality };
-                                break;
-                            }
+                        for (let i = 0; i < frameCount; i++) {
+                            const targetTime = originalTime + (sampleStep * i);
+                            await seekVideoForGifCapture(player, targetTime);
+                            captureContext.drawImage(player, 0, 0, scaledSize.width, scaledSize.height);
+                            gifEncoder.addFrame(captureCanvas, { copy: true, delay: frameDelayMs });
                         }
-                        if (foundTargetMatch) break;
+
+                        const gifBlob = await renderGifToBlob(gifEncoder);
+                        if (gifBlob.size < bestAttempt.gifBlob.size) {
+                            bestAttempt = { gifBlob, gifSize: scaledSize, quality };
+                        }
+
+                        if (gifBlob.size <= calculatedTargetBytes) {
+                            foundTargetMatch = true;
+                            bestAttempt = { gifBlob, gifSize: scaledSize, quality };
+                            break;
+                        }
                     }
                 }
 
