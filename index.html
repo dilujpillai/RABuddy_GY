@@ -8785,7 +8785,7 @@ window.LIKELIHOOD_SCALE = LIKELIHOOD_SCALE;
             if (preset === 'balanced500') {
                 modeLabel = 'Balanced';
                 targetBytes = 500 * 1024;
-                qualitySteps = [GIF_CAPTURE_QUALITY, 28];
+                qualitySteps = [GIF_CAPTURE_QUALITY, 22, 24];
                 fullSize = false;
             } else if (preset === 'fullsize') {
                 modeLabel = 'Full Size';
@@ -8795,7 +8795,7 @@ window.LIKELIHOOD_SCALE = LIKELIHOOD_SCALE;
             } else {
                 modeLabel = 'Optimized';
                 targetBytes = 250 * 1024;
-                qualitySteps = [GIF_CAPTURE_QUALITY, 28, 36];
+                qualitySteps = [GIF_CAPTURE_QUALITY, 22, 24, 26];
                 fullSize = false;
             }
 
@@ -8831,15 +8831,14 @@ window.LIKELIHOOD_SCALE = LIKELIHOOD_SCALE;
                 const frameW = firstFrameImg.naturalWidth || 320;
                 const frameH = firstFrameImg.naturalHeight || 240;
 
-                // Build size candidates
-                const gifSizes = fullSize
-                    ? [getGifCaptureDimensions(frameW, frameH, frameW)]
-                    : buildOptimizedGifSizeCandidates(frameW, frameH);
+                // Use full resolution, optimize via quality levels only (not resolution scaling)
+                const fullResolution = getGifCaptureDimensions(frameW, frameH, frameW);
+                const gifSizes = [fullResolution]; // Keep full resolution, only compress via quality
 
                 let bestAttempt = null;
                 let foundTargetMatch = false;
 
-                // Try combinations of size and quality until we find one that meets target
+                // Try quality levels until we find one that meets target (at full resolution)
                 for (const gifSize of gifSizes) {
                     for (const quality of qualitySteps) {
                         const frameCanvas = document.createElement('canvas');
@@ -9309,10 +9308,10 @@ window.LIKELIHOOD_SCALE = LIKELIHOOD_SCALE;
             const frameDelayMs = Math.max(80, Math.round((clipDuration * 1000) / frameCount));
             const sampleStep = frameCount > 1 ? clipDuration / (frameCount - 1) : 0;
 
-            const gifSizes = fullSize
-                ? [getGifCaptureDimensions(player.videoWidth, player.videoHeight, player.videoWidth)]
-                : buildOptimizedGifSizeCandidates(player.videoWidth, player.videoHeight);
-            const qualitySteps = fullSize ? [GIF_CAPTURE_QUALITY] : [GIF_CAPTURE_QUALITY, 28, 36];
+            // Use full resolution, optimize via quality levels only (not resolution scaling)
+            const fullResolution = getGifCaptureDimensions(player.videoWidth, player.videoHeight, player.videoWidth);
+            const gifSizes = [fullResolution]; // Keep full resolution, only compress via quality
+            const qualitySteps = fullSize ? [GIF_CAPTURE_QUALITY] : [GIF_CAPTURE_QUALITY, 22, 24, 26];
 
             let bestAttempt = null;
 
