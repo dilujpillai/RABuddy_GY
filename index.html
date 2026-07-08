@@ -8785,7 +8785,7 @@ window.LIKELIHOOD_SCALE = LIKELIHOOD_SCALE;
             if (preset === 'balanced500') {
                 modeLabel = 'Balanced';
                 targetBytes = 500 * 1024;
-                qualitySteps = [GIF_CAPTURE_QUALITY, 22, 24];
+                qualitySteps = [GIF_CAPTURE_QUALITY, 24, 30];
                 fullSize = false;
             } else if (preset === 'fullsize') {
                 modeLabel = 'Full Size';
@@ -8795,7 +8795,7 @@ window.LIKELIHOOD_SCALE = LIKELIHOOD_SCALE;
             } else {
                 modeLabel = 'Optimized';
                 targetBytes = 250 * 1024;
-                qualitySteps = [GIF_CAPTURE_QUALITY, 22, 24, 26];
+                qualitySteps = [GIF_CAPTURE_QUALITY, 24, 30, 36];
                 fullSize = false;
             }
 
@@ -9311,7 +9311,7 @@ window.LIKELIHOOD_SCALE = LIKELIHOOD_SCALE;
             // Use full resolution, optimize via quality levels only (not resolution scaling)
             const fullResolution = getGifCaptureDimensions(player.videoWidth, player.videoHeight, player.videoWidth);
             const gifSizes = [fullResolution]; // Keep full resolution, only compress via quality
-            const qualitySteps = fullSize ? [GIF_CAPTURE_QUALITY] : [GIF_CAPTURE_QUALITY, 22, 24, 26];
+            const qualitySteps = fullSize ? [GIF_CAPTURE_QUALITY] : [GIF_CAPTURE_QUALITY, 24, 30, 36];
 
             let bestAttempt = null;
 
