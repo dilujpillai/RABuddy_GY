@@ -8785,7 +8785,7 @@ window.LIKELIHOOD_SCALE = LIKELIHOOD_SCALE;
             if (preset === 'balanced500') {
                 modeLabel = 'Balanced';
                 targetBytes = 500 * 1024;
-                qualitySteps = [GIF_CAPTURE_QUALITY, 24, 30];
+                qualitySteps = [22, 25, 28]; // Try progressively lower quality for compression
                 fullSize = false;
             } else if (preset === 'fullsize') {
                 modeLabel = 'Full Size';
@@ -8795,7 +8795,7 @@ window.LIKELIHOOD_SCALE = LIKELIHOOD_SCALE;
             } else {
                 modeLabel = 'Optimized';
                 targetBytes = 250 * 1024;
-                qualitySteps = [GIF_CAPTURE_QUALITY, 24, 30, 36];
+                qualitySteps = [22, 25, 28, 30]; // More aggressive quality reduction for smaller files
                 fullSize = false;
             }
 
@@ -8831,14 +8831,15 @@ window.LIKELIHOOD_SCALE = LIKELIHOOD_SCALE;
                 const frameW = firstFrameImg.naturalWidth || 320;
                 const frameH = firstFrameImg.naturalHeight || 240;
 
-                // Use full resolution, optimize via quality levels only (not resolution scaling)
+                // Use full resolution first, optimize via quality levels only
                 const fullResolution = getGifCaptureDimensions(frameW, frameH, frameW);
-                const gifSizes = [fullResolution]; // Keep full resolution, only compress via quality
-
+                let gifSizes = [fullResolution]; // Start with full resolution
+                
+                // If full resolution doesn't work with quality optimization, we'll add scaled candidates below
                 let bestAttempt = null;
                 let foundTargetMatch = false;
 
-                // Try quality levels until we find one that meets target (at full resolution)
+                // Try quality levels at full resolution until we find one that meets target
                 for (const gifSize of gifSizes) {
                     for (const quality of qualitySteps) {
                         const frameCanvas = document.createElement('canvas');
@@ -8881,6 +8882,57 @@ window.LIKELIHOOD_SCALE = LIKELIHOOD_SCALE;
                         }
                     }
                     if (foundTargetMatch) break;
+                }
+
+                // If quality-only didn't hit target, add resolution scaling as fallback
+                if (!foundTargetMatch && !fullSize && targetBytes && bestAttempt && bestAttempt.gifBlob.size > targetBytes) {
+                    const scaledSizes = [
+                        getGifCaptureDimensions(frameW, frameH, frameW * 0.75), // 75% resolution
+                        getGifCaptureDimensions(frameW, frameH, frameW * 0.5),  // 50% resolution
+                        getGifCaptureDimensions(frameW, frameH, frameW * 0.33)  // 33% resolution
+                    ];
+                    
+                    for (const scaledSize of scaledSizes) {
+                        for (const quality of [GIF_CAPTURE_QUALITY, 25, 28, 30]) { // Use higher quality values (more compression)
+                            const frameCanvas = document.createElement('canvas');
+                            frameCanvas.width = scaledSize.width;
+                            frameCanvas.height = scaledSize.height;
+                            const frameCtx = frameCanvas.getContext('2d');
+                            if (!frameCtx) continue;
+
+                            const gifEncoder = new GIF({
+                                workers: 2,
+                                quality,
+                                width: scaledSize.width,
+                                height: scaledSize.height,
+                                workerScript: GIF_CAPTURE_WORKER_URL
+                            });
+
+                            for (const frameId of clip.frameIds) {
+                                const frameImg = getClipFrameImage(frameId);
+                                if (!frameImg) continue;
+                                await waitForImage(frameImg);
+                                frameCtx.clearRect(0, 0, scaledSize.width, scaledSize.height);
+                                frameCtx.drawImage(frameImg, 0, 0, scaledSize.width, scaledSize.height);
+                                gifEncoder.addFrame(frameCanvas, {
+                                    copy: true,
+                                    delay: Math.max(60, Number(clip.frameDelayMs) || 160)
+                                });
+                            }
+
+                            const gifBlob = await renderGifToBlob(gifEncoder);
+                            if (!bestAttempt || gifBlob.size < bestAttempt.gifBlob.size) {
+                                bestAttempt = { gifBlob, gifSize: scaledSize, quality };
+                            }
+
+                            if (gifBlob.size <= targetBytes) {
+                                foundTargetMatch = true;
+                                bestAttempt = { gifBlob, gifSize: scaledSize, quality };
+                                break;
+                            }
+                        }
+                        if (foundTargetMatch) break;
+                    }
                 }
 
                 if (!bestAttempt) {
@@ -9308,12 +9360,13 @@ window.LIKELIHOOD_SCALE = LIKELIHOOD_SCALE;
             const frameDelayMs = Math.max(80, Math.round((clipDuration * 1000) / frameCount));
             const sampleStep = frameCount > 1 ? clipDuration / (frameCount - 1) : 0;
 
-            // Use full resolution, optimize via quality levels only (not resolution scaling)
+            // Use full resolution, optimize via quality levels only
             const fullResolution = getGifCaptureDimensions(player.videoWidth, player.videoHeight, player.videoWidth);
-            const gifSizes = [fullResolution]; // Keep full resolution, only compress via quality
-            const qualitySteps = fullSize ? [GIF_CAPTURE_QUALITY] : [GIF_CAPTURE_QUALITY, 24, 30, 36];
+            let gifSizes = [fullResolution]; // Start with full resolution
+            const qualitySteps = fullSize ? [GIF_CAPTURE_QUALITY] : [GIF_CAPTURE_QUALITY, 22, 25, 28];
 
             let bestAttempt = null;
+            let foundTargetMatch = false;
 
             try {
                 player.pause();
@@ -9351,19 +9404,57 @@ window.LIKELIHOOD_SCALE = LIKELIHOOD_SCALE;
                         }
 
                         if (fullSize || gifBlob.size <= targetBytes) {
-                            return {
-                                gifBlob,
-                                clipDuration,
-                                frameCount,
-                                frameDelayMs,
-                                gifSize,
-                                quality,
-                                gifBytes: gifBlob.size,
-                                targetBytes,
-                                targetMet: fullSize ? null : gifBlob.size <= targetBytes,
-                                exportMode: fullSize ? 'full-size' : 'optimized'
-                            };
+                            foundTargetMatch = true;
+                            bestAttempt = attempt;
+                            break; // Found acceptable size
                         }
+                    }
+                    if (foundTargetMatch) break;
+                }
+
+                // If quality-only didn't hit target, add resolution scaling as fallback
+                if (!foundTargetMatch && !fullSize && bestAttempt && bestAttempt.gifBlob.size > targetBytes) {
+                    const scaledSizes = [
+                        getGifCaptureDimensions(player.videoWidth, player.videoHeight, player.videoWidth * 0.75), // 75% resolution
+                        getGifCaptureDimensions(player.videoWidth, player.videoHeight, player.videoWidth * 0.5),  // 50% resolution
+                        getGifCaptureDimensions(player.videoWidth, player.videoHeight, player.videoWidth * 0.33)  // 33% resolution
+                    ];
+                    
+                    for (const scaledSize of scaledSizes) {
+                        for (const quality of [GIF_CAPTURE_QUALITY, 25, 28, 30]) { // Use higher quality values (more compression)
+                            const captureCanvas = document.createElement('canvas');
+                            captureCanvas.width = scaledSize.width;
+                            captureCanvas.height = scaledSize.height;
+                            const captureContext = captureCanvas.getContext('2d');
+                            if (!captureContext) continue;
+
+                            const gifEncoder = new GIF({
+                                workers: 2,
+                                quality,
+                                width: scaledSize.width,
+                                height: scaledSize.height,
+                                workerScript: GIF_CAPTURE_WORKER_URL
+                            });
+
+                            for (let i = 0; i < frameCount; i++) {
+                                const targetTime = originalTime + (sampleStep * i);
+                                await seekVideoForGifCapture(player, targetTime);
+                                captureContext.drawImage(player, 0, 0, scaledSize.width, scaledSize.height);
+                                gifEncoder.addFrame(captureCanvas, { copy: true, delay: frameDelayMs });
+                            }
+
+                            const gifBlob = await renderGifToBlob(gifEncoder);
+                            if (!bestAttempt || gifBlob.size < bestAttempt.gifBlob.size) {
+                                bestAttempt = { gifBlob, gifSize: scaledSize, quality };
+                            }
+
+                            if (gifBlob.size <= targetBytes) {
+                                foundTargetMatch = true;
+                                bestAttempt = { gifBlob, gifSize: scaledSize, quality };
+                                break;
+                            }
+                        }
+                        if (foundTargetMatch) break;
                     }
                 }
 
@@ -9380,8 +9471,8 @@ window.LIKELIHOOD_SCALE = LIKELIHOOD_SCALE;
                     quality: bestAttempt.quality,
                     gifBytes: bestAttempt.gifBlob.size,
                     targetBytes,
-                    targetMet: bestAttempt.gifBlob.size <= targetBytes,
-                    exportMode: 'optimized'
+                    targetMet: fullSize ? null : bestAttempt.gifBlob.size <= targetBytes,
+                    exportMode: fullSize ? 'full-size' : 'optimized'
                 };
             } finally {
                 try {
