@@ -8822,8 +8822,22 @@ window.LIKELIHOOD_SCALE = LIKELIHOOD_SCALE;
                 });
 
                 await waitForImage(firstFrameImg);
-                const frameW = firstFrameImg.naturalWidth || 320;
-                const frameH = firstFrameImg.naturalHeight || 240;
+                let frameW = firstFrameImg.naturalWidth;
+                let frameH = firstFrameImg.naturalHeight;
+                
+                // If frame dimensions couldn't be loaded from DOM, try to get from clip metadata or use defaults
+                if (!frameW || !frameH) {
+                    console.warn('Frame dimensions not available from DOM, checking clip metadata...');
+                    if (clip.metadata && clip.metadata.gifWidth && clip.metadata.gifHeight) {
+                        frameW = clip.metadata.gifWidth;
+                        frameH = clip.metadata.gifHeight;
+                    } else {
+                        // Fall back to reasonable defaults
+                        frameW = 1080;
+                        frameH = 1080;
+                        console.warn('Using default dimensions:', frameW, frameH);
+                    }
+                }
 
                 // STEP 1: Measure baseline at full resolution with quality 20
                 const fullResolution = getGifCaptureDimensions(frameW, frameH, frameW);
@@ -8856,6 +8870,11 @@ window.LIKELIHOOD_SCALE = LIKELIHOOD_SCALE;
                     }
 
                     baselineBlob = await renderGifToBlob(baselineEncoder);
+                }
+
+                // Validate baseline was created
+                if (!baselineBlob || baselineBlob.size === 0) {
+                    throw new Error('Failed to create baseline GIF from frames. Frames may not have loaded properly.');
                 }
 
                 // STEP 2: Calculate adaptive targets based on baseline
@@ -8971,6 +8990,12 @@ window.LIKELIHOOD_SCALE = LIKELIHOOD_SCALE;
 
                 if (!bestAttempt) {
                     throw new Error('Could not generate GIF from this clip.');
+                }
+
+                // Validate bestAttempt structure
+                if (!bestAttempt.gifBlob || !bestAttempt.gifSize) {
+                    console.error('bestAttempt invalid structure:', bestAttempt);
+                    throw new Error('Invalid GIF structure: gifBlob=' + (bestAttempt.gifBlob ? 'ok' : 'missing') + ', gifSize=' + (bestAttempt.gifSize ? 'ok' : 'missing'));
                 }
 
                 const gifBlob = bestAttempt.gifBlob;
@@ -9432,6 +9457,11 @@ window.LIKELIHOOD_SCALE = LIKELIHOOD_SCALE;
                     baselineBlob = await renderGifToBlob(baselineEncoder);
                 }
 
+                // Validate baseline was created
+                if (!baselineBlob || baselineBlob.size === 0) {
+                    throw new Error('Failed to create baseline GIF from video. Video may not have loaded properly.');
+                }
+
                 // STEP 2: Calculate adaptive targets based on baseline
                 if (fullSize) {
                     calculatedTargetBytes = null;
@@ -9539,6 +9569,12 @@ window.LIKELIHOOD_SCALE = LIKELIHOOD_SCALE;
 
                 if (!bestAttempt) {
                     throw new Error('Could not generate GIF from this clip.');
+                }
+
+                // Validate bestAttempt structure
+                if (!bestAttempt.gifBlob || !bestAttempt.gifSize) {
+                    console.error('bestAttempt invalid structure:', bestAttempt);
+                    throw new Error('Invalid GIF structure: gifBlob=' + (bestAttempt.gifBlob ? 'ok' : 'missing') + ', gifSize=' + (bestAttempt.gifSize ? 'ok' : 'missing'));
                 }
 
                 return {
