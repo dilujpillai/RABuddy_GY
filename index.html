@@ -7407,9 +7407,42 @@ async function buildOptimizedGifFromClipFramesForZip(parentImageId, options = {}
         img.src = src;
     });
 
-    const first = await loadImage(frameNodes[0].src);
-    const srcW = first.naturalWidth || first.width;
-    const srcH = first.naturalHeight || first.height;
+    let first = null;
+    try {
+        first = await loadImage(frameNodes[0].src);
+    } catch (e) {
+        console.warn('Failed to load first frame:', e);
+        return null;
+    }
+
+    let srcW = first.naturalWidth || first.width;
+    let srcH = first.naturalHeight || first.height;
+    
+    // Robust fallback for frame dimensions from loaded JSON projects
+    if (!srcW || !srcH) {
+        console.warn('Frame dimensions not available, checking clip metadata...');
+        
+        // Get the clip data from the Map using the parent image ID
+        let foundClip = null;
+        for (const clip of clipCollections.values()) {
+            if (clip.frameIds && clip.frameIds.includes(frameNodes[0].id)) {
+                foundClip = clip;
+                break;
+            }
+        }
+        
+        if (foundClip && foundClip.metadata && foundClip.metadata.gifWidth && foundClip.metadata.gifHeight) {
+            srcW = foundClip.metadata.gifWidth;
+            srcH = foundClip.metadata.gifHeight;
+            console.log('Using dimensions from clip metadata:', srcW, 'x', srcH);
+        } else {
+            // Fallback to safe defaults
+            srcW = 1080;
+            srcH = 1080;
+            console.warn('Using default dimensions for ZIP GIF:', srcW, 'x', srcH);
+        }
+    }
+
     if (!srcW || !srcH) return null;
 
     const scale = Math.min(1, maxDim / Math.max(srcW, srcH));
@@ -7440,10 +7473,15 @@ async function buildOptimizedGifFromClipFramesForZip(parentImageId, options = {}
     gifEncoder.addFrame(canvas, { copy: true, delay: frameDelayMs });
 
     for (let i = 1; i < frameNodes.length; i++) {
-        const img = await loadImage(frameNodes[i].src);
-        ctx.clearRect(0, 0, width, height);
-        ctx.drawImage(img, 0, 0, width, height);
-        gifEncoder.addFrame(canvas, { copy: true, delay: frameDelayMs });
+        try {
+            const img = await loadImage(frameNodes[i].src);
+            ctx.clearRect(0, 0, width, height);
+            ctx.drawImage(img, 0, 0, width, height);
+            gifEncoder.addFrame(canvas, { copy: true, delay: frameDelayMs });
+        } catch (e) {
+            console.warn('Failed to load frame', i, ':', e);
+            // Skip this frame and continue
+        }
     }
 
     return renderGifBlobForZip(gifEncoder);
