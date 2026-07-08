@@ -8808,11 +8808,23 @@ window.LIKELIHOOD_SCALE = LIKELIHOOD_SCALE;
                 }
 
                 const waitForImage = (img) => new Promise((resolve) => {
-                    if (img.complete && img.naturalWidth) {
+                    if (!img) {
+                        resolve(false);
+                        return;
+                    }
+                    if (img.complete && img.naturalWidth > 0 && img.naturalHeight > 0) {
                         resolve(true);
                         return;
                     }
+                    // Set a timeout in case image never loads
+                    const timeout = setTimeout(() => {
+                        img.removeEventListener('load', done);
+                        img.removeEventListener('error', done);
+                        resolve(true); // Resolve anyway, we'll use fallback dimensions
+                    }, 2000);
+                    
                     const done = () => {
+                        clearTimeout(timeout);
                         img.removeEventListener('load', done);
                         img.removeEventListener('error', done);
                         resolve(true);
@@ -8825,17 +8837,35 @@ window.LIKELIHOOD_SCALE = LIKELIHOOD_SCALE;
                 let frameW = firstFrameImg.naturalWidth;
                 let frameH = firstFrameImg.naturalHeight;
                 
-                // If frame dimensions couldn't be loaded from DOM, try to get from clip metadata or use defaults
+                // If frame dimensions couldn't be loaded from DOM, try multiple fallbacks
                 if (!frameW || !frameH) {
-                    console.warn('Frame dimensions not available from DOM, checking clip metadata...');
+                    console.warn('Frame dimensions not available from DOM, trying fallbacks...');
+                    
+                    // Fallback 1: Check clip metadata (set when loading from JSON)
                     if (clip.metadata && clip.metadata.gifWidth && clip.metadata.gifHeight) {
                         frameW = clip.metadata.gifWidth;
                         frameH = clip.metadata.gifHeight;
-                    } else {
-                        // Fall back to reasonable defaults
+                        console.log('Using dimensions from clip metadata:', frameW, 'x', frameH);
+                    }
+                    // Fallback 2: Check clipEntry data structure (for newly captured clips)
+                    else if (clip.frameDelayMs && clip.frameIds && clip.frameIds.length > 0) {
+                        // Try to get dimensions from another frame
+                        for (const fId of clip.frameIds) {
+                            const fImg = getClipFrameImage(fId);
+                            if (fImg && fImg.naturalWidth && fImg.naturalHeight) {
+                                frameW = fImg.naturalWidth;
+                                frameH = fImg.naturalHeight;
+                                console.log('Using dimensions from alternate frame:', frameW, 'x', frameH);
+                                break;
+                            }
+                        }
+                    }
+                    
+                    // Fallback 3: Use safe defaults
+                    if (!frameW || !frameH) {
                         frameW = 1080;
                         frameH = 1080;
-                        console.warn('Using default dimensions:', frameW, frameH);
+                        console.warn('All fallbacks exhausted, using default dimensions:', frameW, 'x', frameH);
                     }
                 }
 
@@ -12782,12 +12812,38 @@ async function loadProject(file) {
                     }
 
                     if (frameIds.length > 0) {
+                        // Extract dimensions from first frame image for metadata storage
+                        let gifWidth, gifHeight;
+                        const firstFrame = document.getElementById(frameIds[0]);
+                        if (firstFrame) {
+                            // Wait a bit for the image to load
+                            await new Promise(resolve => {
+                                if (firstFrame.complete && firstFrame.naturalWidth) {
+                                    gifWidth = firstFrame.naturalWidth;
+                                    gifHeight = firstFrame.naturalHeight;
+                                    resolve();
+                                    return;
+                                }
+                                const timeout = setTimeout(resolve, 500); // Max 500ms wait
+                                firstFrame.addEventListener('load', () => {
+                                    clearTimeout(timeout);
+                                    gifWidth = firstFrame.naturalWidth;
+                                    gifHeight = firstFrame.naturalHeight;
+                                    resolve();
+                                }, { once: true });
+                            });
+                        }
+
                         clipCollections.set(clipId, {
                             id: clipId,
                             name: clipEntry.name || window.originalFileNames.get(clipId) || `${clipId}.gif`,
                             frameIds,
                             frameDelayMs: Math.max(60, Number(clipEntry.frameDelayMs) || 160),
-                            previewUrl: clipRootImage.src
+                            previewUrl: clipRootImage.src,
+                            metadata: {
+                                gifWidth: gifWidth || (clipEntry.metadata && clipEntry.metadata.gifWidth) || 1080,
+                                gifHeight: gifHeight || (clipEntry.metadata && clipEntry.metadata.gifHeight) || 1080
+                            }
                         });
                     }
                 } catch (clipLoadError) {
