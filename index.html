@@ -7215,10 +7215,10 @@ async function downloadProjectZip(options = {}) {
             };
 
             try {
-                projectData.clipData = await collectClipProjectData();
+                projectData.clipData = await window.collectClipProjectData();
                 console.log('✅ ZIP Export: Successfully collected', projectData.clipData.length, 'clips');
-                if (projectData.clipData.length === 0 && clipCollections.size > 0) {
-                    console.error('⚠️  WARNING: clipCollections has', clipCollections.size, 'clips but collect returned 0!');
+                if (projectData.clipData.length === 0 && window.clipCollections.size > 0) {
+                    console.error('⚠️  WARNING: clipCollections has', window.clipCollections.size, 'clips but collect returned 0!');
                 }
             } catch (clipZipError) {
                 console.error('❌ ZIP Export: Failed to collect clip data:', clipZipError);
@@ -7427,7 +7427,7 @@ async function buildOptimizedGifFromClipFramesForZip(parentImageId, options = {}
         
         // Get the clip data from the Map using the parent image ID
         let foundClip = null;
-        for (const clip of clipCollections.values()) {
+        for (const clip of (window.clipCollections || new Map()).values()) {
             if (clip.frameIds && clip.frameIds.includes(frameNodes[0].id)) {
                 foundClip = clip;
                 break;
@@ -8368,14 +8368,17 @@ window.LIKELIHOOD_SCALE = LIKELIHOOD_SCALE;
         // Globally accessible for integration
         window.originalFileNames = new Map();
         window.riskAssessmentData = new Map();
+        window.clipCollections = new Map(); // clipId -> { id, name, frameIds, frameDelayMs, previewMode }
+        window.frameToClipMap = new Map(); // frameId -> clipId
+        window.clipPlayState = new Map(); // taskId -> boolean (true = playing GIF, false = paused on frame)
         
         let undoHistory = new Map();
         let currentLightboxImageId = null;
         let currentLightboxTaskId = null;
         let imageResults = [];
-        const clipCollections = new Map(); // clipId -> { id, name, frameIds, frameDelayMs, previewMode }
-        const frameToClipMap = new Map(); // frameId -> clipId
-        const clipPlayState = new Map(); // taskId -> boolean (true = playing GIF, false = paused on frame)
+        const clipCollections = window.clipCollections;
+        const frameToClipMap = window.frameToClipMap;
+        const clipPlayState = window.clipPlayState;
 
         const lightboxClipPanel = document.getElementById('lightboxClipPanel');
         const lightboxClipFrames = document.getElementById('lightboxClipFrames');
@@ -8567,6 +8570,9 @@ window.LIKELIHOOD_SCALE = LIKELIHOOD_SCALE;
             console.log(`✅ Total clips collected: ${clipData.length}`);
             return clipData;
         }
+
+        // Export collectClipProjectData to window for access from top-level functions
+        window.collectClipProjectData = collectClipProjectData;
 
         function setImageEditorEnabled(enabled) {
             if (window.ImageEditor && typeof window.ImageEditor.setEditorEnabled === 'function') {
@@ -12350,9 +12356,9 @@ downloadBtn.addEventListener('click', async () => {
             };
 
             try {
-                projectData.clipData = await collectClipProjectData();
+                projectData.clipData = await window.collectClipProjectData();
             } catch (clipZipError) {
-                console.warn('Could not persist clip metadata in ZIP project JSON:', clipZipError);
+                console.error('❌ ZIP Export: Failed to collect clip data:', clipZipError);
             }
 
             // Build images array using imageNameMap so names match the ZIP filenames
@@ -12902,7 +12908,7 @@ async function saveProject() {
 
     // Persist clip metadata so GIF tasks can be re-opened with editable frame strips.
     try {
-        projectData.clipData = await collectClipProjectData();
+        projectData.clipData = await window.collectClipProjectData();
     } catch (clipSaveError) {
         console.warn('Could not persist clip metadata in save file:', clipSaveError);
     }
@@ -12928,8 +12934,8 @@ async function loadProject(file) {
         window.originalFileNames.clear();
         window.riskAssessmentData.clear();
         undoHistory.clear();
-        clipCollections.clear();
-        frameToClipMap.clear();
+        window.clipCollections.clear();
+        window.frameToClipMap.clear();
         if (clipFrameStore) clipFrameStore.innerHTML = '';
         imageResults = [];
 
