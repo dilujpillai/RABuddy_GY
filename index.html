@@ -7165,30 +7165,27 @@ async function downloadProjectZip(options = {}) {
             zip.file("arranged_risk_table.csv", `Error: ${e.message}`);
         }
 
-        // 5. Generate Shareable HTML Report (skipped in optimized mode — large embedded images)
-        if (!optimized) {
-            try {
-                if (typeof window.generateShareableHTML === 'function') {
-                    const shareableHTML = await window.generateShareableHTML(imageNameMap);
-                    if (shareableHTML) {
-                        zip.file("Risk_Assessment_Report.html", shareableHTML);
-                        console.log("✅ Shareable HTML report added to ZIP");
-                    }
+        // 5. Generate Shareable HTML Report (always include, but with optimized GIFs if requested)
+        try {
+            if (typeof window.generateShareableHTML === 'function') {
+                const shareableHTML = await window.generateShareableHTML(imageNameMap);
+                if (shareableHTML) {
+                    zip.file("Risk_Assessment_Report.html", shareableHTML);
+                    console.log("✅ Shareable HTML report added to ZIP");
                 }
-            } catch (e) {
-                console.warn("Could not generate shareable HTML:", e);
             }
+        } catch (e) {
+            console.warn("Could not generate shareable HTML:", e);
         }
 
-        // Optimized mode: add a small info file explaining what was excluded.
+        // Optimized mode: add a small info file explaining what was optimized.
         if (optimized) {
             zip.file("OPTIMIZED_EXPORT_INFO.txt",
                 "This is an Optimized export.\n" +
                 "Images have been resized to max 640 px and compressed to ~55% JPEG quality.\n" +
-                "GIF clip tasks are re-encoded from frame strips at smaller dimensions.\n" +
-                "Embedded base64 image payload is omitted from risk_project.json.\n" +
-                "The standalone HTML report has been excluded to reduce file size.\n" +
-                "To get the full HTML report, use the Complete export option.\n"
+                "GIF clip tasks are re-encoded using adaptive sizing (25% of baseline).\n" +
+                "Embedded GIF clips use the same compression as lightbox Optimized preset.\n" +
+                "The HTML report is included with optimized image links.\n"
             );
         }
 
@@ -7400,9 +7397,11 @@ async function buildOptimizedGifFromClipFramesForZip(parentImageId, options = {}
         .filter((img) => img && img.dataset && img.dataset.clipParentId === parentImageId && img.src);
     if (frameNodes.length < 2) return null;
 
-    const maxDim = Math.max(120, Number(options.maxDim) || 220);
+    // For optimized ZIP export, apply adaptive sizing similar to lightbox
+    const useAdaptiveMode = options.adaptiveMode === true;
+    const preset = options.preset || 'optimized'; // 'optimized' = 25% baseline, 'balanced' = 50% baseline
+
     const frameDelayMs = Math.max(60, Number(options.frameDelayMs) || 140);
-    const quality = Math.max(10, Number(options.quality) || 38);
 
     const loadImage = (src) => new Promise((resolve, reject) => {
         const img = new Image();
@@ -7449,6 +7448,124 @@ async function buildOptimizedGifFromClipFramesForZip(parentImageId, options = {}
 
     if (!srcW || !srcH) return null;
 
+    // In adaptive mode, measure baseline then apply target compression
+    if (useAdaptiveMode) {
+        // Helper to calculate even dimensions
+        const calculateDimensions = (srcW, srcH, maxW) => {
+            const scale = Math.min(1, maxW / Math.max(srcW, srcH));
+            let w = Math.max(2, Math.round(srcW * scale));
+            let h = Math.max(2, Math.round(srcH * scale));
+            if (w % 2 !== 0) w -= 1;
+            if (h % 2 !== 0) h -= 1;
+            return { width: Math.max(2, w), height: Math.max(2, h) };
+        };
+        
+        // STEP 1: Measure baseline at full resolution
+        const fullResolution = calculateDimensions(srcW, srcH, srcW);
+        let baselineBlob = null;
+        
+        {
+            const canvas = document.createElement('canvas');
+            canvas.width = fullResolution.width;
+            canvas.height = fullResolution.height;
+            const ctx = canvas.getContext('2d');
+            if (!ctx) return null;
+
+            const baselineEncoder = new GIF({
+                workers: 2,
+                quality: 20, // Max compression
+                width: fullResolution.width,
+                height: fullResolution.height,
+                workerScript: 'lib/gif.worker.js'
+            });
+
+            for (let i = 0; i < frameNodes.length; i++) {
+                try {
+                    const img = i === 0 ? first : await loadImage(frameNodes[i].src);
+                    ctx.clearRect(0, 0, fullResolution.width, fullResolution.height);
+                    ctx.drawImage(img, 0, 0, fullResolution.width, fullResolution.height);
+                    baselineEncoder.addFrame(canvas, { copy: true, delay: frameDelayMs });
+                } catch (e) {
+                    console.warn('Failed to load frame', i, ':', e);
+                    continue;
+                }
+            }
+
+            baselineBlob = await renderGifBlobForZip(baselineEncoder);
+        }
+
+        if (!baselineBlob || baselineBlob.size === 0) {
+            console.warn('Baseline GIF generation failed, falling back to simple compression');
+            useAdaptiveMode = false; // Fall through to simple mode
+        } else {
+            // STEP 2: Calculate adaptive target
+            let calculatedTargetBytes;
+            if (preset === 'balanced') {
+                calculatedTargetBytes = Math.ceil(baselineBlob.size * 0.50);
+            } else {
+                // optimized preset: 25% of baseline
+                calculatedTargetBytes = Math.ceil(baselineBlob.size * 0.25);
+            }
+            
+            let bestAttempt = { gifBlob: baselineBlob, gifSize: fullResolution, quality: 20 };
+            let foundTargetMatch = baselineBlob.size <= calculatedTargetBytes;
+
+            // STEP 3: Try resolution scaling if needed
+            if (!foundTargetMatch && calculatedTargetBytes && baselineBlob.size > calculatedTargetBytes) {
+                const scaledSizes = [
+                    calculateDimensions(srcW, srcH, srcW * 0.75), // 75% resolution
+                    calculateDimensions(srcW, srcH, srcW * 0.5),  // 50% resolution
+                    calculateDimensions(srcW, srcH, srcW * 0.33)  // 33% resolution
+                ];
+                
+                for (const scaledSize of scaledSizes) {
+                    const quality = 20;
+                    const canvas = document.createElement('canvas');
+                    canvas.width = scaledSize.width;
+                    canvas.height = scaledSize.height;
+                    const ctx = canvas.getContext('2d');
+                    if (!ctx) continue;
+
+                    const gifEncoder = new GIF({
+                        workers: 2,
+                        quality,
+                        width: scaledSize.width,
+                        height: scaledSize.height,
+                        workerScript: 'lib/gif.worker.js'
+                    });
+
+                    for (let i = 0; i < frameNodes.length; i++) {
+                        try {
+                            const img = i === 0 ? first : await loadImage(frameNodes[i].src);
+                            ctx.clearRect(0, 0, scaledSize.width, scaledSize.height);
+                            ctx.drawImage(img, 0, 0, scaledSize.width, scaledSize.height);
+                            gifEncoder.addFrame(canvas, { copy: true, delay: frameDelayMs });
+                        } catch (e) {
+                            console.warn('Failed to load frame', i, ':', e);
+                            continue;
+                        }
+                    }
+
+                    const gifBlob = await renderGifBlobForZip(gifEncoder);
+                    if (gifBlob.size < bestAttempt.gifBlob.size) {
+                        bestAttempt = { gifBlob, gifSize: scaledSize, quality };
+                    }
+
+                    if (gifBlob.size <= calculatedTargetBytes) {
+                        foundTargetMatch = true;
+                        bestAttempt = { gifBlob, gifSize: scaledSize, quality };
+                        break;
+                    }
+                }
+            }
+
+            console.log(`✅ Adaptive GIF: ${preset} preset, target=${Math.round(calculatedTargetBytes/1024)}KB, achieved=${Math.round(bestAttempt.gifBlob.size/1024)}KB`);
+            return bestAttempt.gifBlob;
+        }
+    }
+
+    // Fallback to simple scaling (non-adaptive mode)
+    const maxDim = Math.max(120, Number(options.maxDim) || 220);
     const scale = Math.min(1, maxDim / Math.max(srcW, srcH));
     let width = Math.max(2, Math.round(srcW * scale));
     let height = Math.max(2, Math.round(srcH * scale));
@@ -7459,7 +7576,7 @@ async function buildOptimizedGifFromClipFramesForZip(parentImageId, options = {}
 
     const gifEncoder = new GIF({
         workers: 2,
-        quality,
+        quality: 20,
         width,
         height,
         workerScript: 'lib/gif.worker.js'
@@ -7528,11 +7645,11 @@ async function addImagesToZipOptimized(zip, { maxDim = 640, quality = 0.55 } = {
                 let exportBlob;
 
                 if (isGif) {
-                    // Re-encode GIF clip tasks from frame strips for true size reduction.
+                    // Re-encode GIF clip tasks using adaptive sizing (same as lightbox Optimized preset)
                     const optimizedGifBlob = await buildOptimizedGifFromClipFramesForZip(imgId, {
-                        maxDim: Math.min(maxDim, 220),
-                        frameDelayMs: 140,
-                        quality: 38
+                        adaptiveMode: true,  // Enable adaptive baseline-based sizing
+                        preset: 'optimized',  // 25% baseline compression
+                        frameDelayMs: 140
                     });
                     exportBlob = (optimizedGifBlob && optimizedGifBlob.size > 0) ? optimizedGifBlob : blob;
                 } else {
@@ -8308,6 +8425,11 @@ window.LIKELIHOOD_SCALE = LIKELIHOOD_SCALE;
 
         async function collectClipProjectData() {
             const clipData = [];
+            const clipFrameStore = document.getElementById('clipFrameStore');
+            if (!clipFrameStore) {
+                console.warn('⚠️  clipFrameStore not found, trying to collect from clipCollections');
+            }
+            
             console.log('🔄 Collecting clip project data from', clipCollections.size, 'clips');
             
             for (const [clipId, clip] of clipCollections.entries()) {
@@ -8374,6 +8496,71 @@ window.LIKELIHOOD_SCALE = LIKELIHOOD_SCALE;
                     console.log(`  ✅ Clip "${clipId}" added with ${frameItems.length} frames`);
                 } else {
                     console.warn(`  ⚠️  Clip "${clipId}" has no valid frames, skipping`);
+                }
+            }
+            
+            // Also try to collect frames from clipFrameStore by scanning for GIF elements
+            // This handles cases where clip frames exist but clipCollections wasn't populated
+            if (clipFrameStore) {
+                console.log('🔍 Scanning clipFrameStore for additional frames...');
+                const parentIds = new Set();
+                clipFrameStore.querySelectorAll('img[data-clip-parent-id]').forEach(img => {
+                    const parentId = img.dataset.clipParentId;
+                    if (parentId && !clipCollections.has(parentId)) {
+                        parentIds.add(parentId);
+                    }
+                });
+                
+                for (const parentId of parentIds) {
+                    console.log(`  📁 Found frames for unregistered clip "${parentId}"`);
+                    const frameEls = Array.from(clipFrameStore.querySelectorAll(`img[data-clip-parent-id="${parentId}"]`));
+                    const frameItems = [];
+                    
+                    for (let i = 0; i < frameEls.length; i++) {
+                        const frameImg = frameEls[i];
+                        const frameId = frameImg.id;
+                        if (!frameId || !frameImg.src) continue;
+                        
+                        try {
+                            await new Promise((resolve) => {
+                                if (frameImg.complete && frameImg.naturalWidth > 0) {
+                                    resolve();
+                                    return;
+                                }
+                                const timeout = setTimeout(resolve, 500);
+                                frameImg.addEventListener('load', () => {
+                                    clearTimeout(timeout);
+                                    resolve();
+                                }, { once: true });
+                            });
+                            
+                            const frameBlob = await fetch(frameImg.src).then(res => res.blob());
+                            if (!frameBlob || frameBlob.size === 0) continue;
+                            
+                            const frameBase64 = await blobToDataUrl(frameBlob);
+                            if (!frameBase64 || frameBase64.length < 100) continue;
+                            
+                            frameItems.push({
+                                id: frameId,
+                                name: window.originalFileNames.get(frameId) || `frame_${String(i + 1).padStart(2, '0')}.jpg`,
+                                base64: frameBase64
+                            });
+                            console.log(`    ✅ Frame collected: ${frameId}`);
+                        } catch (e) {
+                            console.warn(`    ❌ Could not collect frame ${frameId}:`, e.message);
+                        }
+                    }
+                    
+                    if (frameItems.length > 0) {
+                        clipData.push({
+                            id: parentId,
+                            name: window.originalFileNames.get(parentId) || `${parentId}.gif`,
+                            frameDelayMs: 160,
+                            frames: frameItems,
+                            metadata: {}
+                        });
+                        console.log(`  ✅ Clip "${parentId}" collected with ${frameItems.length} frames`);
+                    }
                 }
             }
             
