@@ -7604,7 +7604,7 @@ async function addImagesToZipOptimized(zip, { maxDim = 640, quality = 0.55 } = {
     const imageDataArray = [];
     const imageNameMap = new Map();
     const fetchPromises = [];
-    const imageFolder = zip.folder('edited_images');
+    const imageFolder = zip.folder('edited_images_optimized');
 
     for (let i = 0; i < galleryImages.length; i++) {
         const imgEl = galleryImages[i];
