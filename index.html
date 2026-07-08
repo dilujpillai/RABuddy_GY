@@ -8927,16 +8927,16 @@ window.LIKELIHOOD_SCALE = LIKELIHOOD_SCALE;
                     const qualitySteps = [22, 25, 28, 30];
                     for (const quality of qualitySteps) {
                         const frameCanvas = document.createElement('canvas');
-                        frameCanvas.width = gifSize.width;
-                        frameCanvas.height = gifSize.height;
+                        frameCanvas.width = fullResolution.width;
+                        frameCanvas.height = fullResolution.height;
                         const frameCtx = frameCanvas.getContext('2d');
                         if (!frameCtx) throw new Error('Could not create canvas context');
 
                         const gifEncoder = new GIF({
                             workers: 2,
                             quality,
-                            width: gifSize.width,
-                            height: gifSize.height,
+                            width: fullResolution.width,
+                            height: fullResolution.height,
                             workerScript: GIF_CAPTURE_WORKER_URL
                         });
 
@@ -8944,8 +8944,8 @@ window.LIKELIHOOD_SCALE = LIKELIHOOD_SCALE;
                             const frameImg = getClipFrameImage(frameId);
                             if (!frameImg) continue;
                             await waitForImage(frameImg);
-                            frameCtx.clearRect(0, 0, gifSize.width, gifSize.height);
-                            frameCtx.drawImage(frameImg, 0, 0, gifSize.width, gifSize.height);
+                            frameCtx.clearRect(0, 0, fullResolution.width, fullResolution.height);
+                            frameCtx.drawImage(frameImg, 0, 0, fullResolution.width, fullResolution.height);
                             gifEncoder.addFrame(frameCanvas, {
                                 copy: true,
                                 delay: Math.max(60, Number(clip.frameDelayMs) || 160)
@@ -8953,7 +8953,7 @@ window.LIKELIHOOD_SCALE = LIKELIHOOD_SCALE;
                         }
 
                         const gifBlob = await renderGifToBlob(gifEncoder);
-                        const attempt = { gifBlob, gifSize, quality };
+                        const attempt = { gifBlob, gifSize: fullResolution, quality };
 
                         if (!bestAttempt || gifBlob.size < bestAttempt.gifBlob.size) {
                             bestAttempt = attempt;
