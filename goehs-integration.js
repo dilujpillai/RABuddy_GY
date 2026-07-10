@@ -4558,9 +4558,11 @@ function calculateRiskScore(freq, sev, like) {
 }
 
 function getRiskRating(score) {
-    if (score <= 10) return 'Low';
-    if (score <= 50) return 'Medium';
-    if (score <= 100) return 'High';
+    const numericScore = Number(score);
+    if (!Number.isFinite(numericScore)) return '';
+    if (numericScore < 20) return 'Low';
+    if (numericScore < 50) return 'Medium';
+    if (numericScore < 72) return 'High';
     return 'Critical';
 }
 
