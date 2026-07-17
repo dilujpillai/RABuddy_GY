@@ -9301,9 +9301,6 @@ window.LIKELIHOOD_SCALE = LIKELIHOOD_SCALE;
             const originalForEraser = autoBlurOriginalByImageId.get(targetImageId);
             if (originalForEraser && window.ImageEditor && typeof window.ImageEditor.registerAutoBlurResult === 'function') {
                 window.ImageEditor.registerAutoBlurResult(targetImageId, originalForEraser, targetElement.src);
-                if (typeof window.ImageEditor.setTool === 'function') {
-                    window.ImageEditor.setTool('eraser');
-                }
             }
 
             // Add error handling for image loading
@@ -11112,13 +11109,6 @@ window.LIKELIHOOD_SCALE = LIKELIHOOD_SCALE;
                 if (blurredUrl) {
                     if (window.ImageEditor && typeof window.ImageEditor.registerAutoBlurResult === 'function') {
                         window.ImageEditor.registerAutoBlurResult(imageId, originalUrl, blurredUrl);
-                    }
-                    if (
-                        window.currentLightboxImageId === imageId &&
-                        window.ImageEditor &&
-                        typeof window.ImageEditor.setTool === 'function'
-                    ) {
-                        window.ImageEditor.setTool('eraser');
                     }
                     console.log(`Auto-blurred ${detections.length} faces on frame ${imageId}`);
                 }
