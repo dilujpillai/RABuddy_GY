@@ -952,6 +952,25 @@
         #fullscreenVideoModal #downloadGifMenu {
             min-width: 234px;
         }
+        #fullscreenVideoModal #fullscreenMuteBtn {
+            background: linear-gradient(145deg, rgba(30, 41, 59, 0.92), rgba(15, 23, 42, 0.92));
+            border: 1px solid rgba(148, 163, 184, 0.35);
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12), 0 8px 18px rgba(2, 6, 23, 0.45);
+        }
+        #fullscreenVideoModal #fullscreenMuteBtn:hover {
+            background: linear-gradient(145deg, rgba(51, 65, 85, 0.96), rgba(15, 23, 42, 0.96));
+        }
+        #fullscreenVideoModal #fullscreenSoundOnIcon,
+        #fullscreenVideoModal #fullscreenSoundMutedIcon {
+            width: 20px;
+            height: 20px;
+            stroke: currentColor;
+            stroke-width: 2.1;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            fill: none;
+            opacity: 0.95;
+        }
         #fullscreenVideoModal .gif-menu-item {
             width: 100%;
             display: flex;
@@ -2729,13 +2748,6 @@
                         <button id="undoBlurBtn" disabled class="hidden">Undo Blur</button>
                         <button id="replaceImageBtn" class="hidden">Replace</button>
                         <input type="file" id="replaceImageInput" accept="image/*" class="hidden">
-                        <button id="blurDetectedFacesBtn" class="inline-flex items-center gap-1.5 text-xs font-medium px-3.5 py-2 rounded-lg transition-all duration-200 bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100" title="Auto-blur detected faces">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 15a3 3 0 100-6 3 3 0 000 6z" />
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M19.172 7.172a4 4 0 00-5.656-5.656l-1.46 1.46M9 10.172L7.172 8.344m11.618 9.282l1.46 1.46a4 4 0 11-5.656-5.656l1.46-1.46" />
-                            </svg>
-                            <span>Blur Faces</span>
-                        </button>
                         <button id="deleteLightboxBtn" class="inline-flex items-center gap-1.5 text-xs font-medium text-red-600 bg-red-50 hover:bg-red-100 border border-red-200 py-2 px-3.5 rounded-lg transition-all duration-200 ml-auto">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
                             Delete
@@ -2832,11 +2844,15 @@
                             </svg>
                         </button>
                         <button id="fullscreenMuteBtn" class="inline-flex items-center justify-center flex-shrink-0 w-12 h-12 rounded-full bg-slate-600 hover:bg-slate-700 active:scale-95 text-white transition-all shadow-lg" title="Mute/Unmute (or press M)">
-                            <svg id="fullscreenSoundOnIcon" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="currentColor" viewBox="0 0 24 24" style="display:none;">
-                                <path d="M13.5 4.06c0-1.336-1.616-2.256-2.73-1.72l-5.464 3.11A2 2 0 004 9.561v4.882a2 2 0 001.306 1.869l5.464 3.11c1.114.536 2.73-.384 2.73-1.72V4.06zM15.5 12c0-1.25.756-2.322 1.832-2.82v5.64c-1.076-.498-1.832-1.57-1.832-2.82zm2.858-4.995c2.926-1.874 6.84-1.031 8.154 2.076.13.27.245.55.3.839v.003c.118.618.18 1.26.18 1.92 0 .66-.062 1.301-.18 1.92-.055.289-.17.569-.3.839-1.315 3.107-5.229 3.95-8.154 2.076M17.5 12c0-1.25-.756-2.322-1.832-2.82V14.82c1.076-.498 1.832-1.57 1.832-2.82z"/>
+                            <svg id="fullscreenSoundOnIcon" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" style="display:none;">
+                                <path d="M11 5L6 9H3v6h3l5 4V5z"/>
+                                <path d="M15 9.5a3.5 3.5 0 010 5"/>
+                                <path d="M17.8 7a7 7 0 010 10"/>
                             </svg>
-                            <svg id="fullscreenSoundMutedIcon" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="currentColor" viewBox="0 0 24 24">
-                                <path d="M13.5 4.06c0-1.336-1.616-2.256-2.73-1.72l-5.464 3.11A2 2 0 004 9.561v4.882a2 2 0 001.306 1.869l5.464 3.11c1.114.536 2.73-.384 2.73-1.72V4.06zM16.338 16.338L19.414 19.414m2.828-2.828l-3.076-3.076m0-2.828l3.074 3.076M9.172 9.172L6.098 6.098m-2.828 2.828l3.074 3.076"/>
+                            <svg id="fullscreenSoundMutedIcon" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24">
+                                <path d="M11 5L6 9H3v6h3l5 4V5z"/>
+                                <path d="M15 9l6 6"/>
+                                <path d="M21 9l-6 6"/>
                             </svg>
                         </button>
                         <div class="flex-1 min-w-0">
@@ -8320,7 +8336,6 @@ window.LIKELIHOOD_SCALE = LIKELIHOOD_SCALE;
         // --- END NEW ---
         const prevArrow = document.getElementById('prevArrow');
         const nextArrow = document.getElementById('nextArrow');
-        const blurDetectedFacesBtn = document.getElementById('blurDetectedFacesBtn');
         const lightboxClipPlayPauseBtn = document.getElementById('lightboxClipPlayPauseBtn');
         const lightboxClipPlayIcon = document.getElementById('lightboxClipPlayIcon');
         const lightboxClipPauseIcon = document.getElementById('lightboxClipPauseIcon');
@@ -8329,6 +8344,7 @@ window.LIKELIHOOD_SCALE = LIKELIHOOD_SCALE;
         
         // Track detected faces per frame for auto-blur functionality
         const detectedFacesByImageId = new Map(); // imageId -> array of face detections
+        const autoBlurOriginalByImageId = new Map(); // imageId -> original (pre-auto-blur) object URL
         const lightboxGallery = document.getElementById('lightboxGallery');
         const stepDescription = document.getElementById('stepDescription');
         const spotHazards = document.getElementById('spotHazards');
@@ -9340,6 +9356,14 @@ window.LIKELIHOOD_SCALE = LIKELIHOOD_SCALE;
                 }
             }
 
+            const originalForEraser = autoBlurOriginalByImageId.get(targetImageId);
+            if (originalForEraser && window.ImageEditor && typeof window.ImageEditor.registerAutoBlurResult === 'function') {
+                window.ImageEditor.registerAutoBlurResult(targetImageId, originalForEraser, targetElement.src);
+                if (typeof window.ImageEditor.setTool === 'function') {
+                    window.ImageEditor.setTool('eraser');
+                }
+            }
+
             // Add error handling for image loading
             lightboxImage.onerror = () => {
                  console.error(`Failed to load lightbox image for ID: ${targetImageId}`);
@@ -9421,6 +9445,11 @@ window.LIKELIHOOD_SCALE = LIKELIHOOD_SCALE;
         const GIF_CAPTURE_BALANCED_TARGET_BYTES = 500 * 1024;
         const GIF_CAPTURE_QUALITY = 20;
         const GIF_CAPTURE_WORKER_URL = 'lib/gif.worker.js';
+
+        // Face detection tuning: prioritize sensitivity over speed.
+        const FACE_SSD_MIN_CONFIDENCE = 0.25;
+        const FACE_TINY_INPUT_SIZE = 512;
+        const FACE_TINY_SCORE_THRESHOLD = 0.2;
 
         let faceApiWarmedUp = false; // Track whether face-api model has been warmed up
         let gifDownloadMenuOpen = false;
@@ -9885,10 +9914,88 @@ window.LIKELIHOOD_SCALE = LIKELIHOOD_SCALE;
                 console.log('Face-api model warmed up successfully.');
             } catch (e) {
                 console.warn('Face-api warmup encountered an issue:', e);
-                faceApiWarmedUp = true; // Mark as done even on error to avoid blocking
+                faceApiWarmedUp = false;
             } finally {
                 if (warmupOverlay) warmupOverlay.style.display = 'none';
             }
+        }
+
+        async function ensureSsdModelLoaded() {
+            if (typeof faceapi === 'undefined') {
+                throw new Error('face-api.js is not available.');
+            }
+            if (faceapi.nets?.ssdMobilenetv1?.params) return;
+
+            const modelSources = ['./models/', 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/'];
+            let lastError = null;
+            for (const modelUrl of modelSources) {
+                try {
+                    await faceapi.nets.ssdMobilenetv1.loadFromUri(modelUrl);
+                    return;
+                } catch (err) {
+                    lastError = err;
+                }
+            }
+            throw lastError || new Error('Unable to load SSD face detection model.');
+        }
+
+        async function ensureTinyModelLoaded() {
+            if (typeof faceapi === 'undefined') {
+                throw new Error('face-api.js is not available.');
+            }
+            if (faceapi.nets?.tinyFaceDetector?.params) return;
+
+            const modelSources = ['./models/', 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/'];
+            let lastError = null;
+            for (const modelUrl of modelSources) {
+                try {
+                    await faceapi.nets.tinyFaceDetector.loadFromUri(modelUrl);
+                    return;
+                } catch (err) {
+                    lastError = err;
+                }
+            }
+            throw lastError || new Error('Unable to load TinyFaceDetector model.');
+        }
+
+        async function detectFacesInImage(imageOrCanvas) {
+            if (typeof faceapi === 'undefined' || !imageOrCanvas) return [];
+
+            // Ensure image dimensions are available before inference.
+            if (imageOrCanvas instanceof HTMLImageElement && (!imageOrCanvas.complete || !imageOrCanvas.naturalWidth || !imageOrCanvas.naturalHeight)) {
+                await new Promise((resolve) => {
+                    let timeout = null;
+                    const done = () => {
+                        if (timeout) clearTimeout(timeout);
+                        imageOrCanvas.removeEventListener('load', done);
+                        imageOrCanvas.removeEventListener('error', done);
+                        resolve(true);
+                    };
+                    timeout = setTimeout(done, 2000);
+                    imageOrCanvas.addEventListener('load', done);
+                    imageOrCanvas.addEventListener('error', done);
+                });
+            }
+
+            await ensureSsdModelLoaded();
+            let detections = await faceapi.detectAllFaces(
+                imageOrCanvas,
+                new faceapi.SsdMobilenetv1Options({ minConfidence: FACE_SSD_MIN_CONFIDENCE })
+            );
+
+            // Fallback: TinyFaceDetector is often better for small/soft faces in video frames.
+            if (!detections || detections.length === 0) {
+                await ensureTinyModelLoaded();
+                detections = await faceapi.detectAllFaces(
+                    imageOrCanvas,
+                    new faceapi.TinyFaceDetectorOptions({
+                        inputSize: FACE_TINY_INPUT_SIZE,
+                        scoreThreshold: FACE_TINY_SCORE_THRESHOLD
+                    })
+                );
+            }
+
+            return Array.isArray(detections) ? detections : [];
         }
 
         function cleanupFullscreenVideoPlayerHandlers(player) {
@@ -9923,6 +10030,7 @@ window.LIKELIHOOD_SCALE = LIKELIHOOD_SCALE;
             }
             if (player._seekBarLoadedMetadataHandler) {
                 player.removeEventListener('loadedmetadata', player._seekBarLoadedMetadataHandler);
+                player.removeEventListener('durationchange', player._seekBarLoadedMetadataHandler);
                 player._seekBarLoadedMetadataHandler = null;
             }
             if (player._playPauseHandler) {
@@ -9930,10 +10038,26 @@ window.LIKELIHOOD_SCALE = LIKELIHOOD_SCALE;
                 player.removeEventListener('pause', player._playPauseHandler);
                 player._playPauseHandler = null;
             }
+            if (player._muteHandler) {
+                player.removeEventListener('volumechange', player._muteHandler);
+                player._muteHandler = null;
+            }
+            if (player._playPauseClickHandler && playPauseBtn) {
+                playPauseBtn.removeEventListener('click', player._playPauseClickHandler);
+                player._playPauseClickHandler = null;
+            }
+            if (player._muteClickHandler) {
+                const muteBtn = document.getElementById('fullscreenMuteBtn');
+                if (muteBtn) muteBtn.removeEventListener('click', player._muteClickHandler);
+                player._muteClickHandler = null;
+            }
             if (player._warmupTimer) {
                 clearTimeout(player._warmupTimer);
                 player._warmupTimer = null;
             }
+            player._pendingSeekRatio = null;
+            player._userInteractedWithControls = false;
+            player._userPausedOnOpen = false;
         }
 
         function formatVideoTime(seconds) {
@@ -9997,31 +10121,50 @@ window.LIKELIHOOD_SCALE = LIKELIHOOD_SCALE;
                 }
                 updateLabels();
                 updatePlayPauseIcon();
+                updateMuteIcon();
             };
 
             const onInput = () => {
+                player._userInteractedWithControls = true;
                 const duration = Number.isFinite(player.duration) ? player.duration : 0;
-                if (!duration) return;
-                const nextTime = (Number(seekBar.value) / 1000) * duration;
+                const ratio = Math.min(1, Math.max(0, Number(seekBar.value) / 1000));
+                if (!duration) {
+                    player._pendingSeekRatio = ratio;
+                    return;
+                }
+                const nextTime = ratio * duration;
+                player._pendingSeekRatio = null;
                 player.currentTime = Math.min(duration, Math.max(0, nextTime));
                 updateLabels();
             };
 
             const onLoaded = () => {
+                if (player._pendingSeekRatio !== null && player._pendingSeekRatio !== undefined) {
+                    const duration = Number.isFinite(player.duration) ? player.duration : 0;
+                    if (duration > 0) {
+                        const nextTime = Math.min(duration, Math.max(0, player._pendingSeekRatio * duration));
+                        player.currentTime = nextTime;
+                    }
+                    player._pendingSeekRatio = null;
+                }
                 syncFromPlayer();
                 updateMuteIcon();
             };
 
             const onPlayPauseClick = () => {
-                if (player.paused) {
+                player._userInteractedWithControls = true;
+                const shouldPlay = player.paused;
+                if (shouldPlay) {
                     player.play();
                 } else {
                     player.pause();
                 }
+                player._userPausedOnOpen = !shouldPlay;
                 updatePlayPauseIcon();
             };
 
             const onMuteClick = () => {
+                player._userInteractedWithControls = true;
                 player.muted = !player.muted;
                 updateMuteIcon();
             };
@@ -10031,10 +10174,13 @@ window.LIKELIHOOD_SCALE = LIKELIHOOD_SCALE;
             player._seekBarLoadedMetadataHandler = onLoaded;
             player._playPauseHandler = updatePlayPauseIcon;
             player._muteHandler = updateMuteIcon;
+            player._playPauseClickHandler = onPlayPauseClick;
+            player._muteClickHandler = onMuteClick;
 
             seekBar.addEventListener('input', onInput);
             player.addEventListener('timeupdate', syncFromPlayer);
             player.addEventListener('loadedmetadata', onLoaded);
+            player.addEventListener('durationchange', onLoaded);
             player.addEventListener('play', updatePlayPauseIcon);
             player.addEventListener('pause', updatePlayPauseIcon);
             player.addEventListener('volumechange', updateMuteIcon);
@@ -10073,6 +10219,10 @@ window.LIKELIHOOD_SCALE = LIKELIHOOD_SCALE;
             const resumeTime = Number(videoElement.currentTime) || 0;
             player.src = videoElement.src;
             player.preload = 'auto';
+            player._userInteractedWithControls = false;
+            player._userPausedOnOpen = false;
+            player._pendingSeekRatio = null;
+            player.load();
 
             if (pausedHint) pausedHint.style.opacity = '0';
             if (warmupOverlay) warmupOverlay.style.display = 'none';
@@ -10090,12 +10240,18 @@ window.LIKELIHOOD_SCALE = LIKELIHOOD_SCALE;
                 }
 
                 // Prioritize initial playback; defer warm-up to reduce first-open hitching.
-                player.play().catch(err => {
-                    console.warn('Autoplay was blocked for fullscreen video:', err);
-                });
+                if (!player._userPausedOnOpen) {
+                    player.play().catch(err => {
+                        console.warn('Autoplay was blocked for fullscreen video:', err);
+                    });
+                }
 
                 if (!faceApiWarmedUp) {
-                    player._warmupTimer = setTimeout(() => warmUpFaceApi(player, { showOverlay: false }), 300);
+                    player._warmupTimer = setTimeout(() => {
+                        if (!player._userInteractedWithControls) {
+                            warmUpFaceApi(player, { showOverlay: false });
+                        }
+                    }, 1400);
                 }
             };
 
@@ -10141,13 +10297,16 @@ window.LIKELIHOOD_SCALE = LIKELIHOOD_SCALE;
                 if (e.code === 'KeyM' || e.key === 'm' || e.key === 'M') {
                     e.preventDefault();
                     const p = document.getElementById('fullscreenVideoPlayer');
+                    p._userInteractedWithControls = true;
                     p.muted = !p.muted;
                 }
                 // SPACE: toggle play/pause and prevent page scroll
                 if (e.code === 'Space' || e.key === ' ') {
                     e.preventDefault();
                     const p = document.getElementById('fullscreenVideoPlayer');
+                    p._userInteractedWithControls = true;
                     if (p.paused) { p.play(); } else { p.pause(); }
+                    p._userPausedOnOpen = p.paused;
                 }
                 // ESC to close
                 if (e.key === 'Escape') {
@@ -10868,6 +11027,12 @@ window.LIKELIHOOD_SCALE = LIKELIHOOD_SCALE;
         document.getElementById('userSeverity').addEventListener('change', saveRiskData);
         document.getElementById('userLikelihood').addEventListener('change', saveRiskData);
 
+        function canvasToBlobAsync(canvas, type = 'image/jpeg', quality = 0.9) {
+            return new Promise((resolve) => {
+                canvas.toBlob((blob) => resolve(blob), type, quality);
+            });
+        }
+
         // --- FACE DETECTION AND AUTO-BLUR FUNCTIONS ---
         async function detectAndAutoBlurFaces(imageId) {
             if (typeof faceapi === 'undefined' || !imageId) return;
@@ -10876,44 +11041,49 @@ window.LIKELIHOOD_SCALE = LIKELIHOOD_SCALE;
                 const imageEl = document.getElementById(imageId);
                 if (!imageEl || !imageEl.complete) return;
                 
-                // Load face detection models if not already loaded
-                if (!faceApiWarmedUp) {
-                    await faceapi.nets.tinyFaceDetector.loadFromUri('https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/');
-                    faceApiWarmedUp = true;
-                }
+                // Load TinyFaceDetector model as needed (independent from warm-up state).
+                await ensureTinyModelLoaded();
                 
                 // Detect faces using TinyFaceDetector for speed
-                const detections = await faceapi.detectAllFaces(imageEl, new faceapi.TinyFaceDetectorOptions({ inputSize: 416 }));
+                let detections = await faceapi.detectAllFaces(
+                    imageEl,
+                    new faceapi.TinyFaceDetectorOptions({
+                        inputSize: FACE_TINY_INPUT_SIZE,
+                        scoreThreshold: FACE_TINY_SCORE_THRESHOLD
+                    })
+                );
+
+                // Fallback to SSD if tiny finds nothing.
+                if (!detections || detections.length === 0) {
+                    await ensureSsdModelLoaded();
+                    detections = await faceapi.detectAllFaces(
+                        imageEl,
+                        new faceapi.SsdMobilenetv1Options({ minConfidence: FACE_SSD_MIN_CONFIDENCE })
+                    );
+                }
                 
                 if (detections && detections.length > 0) {
                     detectedFacesByImageId.set(imageId, detections);
-                    blurDetectedFacesBtn.disabled = false;
-                    blurDetectedFacesBtn.classList.remove('opacity-50', 'cursor-not-allowed');
                     console.log(`Detected ${detections.length} faces on frame ${imageId}`);
                     
                     // Automatically blur the detected faces
                     await autoBlurDetectedFaces(imageId, detections);
                 } else {
                     detectedFacesByImageId.delete(imageId);
-                    blurDetectedFacesBtn.disabled = true;
-                    blurDetectedFacesBtn.classList.add('opacity-50', 'cursor-not-allowed');
                 }
             } catch (err) {
                 console.warn('Face detection failed:', err);
-                blurDetectedFacesBtn.disabled = true;
-                blurDetectedFacesBtn.classList.add('opacity-50', 'cursor-not-allowed');
             }
         }
 
-        async function autoBlurDetectedFaces(imageId, detections) {
+        async function renderBlurredFacesFromSource(imageId, detections, sourceUrl) {
             const imageEl = document.getElementById(imageId);
-            if (!imageEl || !imageEl.src) return;
-            
-            try {
-                // Load image into canvas for blur processing
+            if (!imageEl || !sourceUrl || !Array.isArray(detections)) return null;
+
+            return new Promise((resolve) => {
                 const tempImg = new Image();
                 tempImg.crossOrigin = 'anonymous';
-                
+
                 tempImg.onload = () => {
                     try {
                         const canvas = manualBlurCanvas;
@@ -10921,78 +11091,97 @@ window.LIKELIHOOD_SCALE = LIKELIHOOD_SCALE;
                         canvas.width = tempImg.naturalWidth;
                         canvas.height = tempImg.naturalHeight;
                         ctx.drawImage(tempImg, 0, 0);
-                        
-                        // Calculate scale factor from displayed size to natural size
-                        const displayWidth = imageEl.width || imageEl.clientWidth;
-                        const displayHeight = imageEl.height || imageEl.clientHeight;
-                        const scaleX = tempImg.naturalWidth / displayWidth;
-                        const scaleY = tempImg.naturalHeight / displayHeight;
-                        
-                        // Blur each detected face
-                        detections.forEach(detection => {
+
+                        const displayWidth = imageEl.naturalWidth || imageEl.width || imageEl.clientWidth || tempImg.naturalWidth;
+                        const displayHeight = imageEl.naturalHeight || imageEl.height || imageEl.clientHeight || tempImg.naturalHeight;
+                        const safeDisplayWidth = Math.max(1, displayWidth);
+                        const safeDisplayHeight = Math.max(1, displayHeight);
+                        const scaleX = tempImg.naturalWidth / safeDisplayWidth;
+                        const scaleY = tempImg.naturalHeight / safeDisplayHeight;
+
+                        detections.forEach((detection) => {
                             const box = detection.box;
                             const x = Math.max(0, box.x * scaleX - 5);
                             const y = Math.max(0, box.y * scaleY - 5);
                             const width = Math.min(canvas.width - x, box.width * scaleX + 10);
                             const height = Math.min(canvas.height - y, box.height * scaleY + 10);
-                            
+
                             if (width > 0 && height > 0) {
                                 ctx.filter = 'blur(25px)';
                                 ctx.drawImage(canvas, x, y, width, height, x, y, width, height);
                                 ctx.filter = 'none';
                             }
                         });
-                        
-                        // Convert blurred canvas back to image
-                        canvas.toBlob(blob => {
-                            if (blob) {
-                                const blurredUrl = URL.createObjectURL(blob);
-                                
-                                // Save undo state
-                                const originalUrl = imageEl.src;
-                                undoHistory.set(imageId, originalUrl);
-                                undoBlurBtn.disabled = false;
-                                
-                                // Update both display and thumbnail
-                                imageEl.src = blurredUrl;
-                                const thumbnail = document.getElementById(imageId);
-                                if (thumbnail) thumbnail.src = blurredUrl;
-                                updateLightboxGallery();
-                                
-                                console.log(`Auto-blurred ${detections.length} faces on frame ${imageId}`);
+
+                        canvas.toBlob((blob) => {
+                            if (!blob) {
+                                resolve(null);
+                                return;
                             }
+
+                            const blurredUrl = URL.createObjectURL(blob);
+                            const currentUrl = imageEl.src;
+
+                            imageEl.src = blurredUrl;
+                            const largeImage = document.getElementById('lightboxImage');
+                            if (largeImage && currentLightboxImageId === imageId) {
+                                largeImage.src = blurredUrl;
+                            }
+
+                            updateLightboxGallery();
+
+                            if (currentUrl && currentUrl.startsWith('blob:') && currentUrl !== blurredUrl && currentUrl !== sourceUrl) {
+                                setTimeout(() => URL.revokeObjectURL(currentUrl), 2000);
+                            }
+
+                            resolve(blurredUrl);
                         }, 'image/jpeg', 0.9);
                     } catch (err) {
                         console.error('Error during canvas blur:', err);
+                        resolve(null);
                     }
                 };
-                
+
                 tempImg.onerror = () => {
                     console.error('Failed to load image for auto-blur');
+                    resolve(null);
                 };
-                
-                tempImg.src = imageEl.src;
-            } catch (err) {
-                console.error('Auto-blur failed:', err);
-            }
+
+                tempImg.src = sourceUrl;
+            });
         }
 
-        async function manualBlurDetectedFaces() {
-            const imageId = currentLightboxImageId;
-            if (!imageId) return;
-            
-            const detections = detectedFacesByImageId.get(imageId);
-            if (!detections || detections.length === 0) {
-                showCustomAlert('No faces detected on this frame.', 'info');
-                return;
-            }
+        async function autoBlurDetectedFaces(imageId, detections) {
+            const imageEl = document.getElementById(imageId);
+            if (!imageEl || !imageEl.src) return;
             
             try {
-                await autoBlurDetectedFaces(imageId, detections);
-                showCustomAlert(`Blurred ${detections.length} face(s).`, 'success');
+                const originalUrl = undoHistory.get(imageId) || imageEl.src;
+                if (!undoHistory.has(imageId)) {
+                    undoHistory.set(imageId, originalUrl);
+                }
+                if (!window._imageEditorUndoMap) window._imageEditorUndoMap = new Map();
+                if (!window._imageEditorUndoMap.has(imageId)) {
+                    window._imageEditorUndoMap.set(imageId, imageEl.src);
+                }
+                undoBlurBtn.disabled = false;
+
+                const blurredUrl = await renderBlurredFacesFromSource(imageId, detections, originalUrl);
+                if (blurredUrl) {
+                    if (window.ImageEditor && typeof window.ImageEditor.registerAutoBlurResult === 'function') {
+                        window.ImageEditor.registerAutoBlurResult(imageId, originalUrl, blurredUrl);
+                    }
+                    if (
+                        window.currentLightboxImageId === imageId &&
+                        window.ImageEditor &&
+                        typeof window.ImageEditor.setTool === 'function'
+                    ) {
+                        window.ImageEditor.setTool('eraser');
+                    }
+                    console.log(`Auto-blurred ${detections.length} faces on frame ${imageId}`);
+                }
             } catch (err) {
-                console.error('Manual blur failed:', err);
-                showCustomAlert('Error blurring faces.', 'error');
+                console.error('Auto-blur failed:', err);
             }
         }
         // --- END FACE DETECTION AND AUTO-BLUR FUNCTIONS ---
@@ -11173,6 +11362,11 @@ window.LIKELIHOOD_SCALE = LIKELIHOOD_SCALE;
                         if (resultIndex > -1) imageResults.splice(resultIndex, 1);
                     }
                     window.originalFileNames.delete(taskId);
+                    const originalForEraser = autoBlurOriginalByImageId.get(taskId);
+                    if (originalForEraser) {
+                        URL.revokeObjectURL(originalForEraser);
+                        autoBlurOriginalByImageId.delete(taskId);
+                    }
                     const undoUrl = undoHistory.get(taskId);
                     if (undoUrl) URL.revokeObjectURL(undoUrl);
                     undoHistory.delete(taskId);
@@ -11452,6 +11646,9 @@ window.LIKELIHOOD_SCALE = LIKELIHOOD_SCALE;
                     if (result.blob) {
                         const imageUrl = URL.createObjectURL(result.blob);
                         window.originalFileNames.set(fileId, file.name);
+                        if (result.faceCount > 0 && result.originalBlob) {
+                            autoBlurOriginalByImageId.set(fileId, URL.createObjectURL(result.originalBlob));
+                        }
                         const container = document.createElement('div');
                         container.className = 'gallery-item relative w-full pt-[100%] h-0 cursor-grab';
                         container.id = `gallery-item-${fileId}`;
@@ -11627,7 +11824,11 @@ window.LIKELIHOOD_SCALE = LIKELIHOOD_SCALE;
                             canvas.width = newWidth; canvas.height = newHeight;
                             const ctx = canvas.getContext('2d');
                             ctx.drawImage(img, 0, 0, newWidth, newHeight);
-                            const detections = await faceapi.detectAllFaces(canvas, new faceapi.SsdMobilenetv1Options({ minConfidence: 0.4 }));
+                            const originalBlob = await canvasToBlobAsync(canvas, 'image/jpeg', 0.9);
+                            const detections = await faceapi.detectAllFaces(
+                                canvas,
+                                new faceapi.SsdMobilenetv1Options({ minConfidence: FACE_SSD_MIN_CONFIDENCE })
+                            );
                             if (detections.length > 0) {
                                 detections.forEach(detection => {
                                     const { x, y, width, height } = detection.box;
@@ -11639,9 +11840,8 @@ window.LIKELIHOOD_SCALE = LIKELIHOOD_SCALE;
                                     ctx.restore();
                                 });
                             }
-                            canvas.toBlob(blob => {
-                                resolve({ blob, faceCount: detections.length, width: newWidth, height: newHeight });
-                            }, 'image/jpeg', 0.9);
+                            const blob = await canvasToBlobAsync(canvas, 'image/jpeg', 0.9);
+                            resolve({ blob, originalBlob, faceCount: detections.length, width: newWidth, height: newHeight });
                         } catch (error) { reject(error); }
                     };
                     img.onerror = reject;
@@ -11668,7 +11868,22 @@ window.LIKELIHOOD_SCALE = LIKELIHOOD_SCALE;
                     resizedCanvas.height = newHeight;
                     const ctx = resizedCanvas.getContext('2d');
                     ctx.drawImage(inputCanvas, 0, 0, newWidth, newHeight);
-                    const detections = await faceapi.detectAllFaces(resizedCanvas, new faceapi.SsdMobilenetv1Options({ minConfidence: 0.4 }));
+                    const originalBlob = await canvasToBlobAsync(resizedCanvas, 'image/jpeg', 0.9);
+                    let detections = await faceapi.detectAllFaces(
+                        resizedCanvas,
+                        new faceapi.SsdMobilenetv1Options({ minConfidence: FACE_SSD_MIN_CONFIDENCE })
+                    );
+
+                    if (!detections || detections.length === 0) {
+                        await ensureTinyModelLoaded();
+                        detections = await faceapi.detectAllFaces(
+                            resizedCanvas,
+                            new faceapi.TinyFaceDetectorOptions({
+                                inputSize: FACE_TINY_INPUT_SIZE,
+                                scoreThreshold: FACE_TINY_SCORE_THRESHOLD
+                            })
+                        );
+                    }
                     if (detections.length > 0) {
                         detections.forEach(detection => {
                             const { x, y, width, height } = detection.box;
@@ -11680,9 +11895,8 @@ window.LIKELIHOOD_SCALE = LIKELIHOOD_SCALE;
                             ctx.restore();
                         });
                     }
-                    resizedCanvas.toBlob(blob => {
-                        resolve({ blob, faceCount: detections.length });
-                    }, 'image/jpeg', 0.9);
+                    const blob = await canvasToBlobAsync(resizedCanvas, 'image/jpeg', 0.9);
+                    resolve({ blob, originalBlob, faceCount: detections.length });
                 } catch (error) { reject(error); }
             });
         }
@@ -11710,6 +11924,9 @@ window.LIKELIHOOD_SCALE = LIKELIHOOD_SCALE;
                 if (result.blob) {
                     const imageUrl = URL.createObjectURL(result.blob);
                     window.originalFileNames.set(fileId, frameName);
+                    if (result.faceCount > 0 && result.originalBlob) {
+                        autoBlurOriginalByImageId.set(fileId, URL.createObjectURL(result.originalBlob));
+                    }
                     
                     const container = document.createElement('div');
                     container.className = 'gallery-item relative w-full pt-[100%] h-0 cursor-grab';
@@ -11912,6 +12129,11 @@ window.LIKELIHOOD_SCALE = LIKELIHOOD_SCALE;
                 if (resultIndex > -1) imageResults.splice(resultIndex, 1);
             }
             window.originalFileNames.delete(taskId);
+            const originalForEraser = autoBlurOriginalByImageId.get(taskId);
+            if (originalForEraser) {
+                URL.revokeObjectURL(originalForEraser);
+                autoBlurOriginalByImageId.delete(taskId);
+            }
             // Clean up undo history for the deleted image
             const undoUrl = undoHistory.get(taskId);
             if (undoUrl) URL.revokeObjectURL(undoUrl);
@@ -12111,7 +12333,6 @@ ${controls}
             if (window.ImageEditor) window.ImageEditor.handleUndo();
             else handleUndoBlur();
         });
-        blurDetectedFacesBtn.addEventListener('click', manualBlurDetectedFaces);
         // Make updateLightboxGallery available to image editor
         window.updateLightboxGallery = updateLightboxGallery;
         deleteLightboxBtn.addEventListener('click', handleDeleteLightboxImage);
@@ -12141,6 +12362,11 @@ ${controls}
                     
                     // 4. Clear Undo History (since it's a new image)
                     undoHistory.delete(currentLightboxImageId);
+                    const originalForEraser = autoBlurOriginalByImageId.get(currentLightboxImageId);
+                    if (originalForEraser) {
+                        URL.revokeObjectURL(originalForEraser);
+                        autoBlurOriginalByImageId.delete(currentLightboxImageId);
+                    }
                     undoBlurBtn.disabled = true;
 
                     // 5. Success Message
@@ -12907,6 +13133,12 @@ async function loadProject(file) {
         window.originalFileNames.clear();
         window.riskAssessmentData.clear();
         undoHistory.clear();
+        autoBlurOriginalByImageId.forEach((url) => {
+            if (url && typeof url === 'string' && url.startsWith('blob:')) {
+                URL.revokeObjectURL(url);
+            }
+        });
+        autoBlurOriginalByImageId.clear();
         window.clipCollections.clear();
         window.frameToClipMap.clear();
         if (clipFrameStore) clipFrameStore.innerHTML = '';
