@@ -2640,13 +2640,6 @@
                                         <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z"/>
                                     </svg>
                                 </button>
-                                <button id="lightboxBlurClipFacesBtn" class="inline-flex items-center gap-1 text-xs font-medium text-amber-600 bg-amber-50/80 hover:bg-amber-100 border border-amber-200 py-1 px-2 rounded-lg transition-all duration-200" title="Auto-blur detected faces in GIF">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 15a3 3 0 100-6 3 3 0 000 6z" />
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M19.172 7.172a4 4 0 00-5.656-5.656l-1.46 1.46M9 10.172L7.172 8.344m11.618 9.282l1.46 1.46a4 4 0 11-5.656-5.656l1.46-1.46" />
-                                    </svg>
-                                    <span>Blur Faces</span>
-                                </button>
                                 <div id="lightboxDownloadGifMenuRoot" class="relative">
                                     <button id="lightboxDownloadGifBtn" type="button" class="inline-flex items-center gap-1 text-xs font-medium text-white bg-emerald-500/75 hover:bg-emerald-500/90 border border-emerald-300/40 py-1 px-2 rounded-lg transition-all duration-200" title="Download GIF">
                                         <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -8339,7 +8332,6 @@ window.LIKELIHOOD_SCALE = LIKELIHOOD_SCALE;
         const lightboxClipPlayPauseBtn = document.getElementById('lightboxClipPlayPauseBtn');
         const lightboxClipPlayIcon = document.getElementById('lightboxClipPlayIcon');
         const lightboxClipPauseIcon = document.getElementById('lightboxClipPauseIcon');
-        const lightboxBlurClipFacesBtn = document.getElementById('lightboxBlurClipFacesBtn');
         const lightboxDownloadGifBtn = document.getElementById('lightboxDownloadGifBtn');
         
         // Track detected faces per frame for auto-blur functionality
@@ -8898,31 +8890,6 @@ window.LIKELIHOOD_SCALE = LIKELIHOOD_SCALE;
                 };
             }
 
-            if (lightboxBlurClipFacesBtn) {
-                lightboxBlurClipFacesBtn.onclick = async () => {
-                    const clip = clipCollections.get(taskId);
-                    if (!clip) return;
-                    
-                    for (const frameId of clip.frameIds) {
-                        const detected = detectedFacesByImageId.get(frameId);
-                        if (detected && detected.length > 0) {
-                            await applyBlurToFrameById(frameId, detected);
-                        } else {
-                            // If no detected faces, run face detection first
-                            await detectAndBlurFrameInClip(frameId);
-                        }
-                    }
-                    
-                    // Rebuild preview
-                    try {
-                        await rebuildClipPreviewFromFrames(taskId);
-                    } catch (e) {
-                        console.warn('Could not rebuild GIF after blur:', e);
-                    }
-                    showLightboxImage(taskId, { forceClipPreview: true });
-                };
-            }
-
             if (lightboxDownloadGifBtn) {
                 lightboxDownloadGifBtn.onclick = (e) => {
                     e.preventDefault();
@@ -8955,31 +8922,6 @@ window.LIKELIHOOD_SCALE = LIKELIHOOD_SCALE;
                 };
                 lightboxClipFrames.appendChild(btn);
             });
-        }
-
-        async function detectAndBlurFrameInClip(frameId) {
-            try {
-                const frameImg = getClipFrameImage(frameId);
-                if (!frameImg) return;
-                
-                // Check if faces already detected
-                let detected = detectedFacesByImageId.get(frameId);
-                if (!detected) {
-                    // Detect faces
-                    await waitForImage(frameImg);
-                    detected = await detectFacesInImage(frameImg);
-                    if (detected && detected.length > 0) {
-                        detectedFacesByImageId.set(frameId, detected);
-                    }
-                }
-                
-                // Apply blur if faces detected
-                if (detected && detected.length > 0) {
-                    await applyBlurToFrameById(frameId, detected);
-                }
-            } catch (e) {
-                console.warn('Error detecting/blurring frame:', frameId, e);
-            }
         }
 
         window.showLightboxDownloadGifMenu = function(event, taskId) {
@@ -9381,16 +9323,8 @@ window.LIKELIHOOD_SCALE = LIKELIHOOD_SCALE;
             document.getElementById('userLikelihood').value = data.userLikelihood || '';
             updateLightboxGallery();
             
-            // Auto-detect and blur faces on clip frames when opened
-            if (clip && openingFrameView && isClipFrameId(targetImageId)) {
-                lightboxImage.onload = async () => {
-                    await detectAndAutoBlurFaces(targetImageId);
-                };
-                // If image is already loaded, trigger detection immediately
-                if (lightboxImage.complete) {
-                    await detectAndAutoBlurFaces(targetImageId);
-                }
-            }
+            // For individual clip-frame editing, keep full manual control in the toolbar.
+            // Auto face-detect/blur is intentionally not re-triggered here.
             
             // Notify image editor of image change — passes previous ID so annotations get baked
             if (window.ImageEditor) window.ImageEditor.onImageChange(previousImageId);
@@ -9447,9 +9381,9 @@ window.LIKELIHOOD_SCALE = LIKELIHOOD_SCALE;
         const GIF_CAPTURE_WORKER_URL = 'lib/gif.worker.js';
 
         // Face detection tuning: prioritize sensitivity over speed.
-        const FACE_SSD_MIN_CONFIDENCE = 0.25;
+        const FACE_SSD_MIN_CONFIDENCE = 0.22;
         const FACE_TINY_INPUT_SIZE = 512;
-        const FACE_TINY_SCORE_THRESHOLD = 0.2;
+        const FACE_TINY_SCORE_THRESHOLD = 0.16;
 
         let faceApiWarmedUp = false; // Track whether face-api model has been warmed up
         let gifDownloadMenuOpen = false;
@@ -10359,6 +10293,7 @@ window.LIKELIHOOD_SCALE = LIKELIHOOD_SCALE;
                     // Store frame info
                     fullscreenCapturedFrames.push({
                         blob: result.blob,
+                        originalBlob: result.originalBlob || null,
                         name: frameName,
                         timestamp: now.getTime()
                     });
@@ -10525,6 +10460,7 @@ window.LIKELIHOOD_SCALE = LIKELIHOOD_SCALE;
 
                         capturedFrames.push({
                             blob: processed.blob,
+                            originalBlob: processed.originalBlob || null,
                             name: frameName,
                             timestamp: frameTimestamp
                         });
@@ -10899,6 +10835,9 @@ window.LIKELIHOOD_SCALE = LIKELIHOOD_SCALE;
                             frameToClipMap.set(frameId, fileId);
                             frameIds.push(frameId);
                             window.originalFileNames.set(frameId, frameName);
+                            if (clipFrame.originalBlob) {
+                                autoBlurOriginalByImageId.set(frameId, URL.createObjectURL(clipFrame.originalBlob));
+                            }
                         }
 
                         clipCollections.set(fileId, {
@@ -10914,6 +10853,9 @@ window.LIKELIHOOD_SCALE = LIKELIHOOD_SCALE;
                         fileId = `fullscreen-frame-${frame.timestamp}`;
                         imageUrl = URL.createObjectURL(frame.blob);
                         window.originalFileNames.set(fileId, frame.name);
+                        if (frame.originalBlob) {
+                            autoBlurOriginalByImageId.set(fileId, URL.createObjectURL(frame.originalBlob));
+                        }
                     }
 
                     // Create gallery container
