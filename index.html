@@ -3999,9 +3999,8 @@
     "Animal waste": { group: "Biological hazard", severity: 6, likelihood: 4 }, 
     "Hazardous vegetation": { group: "Biological hazard", severity: 4, likelihood: 4 }, 
     "Flammable and combustible materials": { group: "Fire and explosion", severity: 10, likelihood: 2 }, 
-    "Ignition sources": { group: "Fire and explosion", severity: 10, likelihood: 2 }, 
     "Ignition sources (open flames, sparks, static)": { group: "Fire and explosion", severity: 10, likelihood: 2 },  // NEW
-    "Dust explosions (e.g., coal, wood, metal dust)": { group: "Fire and explosion", severity: 10, likelihood: 2 },  // NEW
+    "Dust explosions (e.g., black, wood, metal dust)": { group: "Fire and explosion", severity: 10, likelihood: 2 },  // NEW
     "Oxygen-enriched environments": { group: "Fire and explosion", severity: 9, likelihood: 2 }  // NEW
 };
         const CONSEQUENCE_REGISTRY = [
@@ -22464,13 +22463,14 @@ COUNTERMEASURE LADDER LEVELS:
 - "Level 2 - Administrative Controls" - Procedures (training, SOPs, permits, inspections)
 - "Level 1 - Individual Target" - PPE (gloves, goggles, helmets, safety shoes)
 
-CONTROL DESCRIPTIONS TO CLASSIFY:
-${needAI.map((c, i) => `${i + 1}. "${c.text}"`).join('\n')}
+CONTROL DESCRIPTIONS TO CLASSIFY (0-based index):
+${needAI.map((c, i) => `${i}. "${c.text}"`).join('\n')}
 
 IMPORTANT:
 1. Each control can match MULTIPLE levels
 2. Use EXACT level names from the list above
 3. Analyze all keywords — one description may describe several countermeasures
+4. "index" in your response MUST match the 0-based index shown above exactly (the first item is index 0, not 1)
 
 Return ONLY a valid JSON array (no explanation, no markdown):
 [{"index": 0, "levels": ["Level X - Name", "Level Y - Name"]}, ...]`;

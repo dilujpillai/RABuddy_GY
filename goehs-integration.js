@@ -3828,15 +3828,28 @@ function suggestCountermeasureLadder(description) {
     //   "training(5), guards(3)"
     const extractCountermeasures = (text) => {
         const result = [];
-        // Match patterns like "text(digit)" or "text" separated by common delimiters
-        const regex = /([^()]+)(?:\((\d)\))?/g;
-        let match;
-        while ((match = regex.exec(text)) !== null) {
-            const itemText = (match[1] || '').trim();
-            const embeddedCode = match[2] ? parseInt(match[2]) : null;
-            if (itemText && itemText.length > 1) {
-                result.push({ text: itemText, code: embeddedCode });
+        if (text.includes('(')) {
+            // Structured format with embedded numeric codes, e.g.
+            // "training(5), guards(3)" or "Code de la route(2)Panneaux de signalisation(3)"
+            const regex = /([^()]+)(?:\((\d)\))?/g;
+            let match;
+            while ((match = regex.exec(text)) !== null) {
+                const itemText = (match[1] || '').trim();
+                const embeddedCode = match[2] ? parseInt(match[2]) : null;
+                if (itemText && itemText.length > 1) {
+                    result.push({ text: itemText, code: embeddedCode });
+                }
             }
+            return result;
+        }
+
+        // No parentheses: split on list delimiters so plain-text inputs like
+        // "1,2,3" or "guard 2, ppe 1" resolve to multiple independent countermeasures.
+        const segments = text.split(/[,;]/).map(s => s.trim()).filter(Boolean);
+        if (segments.length > 1) {
+            segments.forEach(seg => result.push({ text: seg, code: null }));
+        } else if (text.trim()) {
+            result.push({ text: text.trim(), code: null });
         }
         return result;
     };
@@ -3976,8 +3989,10 @@ function suggestCountermeasureLadder(description) {
         }
     };
     
-    // Skip empty, N/A, or very short descriptions
-    if (!desc || desc === 'n/a' || desc === 'na' || desc === '-' || desc === 'none' || desc.length < 3) {
+    // Skip empty or explicit "not applicable" placeholder values.
+    // No blanket minimum-length cutoff: short-but-meaningful input like a bare
+    // level number ("1", "2") or code ("L2") must still reach the matching logic below.
+    if (!desc || desc === 'n/a' || desc === 'na' || desc === '-' || desc === 'none') {
         return suggestions;
     }
     
@@ -3998,6 +4013,14 @@ function suggestCountermeasureLadder(description) {
                 return label;
             }
         }
+
+        // 3. Fallback: bare trailing level number (e.g. "guad 2", "simple 3")
+        // Catches typo'd or unrecognized keywords when the user still typed an explicit 1-6 code.
+        const trailingCode = itemText.match(/(?:^|\s)([1-6])\s*$/);
+        if (trailingCode && codeToLabel[parseInt(trailingCode[1], 10)]) {
+            return codeToLabel[parseInt(trailingCode[1], 10)];
+        }
+
         return null;
     };
     

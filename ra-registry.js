@@ -52,8 +52,8 @@ const HAZARD_CATEGORIES = {
         'Standing or Sitting for long periods'
     ],
     'Fire and Explosion': [
-        'Dust explosions (e.g., coal, wood, metal dust)', 'Flammable and combustible materials',
-        'Ignition sources', 'Ignition sources (open flames, sparks, static)', 'Oxygen-enriched environments'
+        'Dust explosions (e.g., black, wood, metal dust)', 'Flammable and combustible materials',
+        'Ignition sources (open flames, sparks, static)', 'Oxygen-enriched environments'
     ],
     'Hazardous Energy': [
         'Arc flash', 'Compressed air', 'Electricity', 'Electromagnetic fields', 'Electrostatic',
@@ -419,7 +419,7 @@ const TRANSLATIONS = {
     "Flammable and combustible materials": "Flammable and combustible materials",
     "Ignition sources": "Ignition sources",
     "Ignition sources (open flames, sparks, static)": "Ignition sources (open flames, sparks, static)",
-    "Dust explosions (e.g., coal, wood, metal dust)": "Dust explosions (e.g., coal, wood, metal dust)",
+    "Dust explosions (e.g., black, wood, metal dust)": "Dust explosions (e.g., black, wood, metal dust)",
     "Oxygen-enriched environments": "Oxygen-enriched environments",
     // Risk/Consequences (English)
     "Abrasion, Scratches": "Abrasion, Scratches",
@@ -709,7 +709,7 @@ const TRANSLATIONS = {
     "Flammable and combustible materials": "Matières inflammables et combustibles",
     "Ignition sources": "Sources d'ignition (flammes, étincelles, électricité statique)",
     "Ignition sources (open flames, sparks, static)": "Sources d'ignition (flammes, étincelles, électricité statique)",
-    "Dust explosions (e.g., coal, wood, metal dust)": "Explosion de poussières (ex. : poussières de bois, métal, charbon)",
+    "Dust explosions (e.g., black, wood, metal dust)": "Explosion de poussières (ex. : poussières de noir de carbone, bois, métal)",
     "Oxygen-enriched environments": "Environnement enrichi en oxygène",
     // Risk/Consequences (French) - GOEHS Official Translations (Blessure/Maladie)
     // Injuries
@@ -1203,7 +1203,7 @@ const TRANSLATIONS = {
     "Flammable and combustible materials": "Entzündliche und brennbare Materialien",
     "Ignition sources": "Zündquellen",
     "Ignition sources (open flames, sparks, static)": "Zündquellen (offene Flammen, Funken, statisch)",
-    "Dust explosions (e.g., coal, wood, metal dust)": "Staubexplosionen (z.B. Kohle, Holz, Metalstaub)",
+    "Dust explosions (e.g., black, wood, metal dust)": "Staubexplosionen (z.B. Ruß, Holz, Metallstaub)",
     "Oxygen-enriched environments": "Sauerstoffangereicherte Umgebungen",
     // Risk/Consequences (German)
     "Abrasion, Scratches": "Abrasionen, Kratzer",
