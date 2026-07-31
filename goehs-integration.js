@@ -4951,8 +4951,8 @@ function generateExcelWithSheets() {
 
     // -- Flat 40-column header matching Risk_Registry_Batch_Upload_Template.xlsx --
     const headers = [
-        'Row',
-        'OrgName*', 'Location*', 'Department', 'Workstation',
+        'Row*',
+        'Organization*', 'Site*', 'Department', 'Workstation',
         'Assessment Title*', 'Assessment Date', 'Equipment', 'Type', 'Assessment Approver*',
         'Name of Risk Assessment Team Members', 'Completed By',
         'Task Name *', 'Task Description *', 'Condition Mode *', 'Core Activity',
