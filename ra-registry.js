@@ -224,16 +224,16 @@ function goehsUiLabel(val) {
 const TRANSLATIONS = {
   en: {
     // Hazard Groups (English defaults)
-    "Mechanical / Machinery hazards": "Mechanical / Machinery hazards",
+    "Mechanical / Machinery Hazards": "Mechanical / Machinery Hazards",
     "Workplace / Infrastructure Design": "Workplace / Infrastructure Design",
-    "Physical health hazards": "Physical health hazards",
-    "Chemical hazards": "Chemical hazards",
+    "Physical Health Hazards": "Physical Health Hazards",
+    "Chemical Hazards": "Chemical Hazards",
     "Hazardous Energy": "Hazardous Energy",
     "Transportation": "Transportation",
-    "Ergonomic hazards": "Ergonomic hazards",
+    "Ergonomic Hazards": "Ergonomic Hazards",
     "Organizational and Psychosocial": "Organizational and Psychosocial",
-    "Biological hazard": "Biological hazard",
-    "Fire and explosion": "Fire and explosion",
+    "Biological Hazards": "Biological Hazards",
+    "Fire and Explosion": "Fire and Explosion",
     // Frequency Scale
     "RARELY (<30 min/day)": "RARELY (<30 min/day)",
     "OCCASIONAL (<2 hrs/wk)": "OCCASIONAL (<2 hrs/wk)",
@@ -504,16 +504,16 @@ const TRANSLATIONS = {
   },
   fr: {
     // Hazard Groups (French) - GOEHS Official Translations
-    "Mechanical / Machinery hazards": "Dangers mécaniques / liés aux machines",
+    "Mechanical / Machinery Hazards": "Dangers mécaniques / liés aux machines",
     "Workplace / Infrastructure Design": "Dangers liés à l'aménagement du poste de travail",
-    "Physical health hazards": "Dangers liés à l'environnement physique",
-    "Chemical hazards": "Dangers chimiques",
+    "Physical Health Hazards": "Dangers liés à l'environnement physique",
+    "Chemical Hazards": "Dangers chimiques",
     "Hazardous Energy": "Dangers liés aux énergies",
     "Transportation": "Dangers liés au transport",
-    "Ergonomic hazards": "Dangers ergonomiques",
+    "Ergonomic Hazards": "Dangers ergonomiques",
     "Organizational and Psychosocial": "Dangers organisationnels et psychologiques",
-    "Biological hazard": "Dangers biologiques",
-    "Fire and explosion": "Feu et explosion",
+    "Biological Hazards": "Dangers biologiques",
+    "Fire and Explosion": "Feu et explosion",
     // Frequency Scale (French)
     "RARELY (<30 min/day)": "RAREMENT (<30 min/jour)",
     "OCCASIONAL (<2 hrs/wk)": "OCCASIONNEL (<2 hrs/sem)",
@@ -534,7 +534,7 @@ const TRANSLATIONS = {
     "Likely to happen": "Susceptible de se produire",
     "Very likely to happen": "Très susceptible de se produire",
     // Hazard List Items (French) - GOEHS Official Translations
-    // Mechanical / Machinery hazards
+    // Mechanical / Machinery Hazards
     "Hand tools (cut, impact, puncture, etc.)": "Outils à main (coupure, impact, perforation, etc.)",
     "Powered tools": "Outils motorisés",
     "Pinch / nip points": "Points de pincement / coincement",
@@ -575,7 +575,7 @@ const TRANSLATIONS = {
     "Inclined surface": "Surface inclinée",
     "Poor visibility": "Visibilité réduite",
     "Coactivity area": "Zone de coactivité",
-    // Physical health hazards
+    // Physical Health Hazards
     "Noise exposure": "Exposition au bruit",
     "Vibration / Impact (hand-arm, whole-body)": "Vibration / Impact (main-bras, corps entier)",
     "Heat stress": "Stress thermique (chaleur)",
@@ -587,7 +587,7 @@ const TRANSLATIONS = {
     "Severe draft (e.g. cold air current)": "Courants d'air forts",
     "Smoke and fumes": "Fumées et émanations",
     "Physical health [Generic]": "Santé physique [Générique]",
-    // Chemical hazards
+    // Chemical Hazards
     "Explosive materials": "Matières explosives",
     "Flammable materials": "Matières inflammables",
     "Oxidising materials": "Agents oxydants",
@@ -641,7 +641,7 @@ const TRANSLATIONS = {
     "High speed vehicle, tire grip loss": "Vitesse excessive, perte d'adhérence",
     "Inadequate load securing": "Mauvais arrimage de la charge",
     "Traffic [Generic]": "Circulation [Générique]",
-    // Ergonomic hazards
+    // Ergonomic Hazards
     "Postures (Hit list)": "Postures (Hit List)",
     "Force": "Efforts physiques",
     "Lifting/Lowering": "Levage/Abaissement",
@@ -693,7 +693,7 @@ const TRANSLATIONS = {
     "Remote Work Specific Hazards": "Risques spécifiques au travail à distance",
     "Work-Life Balance": "Équilibre travail-vie privée",
     "Employment restriction (e.g. Pregnant/breastfeeding, handicap)": "Restrictions liées à l'emploi (grossesse/allaitement, handicap)",
-    // Biological hazards
+    // Biological Hazards
     "Viruses, bacteria, fungi": "Virus, bactéries, champignons",
     "Legionella (specific bacteria)": "Legionella (bactérie spécifique)",
     "Molds or allergens": "Moisissures ou allergènes",
@@ -1008,16 +1008,16 @@ const TRANSLATIONS = {
   },
   de: {
     // Hazard Groups (German)
-    "Mechanical / Machinery hazards": "Mechanische / Maschinenrisiken",
+    "Mechanical / Machinery Hazards": "Mechanische / Maschinenrisiken",
     "Workplace / Infrastructure Design": "Arbeitsplatz / Infrastrukturdesign",
-    "Physical health hazards": "Physische Gesundheitsrisiken",
-    "Chemical hazards": "Chemische Risiken",
+    "Physical Health Hazards": "Physische Gesundheitsrisiken",
+    "Chemical Hazards": "Chemische Risiken",
     "Hazardous Energy": "Gefährliche Energie",
     "Transportation": "Transport",
-    "Ergonomic hazards": "Ergonomische Risiken",
+    "Ergonomic Hazards": "Ergonomische Risiken",
     "Organizational and Psychosocial": "Organisatorisch und psychosozial",
-    "Biological hazard": "Biologische Risiken",
-    "Fire and explosion": "Feuer und Explosion",
+    "Biological Hazards": "Biologische Risiken",
+    "Fire and Explosion": "Feuer und Explosion",
     // Frequency Scale (German)
     "RARELY (<30 min/day)": "SELTEN (<30 min/Tag)",
     "OCCASIONAL (<2 hrs/wk)": "GELEGENTLICH (<2 Stunden/Wo)",

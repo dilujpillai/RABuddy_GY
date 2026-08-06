@@ -83,6 +83,8 @@
     <script src="fra/fra-components.js"></script>
     <script src="fra/fra-floorplan.js"></script>
     <script src="fra/fra-app.js"></script>
+    <script src="excel-mapper-core.js"></script>
+    <script src="excel-mapper-ui.js"></script>
     <script src="fra/click-mapper.js"></script>
     <!-- Cost-Benefit Analyzer — modular files -->
     <script src="cba/cba-baseline.js"></script>
@@ -242,7 +244,7 @@
 .gy-map-field input { width: 100%; padding: 6px; border: 1px solid #ccc; border-radius: 4px; text-align: center; font-weight: bold; }
 #gyRefreshBtn { background: #3498db; color: white; border: none; padding: 6px 12px; border-radius: 15px; cursor: pointer; }
 .gy-grid-container { display: grid; grid-template-columns: repeat(auto-fill, minmax(400px, 1fr)); gap: 25px; margin-top: 20px; }
-.gy-card { border: 1px solid #e0e0e0; border-radius: 10px; overflow: hidden; background: white; display: flex; flex-direction: column; position: relative; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+/* .gy-card base rule lives further down (fully overridden here, was dead/shadowed code) */
 .gy-card-img { height: 200px; background: #f8f9fa; display: flex; align-items: center; justify-content: center; position: relative; border-bottom: 1px solid #eee; overflow: hidden; }
 .gy-card-img img { max-width: 100%; max-height: 100%; object-fit: contain; }
 .gy-row-badge { position: absolute; bottom: 10px; left: 10px; background: rgba(0,0,0,0.6); color: white; padding: 4px 10px; border-radius: 4px; font-size: 11px; pointer-events: none; z-index: 5; }
@@ -271,9 +273,44 @@
         #gyExcelPreviewTable th:hover { background: #475569; }
         #gyExcelPreviewTable td { padding: 3px 8px; border-bottom: 1px solid #e2e8f0; white-space: nowrap; max-width: 120px; overflow: hidden; text-overflow: ellipsis; }
         #gyExcelPreviewTable tr:hover td { background: #f1f5f9; }
+        #gyExcelPreviewTable tr.gy-map-row th { background: #f8fafc; color: #334155; }
+        #gyExcelPreviewTable .gy-header-map-select { width: 100%; border: 1px solid #cbd5e1; border-radius: 4px; padding: 2px 4px; font-size: 0.62rem; font-weight: 600; color: #0f172a; background: #ffffff; }
         .gy-col-mapped { background: #dcfce7 !important; }
         .gy-col-mapped-header { background: #22c55e !important; }
-        
+        .gy-map-progress { display: inline-flex; align-items: center; gap: 6px; font-size: 0.68rem; font-weight: 700; color: #166534; background: #dcfce7; border: 1px solid #86efac; border-radius: 999px; padding: 2px 10px; }
+        .gy-map-help { font-size: 0.67rem; color: #475569; background: #ffffff; border: 1px dashed #cbd5e1; border-radius: 8px; padding: 6px 8px; margin-bottom: 8px; line-height: 1.35; }
+        .gy-map-advanced { margin-top: 8px; border: 1px solid #dbe4ef; border-radius: 8px; background: #f8fafc; }
+        .gy-map-advanced[open] { background: #ffffff; }
+        .gy-map-advanced summary { list-style: none; cursor: pointer; padding: 8px 10px; font-size: 0.68rem; font-weight: 700; color: #334155; display: flex; align-items: center; justify-content: space-between; }
+        .gy-map-advanced summary::-webkit-details-marker { display: none; }
+        .gy-map-advanced .gy-map-advanced-body { padding: 0 10px 10px 10px; }
+
+        /* Top-level workflow tabs: Single Sheet vs Multi Tab */
+        .gy-top-tab-bar { display: flex; gap: 8px; flex-shrink: 0; margin-bottom: 14px; border-bottom: 2px solid #e2e8f0; }
+        .gy-top-tab { border: none; background: transparent; color: #64748b; font-weight: 700; font-size: 0.85rem; padding: 10px 18px; cursor: pointer; border-bottom: 3px solid transparent; margin-bottom: -2px; transition: all 0.15s; }
+        .gy-top-tab:hover { color: #002c5f; background: #f8fafc; }
+        .gy-top-tab-active, .gy-top-tab-active:hover { color: #002c5f; border-bottom-color: #ffd100; background: transparent; }
+
+        /* Collapsible Column Mapping + Preview panel */
+        .gy-map-collapsible { border: 1px solid #e2e8f0; border-radius: 12px; background: #f8fafc; overflow: hidden; }
+        .gy-map-collapsible > summary { list-style: none; cursor: pointer; padding: 10px 14px; display: flex; align-items: center; justify-content: space-between; gap: 10px; background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%); }
+        .gy-map-collapsible > summary::-webkit-details-marker { display: none; }
+        .gy-map-collapsible > summary .gy-map-collapsible-title { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; font-weight: 700; color: #334155; }
+        .gy-map-collapsible > summary .gy-map-collapsible-hint { font-size: 0.68rem; color: #64748b; }
+        .gy-map-collapsible > summary .gy-map-collapsible-chevron { transition: transform 0.2s ease; color: #64748b; }
+        .gy-map-collapsible[open] > summary .gy-map-collapsible-chevron { transform: rotate(90deg); }
+        .gy-map-collapsible[open] > summary { border-bottom: 2px solid #e2e8f0; }
+        .gy-map-collapsible-body { display: grid; grid-template-columns: 320px 1fr; gap: 16px; padding: 14px; }
+
+        /* Row-level delete/restore controls in the expanded preview */
+        #gyExcelPreviewTable td.gy-row-action-cell, #gyExcelPreviewTable th.gy-row-action-cell { text-align: center; padding: 2px 4px; white-space: nowrap; }
+        .gy-row-del-btn, .gy-row-restore-btn { border: none; border-radius: 4px; cursor: pointer; font-size: 0.7rem; padding: 2px 6px; font-weight: 600; }
+        .gy-row-del-btn { background: #fee2e2; color: #dc2626; }
+        .gy-row-del-btn:hover { background: #fecaca; }
+        .gy-row-restore-btn { background: #dcfce7; color: #16a34a; }
+        .gy-row-restore-btn:hover { background: #bbf7d0; }
+        #gyExcelPreviewTable tr.gy-row-deleted td { background: #fef2f2 !important; color: #b91c1c; text-decoration: line-through; opacity: 0.75; }
+
         /* Modern Card Styling for Steps */
         .gy-card { border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; background: white; display: flex; flex-direction: row; position: relative; box-shadow: 0 2px 8px rgba(0,0,0,0.06); transition: all 0.2s ease; min-height: 480px; }
         .gy-card:hover { box-shadow: 0 8px 24px rgba(0,0,0,0.12); transform: translateY(-2px); }
@@ -2594,6 +2631,11 @@
                         <button id="translateTableBtn" class="rab-btn rab-c-slate"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129"/></svg>Translate</button>
                         <button id="remapColumnsBtn" class="rab-btn rab-c-slate rab-hidden" title="Re-map Excel columns if data wasn't imported correctly"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/></svg>Remap Columns</button>
                     </div>
+                    <div class="rab-row" style="margin-top:8px;">
+                        <button id="aiFixMainTableBtn" class="rab-btn rab-c-amber" title="Scan all rows and auto-correct Hazard Group / Hazard List / Risk-Consequences values that don't match the standard dropdown options">🔧 AI Fix Hazard/Risk</button>
+                        <button id="aiClosestMatchBtn" class="rab-btn rab-c-blue" title="For any Hazard Group / Hazard List / Risk-Consequences dropdown still outlined red after AI Fix, apply the closest standard entry as a best-guess suggestion for you to review">🎯 Suggest Closest Match</button>
+                        <span id="mainTableIssuePill" title="Hazard Group / Hazard List / Risk-Consequences dropdowns that don't match a standard entry" class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-700">✓ 0 issues</span>
+                    </div>
                 </div>
                 <div class="table-wrapper overflow-x-auto" id="table-container">
                     </div>
@@ -3834,23 +3876,23 @@
         };
 
         // --- MASTER HAZARD & CONSEQUENCE REGISTRIES ---
-        //const HAZARD_REGISTRY = { "Hand tools (cut, impact, puncture, etc.)": { group: "Mechanical / Machinery hazards", severity: 5, likelihood: 5 }, "Powered tools": { group: "Mechanical / Machinery hazards", severity: 7, likelihood: 4 }, "Pinch / nip points": { group: "Mechanical / Machinery hazards", severity: 7, likelihood: 5 }, "Rotating parts (entanglement)": { group: "Mechanical / Machinery hazards", severity: 9, likelihood: 3 }, "Moving parts (cutting)": { group: "Mechanical / Machinery hazards", severity: 9, likelihood: 4 }, "Moving parts (crushing)": { group: "Mechanical / Machinery hazards", severity: 9, likelihood: 4 }, "Ejection (parts, materials)": { group: "Mechanical / Machinery hazards", severity: 5, likelihood: 5 }, "Angular, sharp and cutting elements": { group: "Mechanical / Machinery hazards", severity: 7, likelihood: 5 }, "Slips, trips, and falls (same level or height)": { group: "Workplace / Infrastructure Design", severity: 3, likelihood: 8 }, "Slippery, eneven, unstable or damaged floor": { group: "Workplace / Infrastructure Design", severity: 5, likelihood: 7 }, "Congested or obstructed workplace": { group: "Workplace / Infrastructure Design", severity: 3, likelihood: 8 }, "Noise exposure": { group: "Physical health hazards", severity: 3, likelihood: 9 }, "Vibration / Impact (hand-arm, whole-body)": { group: "Physical health hazards", severity: 5, likelihood: 8 }, "Heat stress": { group: "Physical health hazards", severity: 5, likelihood: 5 }, "Cold stress": { group: "Physical health hazards", severity: 5, likelihood: 5 }, "Flammable materials": { group: "Chemical hazards", severity: 10, likelihood: 1 }, "Corrosive materials": { group: "Chemical hazards", severity: 7, likelihood: 3 }, "Electricity": { group: "Hazardous Energy", severity: 10, likelihood: 2 }, "Gravity": { group: "Hazardous Energy", severity: 7, likelihood: 5 }, "Hydraulic": { group: "Hazardous Energy", severity: 7, likelihood: 3 }, "Pneumatic": { group: "Hazardous Energy", severity: 5, likelihood: 3 }, "Interraction pedestrian/Vehicle": { group: "Transportation", severity: 7, likelihood: 3 }, "Postures (Hit list)": { group: "Ergonomic hazards", severity: 3, likelihood: 9 }, "Force": { group: "Ergonomic hazards", severity: 5, likelihood: 8 }, "Lifting/Lowering": { group: "Ergonomic hazards", severity: 5, likelihood: 8 }, "Pushing": { group: "Ergonomic hazards", severity: 5, likelihood: 8 }, "Pulling": { group: "Ergonomic hazards", severity: 5, likelihood: 8 }, "Carrying": { group: "Ergonomic hazards", severity: 5, likelihood: 8 }, "High job demands": { group: "Organizational and Psychosocial", severity: 3, likelihood: 8 }, "Low job control or autonomy": { group: "Organizational and Psychosocial", severity: 3, likelihood: 7 }, "Monotonous or repetitive tasks": { group: "Organizational and Psychosocial", severity: 3, likelihood: 9 }, "Viruses, bacteria, fungi": { group: "Biological hazard", severity: 7, likelihood: 3 }, "Flammable and combustible materials": { group: "Fire and explosion", severity: 10, likelihood: 2 }, "Ignition sources": { group: "Fire and explosion", severity: 10, likelihood: 2 } };
+        //const HAZARD_REGISTRY = { "Hand tools (cut, impact, puncture, etc.)": { group: "Mechanical / Machinery Hazards", severity: 5, likelihood: 5 }, "Powered tools": { group: "Mechanical / Machinery Hazards", severity: 7, likelihood: 4 }, "Pinch / nip points": { group: "Mechanical / Machinery Hazards", severity: 7, likelihood: 5 }, "Rotating parts (entanglement)": { group: "Mechanical / Machinery Hazards", severity: 9, likelihood: 3 }, "Moving parts (cutting)": { group: "Mechanical / Machinery Hazards", severity: 9, likelihood: 4 }, "Moving parts (crushing)": { group: "Mechanical / Machinery Hazards", severity: 9, likelihood: 4 }, "Ejection (parts, materials)": { group: "Mechanical / Machinery Hazards", severity: 5, likelihood: 5 }, "Angular, sharp and cutting elements": { group: "Mechanical / Machinery Hazards", severity: 7, likelihood: 5 }, "Slips, trips, and falls (same level or height)": { group: "Workplace / Infrastructure Design", severity: 3, likelihood: 8 }, "Slippery, eneven, unstable or damaged floor": { group: "Workplace / Infrastructure Design", severity: 5, likelihood: 7 }, "Congested or obstructed workplace": { group: "Workplace / Infrastructure Design", severity: 3, likelihood: 8 }, "Noise exposure": { group: "Physical Health Hazards", severity: 3, likelihood: 9 }, "Vibration / Impact (hand-arm, whole-body)": { group: "Physical Health Hazards", severity: 5, likelihood: 8 }, "Heat stress": { group: "Physical Health Hazards", severity: 5, likelihood: 5 }, "Cold stress": { group: "Physical Health Hazards", severity: 5, likelihood: 5 }, "Flammable materials": { group: "Chemical Hazards", severity: 10, likelihood: 1 }, "Corrosive materials": { group: "Chemical Hazards", severity: 7, likelihood: 3 }, "Electricity": { group: "Hazardous Energy", severity: 10, likelihood: 2 }, "Gravity": { group: "Hazardous Energy", severity: 7, likelihood: 5 }, "Hydraulic": { group: "Hazardous Energy", severity: 7, likelihood: 3 }, "Pneumatic": { group: "Hazardous Energy", severity: 5, likelihood: 3 }, "Interraction pedestrian/Vehicle": { group: "Transportation", severity: 7, likelihood: 3 }, "Postures (Hit list)": { group: "Ergonomic Hazards", severity: 3, likelihood: 9 }, "Force": { group: "Ergonomic Hazards", severity: 5, likelihood: 8 }, "Lifting/Lowering": { group: "Ergonomic Hazards", severity: 5, likelihood: 8 }, "Pushing": { group: "Ergonomic Hazards", severity: 5, likelihood: 8 }, "Pulling": { group: "Ergonomic Hazards", severity: 5, likelihood: 8 }, "Carrying": { group: "Ergonomic Hazards", severity: 5, likelihood: 8 }, "High job demands": { group: "Organizational and Psychosocial", severity: 3, likelihood: 8 }, "Low job control or autonomy": { group: "Organizational and Psychosocial", severity: 3, likelihood: 7 }, "Monotonous or repetitive tasks": { group: "Organizational and Psychosocial", severity: 3, likelihood: 9 }, "Viruses, bacteria, fungi": { group: "Biological Hazards", severity: 7, likelihood: 3 }, "Flammable and combustible materials": { group: "Fire and Explosion", severity: 10, likelihood: 2 }, "Ignition sources": { group: "Fire and Explosion", severity: 10, likelihood: 2 } };
         const HAZARD_REGISTRY = { 
-    "Hand tools (cut, impact, puncture, etc.)": { group: "Mechanical / Machinery hazards", severity: 5, likelihood: 5 }, 
-    "Powered tools": { group: "Mechanical / Machinery hazards", severity: 7, likelihood: 4 }, 
-    "Pinch / nip points": { group: "Mechanical / Machinery hazards", severity: 7, likelihood: 5 }, 
-    "Rotating parts (entanglement)": { group: "Mechanical / Machinery hazards", severity: 9, likelihood: 3 }, 
-    "Moving parts (cutting)": { group: "Mechanical / Machinery hazards", severity: 9, likelihood: 4 }, 
-    "Moving parts (crushing)": { group: "Mechanical / Machinery hazards", severity: 9, likelihood: 4 }, 
-    "Ejection (parts, materials)": { group: "Mechanical / Machinery hazards", severity: 5, likelihood: 5 }, 
-    "Angular, sharp and cutting elements": { group: "Mechanical / Machinery hazards", severity: 7, likelihood: 5 }, 
-    "Degraded or malfunctioning equipment": { group: "Mechanical / Machinery hazards", severity: 8, likelihood: 4 }, 
-    "Equipment failure": { group: "Mechanical / Machinery hazards", severity: 9, likelihood: 3 }, 
-    "Improper use of tools/machines": { group: "Mechanical / Machinery hazards", severity: 7, likelihood: 6 }, 
-    "Inadequate guarding": { group: "Mechanical / Machinery hazards", severity: 8, likelihood: 4 }, 
-    "Use of lifting equipment and accessories": { group: "Mechanical / Machinery hazards", severity: 7, likelihood: 5 }, 
-    "Use of suspension equipment (jacks, etc.)": { group: "Mechanical / Machinery hazards", severity: 8, likelihood: 4 }, 
-    "Acceleration / deceleration": { group: "Mechanical / Machinery hazards", severity: 6, likelihood: 5 }, 
+    "Hand tools (cut, impact, puncture, etc.)": { group: "Mechanical / Machinery Hazards", severity: 5, likelihood: 5 }, 
+    "Powered tools": { group: "Mechanical / Machinery Hazards", severity: 7, likelihood: 4 }, 
+    "Pinch / nip points": { group: "Mechanical / Machinery Hazards", severity: 7, likelihood: 5 }, 
+    "Rotating parts (entanglement)": { group: "Mechanical / Machinery Hazards", severity: 9, likelihood: 3 }, 
+    "Moving parts (cutting)": { group: "Mechanical / Machinery Hazards", severity: 9, likelihood: 4 }, 
+    "Moving parts (crushing)": { group: "Mechanical / Machinery Hazards", severity: 9, likelihood: 4 }, 
+    "Ejection (parts, materials)": { group: "Mechanical / Machinery Hazards", severity: 5, likelihood: 5 }, 
+    "Angular, sharp and cutting elements": { group: "Mechanical / Machinery Hazards", severity: 7, likelihood: 5 }, 
+    "Degraded or malfunctioning equipment": { group: "Mechanical / Machinery Hazards", severity: 8, likelihood: 4 }, 
+    "Equipment failure": { group: "Mechanical / Machinery Hazards", severity: 9, likelihood: 3 }, 
+    "Improper use of tools/machines": { group: "Mechanical / Machinery Hazards", severity: 7, likelihood: 6 }, 
+    "Inadequate guarding": { group: "Mechanical / Machinery Hazards", severity: 8, likelihood: 4 }, 
+    "Use of lifting equipment and accessories": { group: "Mechanical / Machinery Hazards", severity: 7, likelihood: 5 }, 
+    "Use of suspension equipment (jacks, etc.)": { group: "Mechanical / Machinery Hazards", severity: 8, likelihood: 4 }, 
+    "Acceleration / deceleration": { group: "Mechanical / Machinery Hazards", severity: 6, likelihood: 5 }, 
     "Slips, trips, and falls (same level or height)": { group: "Workplace / Infrastructure Design", severity: 3, likelihood: 8 }, 
     "Slippery, uneven, unstable or damaged floor": { group: "Workplace / Infrastructure Design", severity: 5, likelihood: 7 }, 
     "Congested or obstructed workplace": { group: "Workplace / Infrastructure Design", severity: 3, likelihood: 8 }, 
@@ -3875,40 +3917,40 @@
     "Inclined surface": { group: "Workplace / Infrastructure Design", severity: 5, likelihood: 6 }, 
     "Poor visibility": { group: "Workplace / Infrastructure Design", severity: 4, likelihood: 7 }, 
     "Coactivity area": { group: "Workplace / Infrastructure Design", severity: 6, likelihood: 6 }, 
-    "Noise exposure": { group: "Physical health hazards", severity: 3, likelihood: 9 }, 
-    "Vibration / Impact (hand-arm, whole-body)": { group: "Physical health hazards", severity: 5, likelihood: 8 }, 
-    "Heat stress": { group: "Physical health hazards", severity: 5, likelihood: 5 }, 
-    "Cold stress": { group: "Physical health hazards", severity: 5, likelihood: 5 }, 
-    "Poor lighting (intensity, glare, reflection)": { group: "Physical health hazards", severity: 4, likelihood: 7 }, 
-    "Electro-magnetic fields": { group: "Physical health hazards", severity: 6, likelihood: 3 }, 
-    "Ionizing radiation (X-rays, radioactive elements)": { group: "Physical health hazards", severity: 9, likelihood: 2 }, 
-    "Non-ionizing radiation (UV, microwave, laser, welding radiations)": { group: "Physical health hazards", severity: 7, likelihood: 4 }, 
-    "Severe draft (e.g. cold air current)": { group: "Physical health hazards", severity: 5, likelihood: 5 }, 
-    "Smoke and fumes": { group: "Physical health hazards", severity: 6, likelihood: 6 }, 
-    "Physical health [Generic]": { group: "Physical health hazards", severity: 5, likelihood: 5 }, 
-    "Explosive materials": { group: "Chemical hazards", severity: 10, likelihood: 1 }, 
-    "Flammable materials": { group: "Chemical hazards", severity: 10, likelihood: 1 }, 
-    "Oxidising materials": { group: "Chemical hazards", severity: 9, likelihood: 2 }, 
-    "Corrosive materials": { group: "Chemical hazards", severity: 7, likelihood: 3 }, 
-    "Acute toxicity materials": { group: "Chemical hazards", severity: 8, likelihood: 3 }, 
-    "Health hazard, sensitizers, allergens materials": { group: "Chemical hazards", severity: 6, likelihood: 5 }, 
-    "Carcinogens, mutagens, reprotoxic (CMRs) materials": { group: "Chemical hazards", severity: 9, likelihood: 2 }, 
-    "Gas under pressure": { group: "Chemical hazards", severity: 7, likelihood: 3 }, 
-    "Asbestos": { group: "Chemical hazards", severity: 9, likelihood: 2 }, 
-    "Fibers other than asbestos": { group: "Chemical hazards", severity: 7, likelihood: 3 }, 
-    "Oil": { group: "Chemical hazards", severity: 5, likelihood: 4 }, 
-    "Crystalline silica": { group: "Chemical hazards", severity: 8, likelihood: 3 }, 
-    "Organic peroxides": { group: "Chemical hazards", severity: 9, likelihood: 2 }, 
-    "Nanomaterials": { group: "Chemical hazards", severity: 6, likelihood: 3 }, 
-    "Endocrine disrupters": { group: "Chemical hazards", severity: 7, likelihood: 4 }, 
-    "Lead-containing material": { group: "Chemical hazards", severity: 8, likelihood: 3 }, 
-    "Particulate material (dust, smoke, fog, aerosol)": { group: "Chemical hazards", severity: 6, likelihood: 6 }, 
-    "Improper labeling or storage": { group: "Chemical hazards", severity: 7, likelihood: 5 }, 
-    "Incompatible chemical reactions": { group: "Chemical hazards", severity: 8, likelihood: 4 }, 
-    "Chemical spills or leaks": { group: "Chemical hazards", severity: 7, likelihood: 5 }, 
-    "Water reactive substances": { group: "Chemical hazards", severity: 8, likelihood: 3 }, 
-    "Shock / vibration sensitive substances": { group: "Chemical hazards", severity: 9, likelihood: 2 }, 
-    "Chemicals [Generic]": { group: "Chemical hazards", severity: 5, likelihood: 5 }, 
+    "Noise exposure": { group: "Physical Health Hazards", severity: 3, likelihood: 9 }, 
+    "Vibration / Impact (hand-arm, whole-body)": { group: "Physical Health Hazards", severity: 5, likelihood: 8 }, 
+    "Heat stress": { group: "Physical Health Hazards", severity: 5, likelihood: 5 }, 
+    "Cold stress": { group: "Physical Health Hazards", severity: 5, likelihood: 5 }, 
+    "Poor lighting (intensity, glare, reflection)": { group: "Physical Health Hazards", severity: 4, likelihood: 7 }, 
+    "Electro-magnetic fields": { group: "Physical Health Hazards", severity: 6, likelihood: 3 }, 
+    "Ionizing radiation (X-rays, radioactive elements)": { group: "Physical Health Hazards", severity: 9, likelihood: 2 }, 
+    "Non-ionizing radiation (UV, microwave, laser, welding radiations)": { group: "Physical Health Hazards", severity: 7, likelihood: 4 }, 
+    "Severe draft (e.g. cold air current)": { group: "Physical Health Hazards", severity: 5, likelihood: 5 }, 
+    "Smoke and fumes": { group: "Physical Health Hazards", severity: 6, likelihood: 6 }, 
+    "Physical health [Generic]": { group: "Physical Health Hazards", severity: 5, likelihood: 5 }, 
+    "Explosive materials": { group: "Chemical Hazards", severity: 10, likelihood: 1 }, 
+    "Flammable materials": { group: "Chemical Hazards", severity: 10, likelihood: 1 }, 
+    "Oxidising materials": { group: "Chemical Hazards", severity: 9, likelihood: 2 }, 
+    "Corrosive materials": { group: "Chemical Hazards", severity: 7, likelihood: 3 }, 
+    "Acute toxicity materials": { group: "Chemical Hazards", severity: 8, likelihood: 3 }, 
+    "Health hazard, sensitizers, allergens materials": { group: "Chemical Hazards", severity: 6, likelihood: 5 }, 
+    "Carcinogens, mutagens, reprotoxic (CMRs) materials": { group: "Chemical Hazards", severity: 9, likelihood: 2 }, 
+    "Gas under pressure": { group: "Chemical Hazards", severity: 7, likelihood: 3 }, 
+    "Asbestos": { group: "Chemical Hazards", severity: 9, likelihood: 2 }, 
+    "Fibers other than asbestos": { group: "Chemical Hazards", severity: 7, likelihood: 3 }, 
+    "Oil": { group: "Chemical Hazards", severity: 5, likelihood: 4 }, 
+    "Crystalline silica": { group: "Chemical Hazards", severity: 8, likelihood: 3 }, 
+    "Organic peroxides": { group: "Chemical Hazards", severity: 9, likelihood: 2 }, 
+    "Nanomaterials": { group: "Chemical Hazards", severity: 6, likelihood: 3 }, 
+    "Endocrine disrupters": { group: "Chemical Hazards", severity: 7, likelihood: 4 }, 
+    "Lead-containing material": { group: "Chemical Hazards", severity: 8, likelihood: 3 }, 
+    "Particulate material (dust, smoke, fog, aerosol)": { group: "Chemical Hazards", severity: 6, likelihood: 6 }, 
+    "Improper labeling or storage": { group: "Chemical Hazards", severity: 7, likelihood: 5 }, 
+    "Incompatible chemical reactions": { group: "Chemical Hazards", severity: 8, likelihood: 4 }, 
+    "Chemical spills or leaks": { group: "Chemical Hazards", severity: 7, likelihood: 5 }, 
+    "Water reactive substances": { group: "Chemical Hazards", severity: 8, likelihood: 3 }, 
+    "Shock / vibration sensitive substances": { group: "Chemical Hazards", severity: 9, likelihood: 2 }, 
+    "Chemicals [Generic]": { group: "Chemical Hazards", severity: 5, likelihood: 5 }, 
     "Electricity": { group: "Hazardous Energy", severity: 10, likelihood: 2 }, 
     "Electrostatic": { group: "Hazardous Energy", severity: 7, likelihood: 3 }, 
     "Electromagnetic fields": { group: "Hazardous Energy", severity: 6, likelihood: 3 }, 
@@ -3937,18 +3979,18 @@
     "High speed vehicle, tire grip loss": { group: "Transportation", severity: 9, likelihood: 3 }, 
     "Inadequate load securing": { group: "Transportation", severity: 7, likelihood: 4 }, 
     "Traffic [Generic]": { group: "Transportation", severity: 6, likelihood: 5 }, 
-    "Postures (Hit list)": { group: "Ergonomic hazards", severity: 3, likelihood: 9 }, 
-    "Force": { group: "Ergonomic hazards", severity: 5, likelihood: 8 }, 
-    "Lifting/Lowering": { group: "Ergonomic hazards", severity: 5, likelihood: 8 }, 
-    "Pushing": { group: "Ergonomic hazards", severity: 5, likelihood: 8 }, 
-    "Pulling": { group: "Ergonomic hazards", severity: 5, likelihood: 8 }, 
-    "Carrying": { group: "Ergonomic hazards", severity: 5, likelihood: 8 }, 
-    "Soft tissue compression": { group: "Ergonomic hazards", severity: 5, likelihood: 7 }, 
-    "Ill-fitting gloves": { group: "Ergonomic hazards", severity: 4, likelihood: 6 }, 
-    "Standing or Sitting for long periods": { group: "Ergonomic hazards", severity: 4, likelihood: 8 }, 
-    "Computer workstation / Screen": { group: "Ergonomic hazards", severity: 4, likelihood: 9 }, 
-    "Inadequate tool or workstation design": { group: "Ergonomic hazards", severity: 5, likelihood: 7 }, 
-    "Poor ergonomics [Generic]": { group: "Ergonomic hazards", severity: 5, likelihood: 7 }, 
+    "Postures (Hit list)": { group: "Ergonomic Hazards", severity: 3, likelihood: 9 }, 
+    "Force": { group: "Ergonomic Hazards", severity: 5, likelihood: 8 }, 
+    "Lifting/Lowering": { group: "Ergonomic Hazards", severity: 5, likelihood: 8 }, 
+    "Pushing": { group: "Ergonomic Hazards", severity: 5, likelihood: 8 }, 
+    "Pulling": { group: "Ergonomic Hazards", severity: 5, likelihood: 8 }, 
+    "Carrying": { group: "Ergonomic Hazards", severity: 5, likelihood: 8 }, 
+    "Soft tissue compression": { group: "Ergonomic Hazards", severity: 5, likelihood: 7 }, 
+    "Ill-fitting gloves": { group: "Ergonomic Hazards", severity: 4, likelihood: 6 }, 
+    "Standing or Sitting for long periods": { group: "Ergonomic Hazards", severity: 4, likelihood: 8 }, 
+    "Computer workstation / Screen": { group: "Ergonomic Hazards", severity: 4, likelihood: 9 }, 
+    "Inadequate tool or workstation design": { group: "Ergonomic Hazards", severity: 5, likelihood: 7 }, 
+    "Poor ergonomics [Generic]": { group: "Ergonomic Hazards", severity: 5, likelihood: 7 }, 
     "Ambiguity of the roles and responsibilities": { group: "Organizational and Psychosocial", severity: 3, likelihood: 8 }, 
     "Inadequate staffing": { group: "Organizational and Psychosocial", severity: 4, likelihood: 7 }, 
     "High job demands (physical or mental workload)": { group: "Organizational and Psychosocial", severity: 3, likelihood: 8 }, 
@@ -3987,21 +4029,21 @@
     "Remote Work Specific Hazards": { group: "Organizational and Psychosocial", severity: 4, likelihood: 8 }, 
     "Work-Life Balance": { group: "Organizational and Psychosocial", severity: 4, likelihood: 9 }, 
     "Employment restriction (e.g. Pregnant/breastfeeding, handicap)": { group: "Organizational and Psychosocial", severity: 5, likelihood: 5 }, 
-    "Viruses, bacteria, fungi": { group: "Biological hazard", severity: 7, likelihood: 3 }, 
-    "Legionella (specific bacteria)": { group: "Biological hazard", severity: 8, likelihood: 3 }, 
-    "Molds or allergens": { group: "Biological hazard", severity: 5, likelihood: 5 }, 
-    "Handling human or animal bodily fluids": { group: "Biological hazard", severity: 7, likelihood: 4 }, 
-    "Bloodborne pathogens": { group: "Biological hazard", severity: 8, likelihood: 3 }, 
-    "Contaminated waste or biological material": { group: "Biological hazard", severity: 6, likelihood: 4 }, 
-    "Potability of water": { group: "Biological hazard", severity: 6, likelihood: 4 }, 
-    "Food hygiene": { group: "Biological hazard", severity: 6, likelihood: 5 }, 
-    "Animal or insect bites/stings": { group: "Biological hazard", severity: 5, likelihood: 5 }, 
-    "Animal waste": { group: "Biological hazard", severity: 6, likelihood: 4 }, 
-    "Hazardous vegetation": { group: "Biological hazard", severity: 4, likelihood: 4 }, 
-    "Flammable and combustible materials": { group: "Fire and explosion", severity: 10, likelihood: 2 }, 
-    "Ignition sources (open flames, sparks, static)": { group: "Fire and explosion", severity: 10, likelihood: 2 },  // NEW
-    "Dust explosions (e.g., black, wood, metal dust)": { group: "Fire and explosion", severity: 10, likelihood: 2 },  // NEW
-    "Oxygen-enriched environments": { group: "Fire and explosion", severity: 9, likelihood: 2 }  // NEW
+    "Viruses, bacteria, fungi": { group: "Biological Hazards", severity: 7, likelihood: 3 }, 
+    "Legionella (specific bacteria)": { group: "Biological Hazards", severity: 8, likelihood: 3 }, 
+    "Molds or allergens": { group: "Biological Hazards", severity: 5, likelihood: 5 }, 
+    "Handling human or animal bodily fluids": { group: "Biological Hazards", severity: 7, likelihood: 4 }, 
+    "Bloodborne pathogens": { group: "Biological Hazards", severity: 8, likelihood: 3 }, 
+    "Contaminated waste or biological material": { group: "Biological Hazards", severity: 6, likelihood: 4 }, 
+    "Potability of water": { group: "Biological Hazards", severity: 6, likelihood: 4 }, 
+    "Food hygiene": { group: "Biological Hazards", severity: 6, likelihood: 5 }, 
+    "Animal or insect bites/stings": { group: "Biological Hazards", severity: 5, likelihood: 5 }, 
+    "Animal waste": { group: "Biological Hazards", severity: 6, likelihood: 4 }, 
+    "Hazardous vegetation": { group: "Biological Hazards", severity: 4, likelihood: 4 }, 
+    "Flammable and combustible materials": { group: "Fire and Explosion", severity: 10, likelihood: 2 }, 
+    "Ignition sources (open flames, sparks, static)": { group: "Fire and Explosion", severity: 10, likelihood: 2 },  // NEW
+    "Dust explosions (e.g., black, wood, metal dust)": { group: "Fire and Explosion", severity: 10, likelihood: 2 },  // NEW
+    "Oxygen-enriched environments": { group: "Fire and Explosion", severity: 9, likelihood: 2 }  // NEW
 };
         const CONSEQUENCE_REGISTRY = [
             // Injuries
@@ -4595,6 +4637,7 @@ data.forEach((row, index) => {
             // Update control measure indicators on all rows
             updateAllControlIndicators();
             // --- END NEW ---
+            if (typeof updateMainTableIssuePill === 'function') updateMainTableIssuePill();
         }
 
         function getTaskDeleteRestoreButtonClass(isDeleted, options = {}) {
@@ -4945,6 +4988,290 @@ data.forEach((row, index) => {
             
             updateDashboardMetrics();
         }
+
+        // ===== Live "N issues" pill: counts Hazard Group / Hazard List / Risk-Consequences =====
+        // ===== dropdowns that don't match a standard entry, kept in sync via one delegated =====
+        // ===== change listener on #table-container rather than threading update calls =====
+        // ===== through every place a row can be built, fixed, or edited. =====
+        function countMainTableIssues() {
+            const rows = document.querySelectorAll('#table-container tbody tr:not(.deleted-row)');
+            let n = 0;
+            rows.forEach(row => {
+                const groupSel = row.querySelector('.group select');
+                const hazSel = row.querySelector('.hazard-list-cell select');
+                const consSel = row.querySelector('.consequence-cell select');
+                if (hazSel && !HAZARD_REGISTRY[hazSel.value]) n++;
+                if (consSel && !CONSEQUENCE_REGISTRY.includes(consSel.value)) n++;
+                if (groupSel && !HAZARD_GROUPS.includes(groupSel.value)) n++;
+            });
+            return n;
+        }
+        function updateMainTableIssuePill() {
+            const pill = document.getElementById('mainTableIssuePill');
+            if (!pill) return;
+            const n = countMainTableIssues();
+            pill.textContent = n === 0 ? '✓ 0 issues' : `⚠ ${n} issue${n === 1 ? '' : 's'}`;
+            pill.className = 'inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold ' +
+                (n === 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700');
+        }
+        window.updateMainTableIssuePill = updateMainTableIssuePill;
+        document.getElementById('table-container')?.addEventListener('change', (e) => {
+            if (e.target.closest('.group, .hazard-list-cell, .consequence-cell')) {
+                updateMainTableIssuePill();
+            }
+        });
+
+        // ===== AI Fix: correct Hazard Group / Hazard List / Risk-Consequences values in the =====
+        // ===== main table that don't match the standard registry dropdowns (first-pass AI import noise). =====
+        function levenshteinDist(a, b) {
+            a = String(a || '').toLowerCase(); b = String(b || '').toLowerCase();
+            if (!a) return b.length; if (!b) return a.length;
+            const dp = Array.from({ length: a.length + 1 }, () => new Array(b.length + 1).fill(0));
+            for (let i = 0; i <= a.length; i++) dp[i][0] = i;
+            for (let j = 0; j <= b.length; j++) dp[0][j] = j;
+            for (let i = 1; i <= a.length; i++) for (let j = 1; j <= b.length; j++) {
+                dp[i][j] = a[i - 1] === b[j - 1] ? dp[i - 1][j - 1] : 1 + Math.min(dp[i - 1][j - 1], dp[i - 1][j], dp[i][j - 1]);
+            }
+            return dp[a.length][b.length];
+        }
+        function snapToRegistryList(val, list) {
+            const v = String(val || '').trim();
+            if (!v) return list[0];
+            const exact = list.find(x => x.toLowerCase() === v.toLowerCase());
+            if (exact) return exact;
+            const sub = list.find(x => x.toLowerCase().includes(v.toLowerCase()) || v.toLowerCase().includes(x.toLowerCase()));
+            if (sub) return sub;
+            let best = list[0], bestD = Infinity;
+            for (const x of list) {
+                const d = levenshteinDist(v, x);
+                if (d < bestD) { bestD = d; best = x; }
+            }
+            return best;
+        }
+        // The AI remap pass often returns a semantically-correct answer that isn't a
+        // byte-exact match to the registry string (different case, trailing punctuation,
+        // extra whitespace). Resolve it back to the canonical registry value instead of
+        // silently discarding a good answer just because it wasn't an exact string match.
+        function resolveToRegistryValue(target, list) {
+            const t = String(target || '').trim();
+            if (!t) return null;
+            const exact = list.find(x => x === t);
+            if (exact) return exact;
+            const ci = list.find(x => x.toLowerCase().trim() === t.toLowerCase());
+            if (ci) return ci;
+            const norm = s => s.toLowerCase().replace(/[.,;:'"()]/g, '').replace(/\s+/g, ' ').trim();
+            const loose = list.find(x => norm(x) === norm(t));
+            return loose || null;
+        }
+        // Setting .value alone doesn't run the dropdown's own onchange wiring (group-class
+        // refresh, score/category recalculation) - dispatch a real change event so a
+        // programmatic fix behaves identically to the user picking the option themselves.
+        // Also marks the field with an outline so it's obvious which values were touched:
+        // solid green for a confident AI Fix, dashed amber for a "closest value" best-guess
+        // suggestion from the second pass that still needs the user's own review. The
+        // outline clears itself the next time the user interacts with that field.
+        function setSelectValueAndFire(select, value, isSuggestion) {
+            select.value = value;
+            select.dispatchEvent(new Event('change', { bubbles: true }));
+            select.style.outline = isSuggestion ? '2px dashed #d97706' : '2px solid #16a34a';
+            select.style.outlineOffset = '1px';
+            if (isSuggestion) select.title = 'Closest-match suggestion - please verify this is correct.';
+            const clearGlow = () => {
+                select.style.outline = '';
+                select.style.outlineOffset = '';
+                if (isSuggestion) select.title = '';
+            };
+            select.addEventListener('change', clearGlow, { once: true });
+            select.addEventListener('focus', clearGlow, { once: true });
+        }
+
+        // Second pass: for any Hazard Group / Hazard List / Risk-Consequences field still
+        // mismatched after AI Fix (either never run, or the AI genuinely couldn't resolve
+        // it), apply the closest standard entry purely by edit-distance as a starting
+        // suggestion - no AI call, no confidence threshold, always picks something. Marked
+        // with a dashed amber outline (not the solid green "confident fix" one) so the user
+        // knows to double-check it rather than trust it outright.
+        function closestMatchRemainingMismatches() {
+            const rows = Array.from(document.querySelectorAll('#table-container tbody tr'));
+            if (rows.length === 0) {
+                showCustomAlert('No rows in the table.', 'info');
+                return;
+            }
+            const HAZ_KEYS_LOCAL = Object.keys(HAZARD_REGISTRY);
+            let count = 0;
+
+            rows.forEach(row => {
+                const groupSel = row.querySelector('.group select');
+                const hazSel = row.querySelector('.hazard-list-cell select');
+                const consSel = row.querySelector('.consequence-cell select');
+
+                if (hazSel && !HAZARD_REGISTRY[hazSel.value]) {
+                    setSelectValueAndFire(hazSel, snapToRegistryList(hazSel.value, HAZ_KEYS_LOCAL), true);
+                    count++;
+                }
+                if (consSel && !CONSEQUENCE_REGISTRY.includes(consSel.value)) {
+                    setSelectValueAndFire(consSel, snapToRegistryList(consSel.value, CONSEQUENCE_REGISTRY), true);
+                    count++;
+                }
+                // Re-check group after the hazard fix above may already have cascaded it.
+                if (groupSel && !HAZARD_GROUPS.includes(groupSel.value)) {
+                    const snap = (hazSel && HAZARD_REGISTRY[hazSel.value])
+                        ? HAZARD_REGISTRY[hazSel.value].group
+                        : snapToRegistryList(groupSel.value, HAZARD_GROUPS);
+                    setSelectValueAndFire(groupSel, snap, true);
+                    count++;
+                }
+            });
+
+            showCustomAlert(
+                count > 0
+                    ? `🎯 Applied ${count} closest-match suggestion(s) - review the dashed amber-outlined dropdowns, these are best guesses, not confirmed matches.`
+                    : 'No remaining mismatches - everything already matches a standard entry.',
+                count > 0 ? 'info' : 'success'
+            );
+        }
+        window.closestMatchRemainingMismatches = closestMatchRemainingMismatches;
+
+        async function aiFixMainTableRows() {
+            const btn = document.getElementById('aiFixMainTableBtn');
+            const rows = Array.from(document.querySelectorAll('#table-container tbody tr'));
+            if (rows.length === 0) {
+                showCustomAlert('No rows in the table to fix.', 'info');
+                return;
+            }
+            const origHtml = btn ? btn.innerHTML : '';
+            if (btn) { btn.disabled = true; btn.innerHTML = '⏳ Fixing…'; }
+
+            const HAZ_KEYS_LOCAL = Object.keys(HAZARD_REGISTRY);
+            const unresolved = [];
+            let localFixed = 0;
+
+            rows.forEach(row => {
+                const groupSel = row.querySelector('.group select');
+                const hazSel = row.querySelector('.hazard-list-cell select');
+                const consSel = row.querySelector('.consequence-cell select');
+
+                if (hazSel && !HAZARD_REGISTRY[hazSel.value]) {
+                    const orig = hazSel.value;
+                    const snap = snapToRegistryList(orig, HAZ_KEYS_LOCAL);
+                    const dist = levenshteinDist(orig, snap);
+                    if (dist <= 4 || snap.toLowerCase().includes(String(orig || '').toLowerCase().slice(0, 5))) {
+                        setSelectValueAndFire(hazSel, snap);
+                        localFixed++;
+                    } else {
+                        unresolved.push({ field: 'hazard', value: orig, select: hazSel });
+                    }
+                }
+
+                if (consSel && !CONSEQUENCE_REGISTRY.includes(consSel.value)) {
+                    const orig = consSel.value;
+                    const snap = snapToRegistryList(orig, CONSEQUENCE_REGISTRY);
+                    const dist = levenshteinDist(orig, snap);
+                    if (dist <= 6) {
+                        setSelectValueAndFire(consSel, snap);
+                        localFixed++;
+                    } else {
+                        unresolved.push({ field: 'cons', value: orig, select: consSel });
+                    }
+                }
+
+                // Hazard Group: a valid Hazard List fix above already cascades the correct
+                // group, so only attempt an independent fix if it's still mismatched.
+                if (groupSel && !HAZARD_GROUPS.includes(groupSel.value)) {
+                    if (hazSel && HAZARD_REGISTRY[hazSel.value]) {
+                        setSelectValueAndFire(groupSel, HAZARD_REGISTRY[hazSel.value].group);
+                        localFixed++;
+                    } else {
+                        const orig = groupSel.value;
+                        const snap = snapToRegistryList(orig, HAZARD_GROUPS);
+                        const dist = levenshteinDist(orig, snap);
+                        if (dist <= 4) {
+                            setSelectValueAndFire(groupSel, snap);
+                            localFixed++;
+                        } else {
+                            unresolved.push({ field: 'group', value: orig, select: groupSel });
+                        }
+                    }
+                }
+            });
+
+            let aiFixedCount = 0;
+            if (unresolved.length > 0) {
+                // One AI call per field type, each given ONLY that field's registry - dumping
+                // all three registries into a single call let the model cross-match a Risk/
+                // Consequences item onto a Hazard List entry (or vice versa) since nothing
+                // structurally prevented it from picking off the wrong list.
+                const fieldConfig = {
+                    hazard: { registry: HAZ_KEYS_LOCAL, label: 'Hazard List' },
+                    cons: { registry: CONSEQUENCE_REGISTRY, label: 'Risk/Consequences' },
+                    group: { registry: HAZARD_GROUPS, label: 'Hazard Group' }
+                };
+                const byField = { hazard: [], cons: [], group: [] };
+                unresolved.forEach(u => byField[u.field].push(u));
+
+                for (const field of Object.keys(byField)) {
+                    const items = byField[field];
+                    if (items.length === 0) continue;
+                    const cfg = fieldConfig[field];
+                    try {
+                        // Give the AI the row's Task Steps + Hazard Source as context - a vague
+                        // AI-imported entry like "No potential of injury" only maps correctly to
+                        // something like "Work related injury otherwise stated" once the model can
+                        // see what the task actually involves, not just the malformed value alone.
+                        // Also pass along the row's OTHER (already-valid) hazard fields when
+                        // available - knowing the hazard is e.g. "Poor ergonomics [Generic]" is a
+                        // much stronger signal for the right consequence than task text alone, and
+                        // prevents wildly unrelated guesses (a real observed case: an ergonomics row
+                        // getting matched to "Sunburn" with no such context to anchor it).
+                        const payload = items.map((u, i) => {
+                            const row = u.select.closest('tr');
+                            const steps = row?.children?.[2]?.textContent?.trim().slice(0, 150) || '';
+                            const hazardSource = row?.children?.[11]?.querySelector('input')?.value?.trim().slice(0, 150) || '';
+                            const hazSelInRow = row?.querySelector('.hazard-list-cell select');
+                            const groupSelInRow = row?.querySelector('.group select');
+                            const knownHazardList = (field !== 'hazard' && hazSelInRow && HAZARD_REGISTRY[hazSelInRow.value]) ? hazSelInRow.value : '';
+                            const knownHazardGroup = (field !== 'group' && groupSelInRow && HAZARD_GROUPS.includes(groupSelInRow.value)) ? groupSelInRow.value : '';
+                            return {
+                                id: i, value: String(u.value || '').slice(0, 200), task_steps: steps, hazard_source: hazardSource,
+                                known_hazard_list: knownHazardList, known_hazard_group: knownHazardGroup
+                            };
+                        });
+                        const prompt = `Map each item below to the closest EXACT entry in the ${cfg.label} registry, using its task_steps, hazard_source, known_hazard_list and known_hazard_group as context to disambiguate vague or generic values - the known_hazard_list/known_hazard_group fields (when non-empty) are the row's own already-confirmed hazard classification and are the strongest signal for what a plausible match looks like (e.g. a row already classified under an ergonomics hazard should map to an ergonomic/musculoskeletal-type entry, not an unrelated one). "mapped" must be copied character-for-character from the registry list - do not invent new text and do not use any other registry. Reply with ONLY a JSON array like [{"id":0,"mapped":"<exact registry value>"}].
+${cfg.label} registry: ${JSON.stringify(cfg.registry)}
+Items:
+${JSON.stringify(payload, null, 2)}`;
+                        const content = await callAPI('openai/gpt-4o-mini', prompt);
+                        const s = content.indexOf('['), e = content.lastIndexOf(']');
+                        if (s !== -1 && e > s) {
+                            const arr = JSON.parse(content.substring(s, e + 1));
+                            arr.forEach(a => {
+                                const u = items[a.id]; if (!u) return;
+                                const resolved = resolveToRegistryValue(a.mapped, cfg.registry);
+                                if (resolved) {
+                                    setSelectValueAndFire(u.select, resolved);
+                                    aiFixedCount++;
+                                }
+                            });
+                        }
+                    } catch (e) {
+                        console.warn(`AI Fix (main table) remap failed for field "${field}":`, e);
+                    }
+                }
+            }
+
+            if (btn) { btn.disabled = false; btn.innerHTML = origHtml; }
+
+            const total = localFixed + aiFixedCount;
+            const remaining = unresolved.length - aiFixedCount;
+            showCustomAlert(
+                total > 0
+                    ? `✅ AI Fix: ${total} fixed (${localFixed} local + ${aiFixedCount} AI).${remaining > 0 ? ` ${remaining} remaining unresolved — click "Suggest Closest Match" for a best-guess starting point on those.` : ''}`
+                    : 'No Hazard Group / Hazard List / Risk-Consequences mismatches found.',
+                total > 0 ? 'success' : 'info'
+            );
+        }
+        window.aiFixMainTableRows = aiFixMainTableRows;
+
         // --- NEW: Function to recalculate RESIDUAL row ---
         window.recalculateResidualRow = function(rowIndex) {
             const row = document.querySelector(`#table-container tr[data-row-index="${rowIndex}"]`);
@@ -7956,6 +8283,7 @@ window.toggleRowDelete = function(rowIndex, btn) {
             window.syncMainTableRowStateToGoehs(sourceRowIndex, isDeleted);
         }
     }
+    if (typeof window.updateMainTableIssuePill === 'function') window.updateMainTableIssuePill();
 }
 
 // --- Restore row from modal ---
@@ -8625,7 +8953,17 @@ window.LIKELIHOOD_SCALE = LIKELIHOOD_SCALE;
         if (translateTableBtn) {
             translateTableBtn.onclick = () => translationModal.style.display = 'flex';
         }
-        
+
+        const aiFixMainTableBtn = document.getElementById('aiFixMainTableBtn');
+        if (aiFixMainTableBtn) {
+            aiFixMainTableBtn.onclick = aiFixMainTableRows;
+        }
+
+        const aiClosestMatchBtn = document.getElementById('aiClosestMatchBtn');
+        if (aiClosestMatchBtn) {
+            aiClosestMatchBtn.onclick = closestMatchRemainingMismatches;
+        }
+
         if (translateCancelBtn) {
             translateCancelBtn.onclick = () => translationModal.style.display = 'none';
         }
@@ -12933,7 +13271,7 @@ updateSpeechModeButton();
 document.addEventListener('DOMContentLoaded', initSpeechRecognition);
 
 // --- Save/Load Project Feature ---
-async function saveProject() {
+async function saveProject(filenameOverride, silent) {
     // Check if there's either images/notes OR table data to save
     const hasImages = galleryDiv.querySelectorAll('.gallery-item img').length > 0;
     const hasTableData = document.querySelector('#table-container table') !== null;
@@ -13048,11 +13386,12 @@ async function saveProject() {
     const url = URL.createObjectURL(jsonBlob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = getProjectFileName('risk_project', '.json');
+    link.download = filenameOverride || getProjectFileName('risk_project', '.json');
     link.click();
     URL.revokeObjectURL(url);
-    showCustomAlert("Project saved as JSON!", 'success');
+    if (!silent) showCustomAlert("Project saved as JSON!", 'success');
 }
+window.saveProject = saveProject;
 
 async function loadProject(file) {
     const pendingWorkflowContext = window.pendingGoehsWorkflowContext || null;
@@ -13812,15 +14151,22 @@ downloadBtn.addEventListener('click', async () => {
             <p style="text-align:center; color:#64748b; margin: 4px 0 0 0; font-size: 0.875rem;">Upload your Risk Assessment Excel file • Map columns • Assign images to steps</p>
         </div>
 
+        <!-- Workflow entry: Single Sheet vs Multi Tab -->
+        <div id="gyTopTabBar" class="gy-top-tab-bar">
+            <button type="button" id="gyTopTabSingle" class="gy-top-tab gy-top-tab-active" onclick="switchGyTopTab('single')">📄 Single Sheet → AI</button>
+            <button type="button" id="gyTopTabMulti" class="gy-top-tab" onclick="switchGyTopTab('multi')">📚 Multi Tab → AI</button>
+        </div>
+
+        <div id="gySingleTabContent" style="display:contents;">
         <!-- Sheet Tabs Bar -->
         <div id="gySheetTabsBar" style="display:none; flex-shrink:0; margin-bottom:12px; background:linear-gradient(135deg,#002c5f 0%,#001a3d 100%); border-radius:10px; padding:6px 10px; overflow-x:auto; white-space:nowrap;">
             <span style="color:#93c5fd; font-size:0.7rem; font-weight:600; margin-right:10px; vertical-align:middle;">📑 Sheets:</span>
             <span id="gySheetTabsList" style="display:inline-flex; gap:4px;"></span>
         </div>
         
-        <!-- Top Section: Drop Zone + Column Mapping + Preview -->
-        <div style="display: grid; grid-template-columns: 180px 320px 1fr; gap: 20px; flex-shrink: 0; margin-bottom: 16px;">
-            
+        <!-- Top Section: Drop Zone + Collapsible Column Mapping / Preview -->
+        <div style="display: grid; grid-template-columns: 180px 1fr; gap: 20px; flex-shrink: 0; margin-bottom: 16px; align-items: start;">
+
             <!-- Drop Zone -->
             <div id="gyDropZone" class="gy-dropzone" style="padding: 16px; border-radius: 12px; min-height: 140px;">
                 <div style="font-size: 32px;">📂</div>
@@ -13828,56 +14174,75 @@ downloadBtn.addEventListener('click', async () => {
                 <p style="font-size: 0.75rem; color: #64748b; margin: 0;">or click to browse</p>
                 <p class="text-emerald-600 text-xs mt-2">.xlsx, .xls, .json</p>
             </div>
-            
-            <!-- Column Mapping -->
-            <div style="background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%); border: 1px solid #e2e8f0; padding: 12px; border-radius: 12px;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; padding-bottom: 8px; border-bottom: 2px solid #e2e8f0;">
-                    <h4 style="font-size: 0.8rem; font-weight: 700; color: #334155; margin: 0;">🎯 Column Mapping</h4>
-                    <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
-                        <button id="gyCopyMappingBtn" type="button" title="Copy current column mapping — then switch to the next tab and click Paste" style="background:linear-gradient(135deg,#0ea5e9,#0284c7);color:white;border:none;padding:4px 10px;border-radius:6px;cursor:pointer;font-size:0.68rem;font-weight:600;transition:all 0.2s;" onmouseover="this.style.transform='translateY(-1px)';this.style.boxShadow='0 2px 8px rgba(14,165,233,0.35)'" onmouseout="this.style.transform='';this.style.boxShadow=''">📋 Copy Mapping</button>
-                        <button id="gyPasteMappingBtn" type="button" title="Paste the copied mapping into this tab" disabled style="background:#e2e8f0;color:#94a3b8;border:none;padding:4px 10px;border-radius:6px;cursor:not-allowed;font-size:0.68rem;font-weight:600;transition:all 0.2s;">📌 Paste</button>
-                        <button id="gyApplyMappingAll" type="button" title="Apply this mapping to ALL other tabs at once" style="display:none;background:linear-gradient(135deg,#f59e0b,#d97706);color:white;border:none;padding:4px 10px;border-radius:6px;cursor:pointer;font-size:0.68rem;font-weight:600;transition:all 0.2s;" onmouseover="this.style.transform='translateY(-1px)';this.style.boxShadow='0 2px 8px rgba(245,158,11,0.35)'" onmouseout="this.style.transform='';this.style.boxShadow=''">📋 Apply to All Tabs</button>
-                        <button id="gyRefreshBtn" type="button" style="background: linear-gradient(135deg, #002c5f 0%, #001a3d 100%); color: white; border: none; padding: 4px 10px; border-radius: 6px; cursor: pointer; font-size: 0.7rem; font-weight: 600;">↻ Refresh</button>
+
+            <!-- Column Mapping + Preview: collapsed by default, expand for full-width review/edit -->
+            <details id="gyMapPreviewDetails" class="gy-map-collapsible">
+                <summary>
+                    <span class="gy-map-collapsible-title">🎯 Column Mapping &amp; Preview <span id="gyMapProgress" class="gy-map-progress">0/10 mapped</span></span>
+                    <span class="gy-map-collapsible-hint">Click to expand — review, remap and delete/restore rows here</span>
+                    <svg class="gy-map-collapsible-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M9 6l6 6-6 6"/></svg>
+                </summary>
+                <div class="gy-map-collapsible-body">
+                    <!-- Column Mapping controls -->
+                    <div>
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; padding-bottom: 8px; border-bottom: 2px solid #e2e8f0;">
+                            <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+                                <button id="gyCopyMappingBtn" type="button" title="Copy current column mapping — then switch to the next tab and click Paste" style="background:linear-gradient(135deg,#0ea5e9,#0284c7);color:white;border:none;padding:4px 10px;border-radius:6px;cursor:pointer;font-size:0.68rem;font-weight:600;transition:all 0.2s;" onmouseover="this.style.transform='translateY(-1px)';this.style.boxShadow='0 2px 8px rgba(14,165,233,0.35)'" onmouseout="this.style.transform='';this.style.boxShadow=''">📋 Copy Mapping</button>
+                                <button id="gyPasteMappingBtn" type="button" title="Paste the copied mapping into this tab" disabled style="background:#e2e8f0;color:#94a3b8;border:none;padding:4px 10px;border-radius:6px;cursor:not-allowed;font-size:0.68rem;font-weight:600;transition:all 0.2s;">📌 Paste</button>
+                                <button id="gyApplyMappingAll" type="button" title="Apply this mapping to ALL other tabs at once" style="display:none;background:linear-gradient(135deg,#f59e0b,#d97706);color:white;border:none;padding:4px 10px;border-radius:6px;cursor:pointer;font-size:0.68rem;font-weight:600;transition:all 0.2s;" onmouseover="this.style.transform='translateY(-1px)';this.style.boxShadow='0 2px 8px rgba(245,158,11,0.35)'" onmouseout="this.style.transform='';this.style.boxShadow=''">📋 Apply to All Tabs</button>
+                                <button id="gyClearMappingBtn" type="button" title="Clear all mapped columns" style="background:#fff;color:#475569;border:1px solid #cbd5e1;padding:4px 10px;border-radius:6px;cursor:pointer;font-size:0.68rem;font-weight:600;transition:all 0.2s;">🧹 Clear</button>
+                                <button id="gyRefreshBtn" type="button" style="background: linear-gradient(135deg, #002c5f 0%, #001a3d 100%); color: white; border: none; padding: 4px 10px; border-radius: 6px; cursor: pointer; font-size: 0.7rem; font-weight: 600;">↻ Refresh</button>
+                            </div>
+                        </div>
+                        <div id="gyMapHelp" class="gy-map-help">Use the <strong>Map to</strong> row in the preview table to assign columns quickly. Open <strong>Advanced Manual Mapping</strong> only if you need direct A/B/C edits.</div>
+                        <details id="gyManualMapDetails" class="gy-map-advanced">
+                            <summary>
+                                <span>⚙️ Advanced Manual Mapping</span>
+                                <span style="font-size:0.62rem;color:#64748b;">Direct column letters</span>
+                            </summary>
+                            <div class="gy-map-advanced-body">
+                                <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px;">
+                                    <div class="gy-map-field-mini"><label>Step</label><input type="text" id="gyColStep" placeholder="A" oninput="this.value=this.value.toUpperCase()"></div>
+                                    <div class="gy-map-field-mini"><label>Desc</label><input type="text" id="gyColDesc" placeholder="B" oninput="this.value=this.value.toUpperCase()"></div>
+                                    <div class="gy-map-field-mini"><label>Haz Src</label><input type="text" id="gyColHazSource" placeholder="" oninput="this.value=this.value.toUpperCase()"></div>
+                                    <div class="gy-map-field-mini"><label>Haz Grp</label><input type="text" id="gyColHazGroup" placeholder="C" oninput="this.value=this.value.toUpperCase()"></div>
+                                    <div class="gy-map-field-mini"><label>Haz List</label><input type="text" id="gyColHazList" placeholder="D" oninput="this.value=this.value.toUpperCase()"></div>
+                                    <div class="gy-map-field-mini"><label>Risk</label><input type="text" id="gyColRisk" placeholder="E" oninput="this.value=this.value.toUpperCase()"></div>
+                                    <div class="gy-map-field-mini"><label>Controls</label><input type="text" id="gyColControl" placeholder="H" oninput="this.value=this.value.toUpperCase()"></div>
+                                    <div class="gy-map-field-mini"><label>Freq</label><input type="text" id="gyColFrequency" placeholder="" oninput="this.value=this.value.toUpperCase()"></div>
+                                    <div class="gy-map-field-mini"><label>Sev</label><input type="text" id="gyColSeverity" placeholder="" oninput="this.value=this.value.toUpperCase()"></div>
+                                    <div class="gy-map-field-mini"><label>Like</label><input type="text" id="gyColLikelihood" placeholder="" oninput="this.value=this.value.toUpperCase()"></div>
+                                </div>
+                            </div>
+                        </details>
+                    </div>
+
+                    <!-- Excel Preview Panel -->
+                    <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; display: flex; flex-direction: column;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: linear-gradient(135deg, #002c5f 0%, #001a3d 100%); color: white;">
+                            <h4 style="font-size: 0.75rem; font-weight: 600; margin: 0;">📋 Excel Data Preview</h4>
+                            <div style="display: flex; gap: 8px; align-items: center;">
+                                <label style="font-size: 0.65rem;">Header Row:</label>
+                                <input type="number" id="gyHeaderRow" value="1" min="1" max="50" style="width: 40px; padding: 2px 4px; border: none; border-radius: 4px; font-size: 0.7rem; text-align: center; color: #1e293b; background: #fff;">
+                                <label style="font-size: 0.65rem;">Data Start:</label>
+                                <input type="number" id="gyDataStartRow" value="2" min="1" max="100" style="width: 40px; padding: 2px 4px; border: none; border-radius: 4px; font-size: 0.7rem; text-align: center; color: #1e293b; background: #fff;">
+                            </div>
+                        </div>
+                        <div id="gyExcelPreviewContainer" style="flex: 1; overflow: auto; max-height: 50vh;">
+                            <table id="gyExcelPreviewTable" style="width: 100%; border-collapse: collapse; font-size: 0.65rem;">
+                                <thead id="gyExcelPreviewHead" style="background: #334155; color: white; position: sticky; top: 0;"></thead>
+                                <tbody id="gyExcelPreviewBody"></tbody>
+                            </table>
+                            <div id="gyExcelPreviewEmpty" style="padding: 24px; text-align: center; color: #94a3b8; font-size: 0.8rem;">
+                                <span style="font-size: 2rem;">📄</span><br>
+                                Drop an Excel file to preview data
+                            </div>
+                        </div>
                     </div>
                 </div>
-                <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px;">
-                    <div class="gy-map-field-mini"><label>Step</label><input type="text" id="gyColStep" placeholder="A" oninput="this.value=this.value.toUpperCase()"></div>
-                    <div class="gy-map-field-mini"><label>Desc</label><input type="text" id="gyColDesc" placeholder="B" oninput="this.value=this.value.toUpperCase()"></div>
-                    <div class="gy-map-field-mini"><label>Haz Src</label><input type="text" id="gyColHazSource" placeholder="" oninput="this.value=this.value.toUpperCase()"></div>
-                    <div class="gy-map-field-mini"><label>Haz Grp</label><input type="text" id="gyColHazGroup" placeholder="C" oninput="this.value=this.value.toUpperCase()"></div>
-                    <div class="gy-map-field-mini"><label>Haz List</label><input type="text" id="gyColHazList" placeholder="D" oninput="this.value=this.value.toUpperCase()"></div>
-                    <div class="gy-map-field-mini"><label>Risk</label><input type="text" id="gyColRisk" placeholder="E" oninput="this.value=this.value.toUpperCase()"></div>
-                    <div class="gy-map-field-mini"><label>Controls</label><input type="text" id="gyColControl" placeholder="H" oninput="this.value=this.value.toUpperCase()"></div>
-                    <div class="gy-map-field-mini"><label>Freq</label><input type="text" id="gyColFrequency" placeholder="" oninput="this.value=this.value.toUpperCase()"></div>
-                    <div class="gy-map-field-mini"><label>Sev</label><input type="text" id="gyColSeverity" placeholder="" oninput="this.value=this.value.toUpperCase()"></div>
-                    <div class="gy-map-field-mini"><label>Like</label><input type="text" id="gyColLikelihood" placeholder="" oninput="this.value=this.value.toUpperCase()"></div>
-                </div>
-            </div>
-            
-            <!-- Excel Preview Panel -->
-            <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; display: flex; flex-direction: column;">
-                <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: linear-gradient(135deg, #002c5f 0%, #001a3d 100%); color: white;">
-                    <h4 style="font-size: 0.75rem; font-weight: 600; margin: 0;">📋 Excel Data Preview</h4>
-                    <div style="display: flex; gap: 8px; align-items: center;">
-                        <label style="font-size: 0.65rem;">Header Row:</label>
-                        <input type="number" id="gyHeaderRow" value="1" min="1" max="50" style="width: 40px; padding: 2px 4px; border: none; border-radius: 4px; font-size: 0.7rem; text-align: center; color: #1e293b; background: #fff;">
-                        <label style="font-size: 0.65rem;">Data Start:</label>
-                        <input type="number" id="gyDataStartRow" value="2" min="1" max="100" style="width: 40px; padding: 2px 4px; border: none; border-radius: 4px; font-size: 0.7rem; text-align: center; color: #1e293b; background: #fff;">
-                    </div>
-                </div>
-                <div id="gyExcelPreviewContainer" style="flex: 1; overflow: auto; max-height: 150px;">
-                    <table id="gyExcelPreviewTable" style="width: 100%; border-collapse: collapse; font-size: 0.65rem;">
-                        <thead id="gyExcelPreviewHead" style="background: #334155; color: white; position: sticky; top: 0;"></thead>
-                        <tbody id="gyExcelPreviewBody"></tbody>
-                    </table>
-                    <div id="gyExcelPreviewEmpty" style="padding: 24px; text-align: center; color: #94a3b8; font-size: 0.8rem;">
-                        <span style="font-size: 2rem;">📄</span><br>
-                        Drop an Excel file to preview data
-                    </div>
-                </div>
-            </div>
+            </details>
         </div>
-        
+
         <input type="file" id="gyFileInput" accept=".xlsx, .xls, .json" style="display:none">
         <div id="gyStatus" style="text-align: center; font-size: 0.8rem; font-weight: 600; color: #64748b; padding: 4px 0; flex-shrink: 0;"></div>
 
@@ -13921,10 +14286,10 @@ downloadBtn.addEventListener('click', async () => {
         
         <!-- Footer Actions -->
         <div style="flex-shrink: 0; padding-top: 12px; margin-top: 12px; border-top: 2px solid #e2e8f0; display: flex; justify-content: flex-end; gap: 12px; align-items: center;">
-            <button id="gyBatchAllBtn" style="display:none; background:linear-gradient(135deg,#475569 0%,#334155 100%); color:white; font-weight:700; padding:10px 20px; border:none; border-radius:8px; cursor:pointer; font-size:0.85rem; transition:all 0.2s;" onmouseover="this.style.transform='translateY(-1px)';this.style.boxShadow='0 4px 12px rgba(71,85,105,0.25)'" onmouseout="this.style.transform='';this.style.boxShadow=''">⚡ Process All Tabs &amp; Download ZIP</button>
-            <button id="gyExportBtn" style="display:none;" class="btn-white">💾 Save Project (JSON)</button>
-            <button id="gyForwardBtn" style="display:none;" class="btn-indigo">✓ Load as New Project</button>
+            <button id="gyExportBtn" class="rab-btn rab-c-yellow rab-hidden">💾 Save Project (JSON)</button>
+            <button id="gyForwardBtn" class="rab-btn rab-c-yellow rab-hidden">✓ Load as New Project</button>
         </div>
+        </div><!-- /gySingleTabContent -->
     </div>
 </div>
 
@@ -14282,6 +14647,8 @@ downloadBtn.addEventListener('click', async () => {
     let ra2025Strings = [];
     let ra2025AllRows = [];
     let ra2025ColumnMap = {};
+    const mapperCore = window.RABExcelMapperCore;
+    const mapperUi = window.RABExcelMapperUI;
 
     const RA2025_MAP_FIELDS = [
         {
@@ -14371,6 +14738,11 @@ downloadBtn.addEventListener('click', async () => {
     ];
 
     function resetRA2025ColumnMap() {
+        if (mapperCore && typeof mapperCore.initializeMapping === 'function') {
+            ra2025ColumnMap = mapperCore.initializeMapping(RA2025_MAP_FIELDS);
+            return;
+        }
+
         ra2025ColumnMap = {};
         RA2025_MAP_FIELDS.forEach(field => {
             ra2025ColumnMap[field.key] = '';
@@ -14378,6 +14750,9 @@ downloadBtn.addEventListener('click', async () => {
     }
 
     function normalizeColLetter(value) {
+        if (mapperCore && typeof mapperCore.normalizeColLetter === 'function') {
+            return mapperCore.normalizeColLetter(value);
+        }
         return String(value || '').toUpperCase().replace(/[^A-Z]/g, '').slice(0, 3);
     }
 
@@ -14697,6 +15072,12 @@ downloadBtn.addEventListener('click', async () => {
     function clearColumnMapping(col) {
         const normalizedCol = normalizeColLetter(col);
         if (!normalizedCol) return;
+
+        if (mapperCore && typeof mapperCore.clearColumn === 'function') {
+            mapperCore.clearColumn(ra2025ColumnMap, normalizedCol);
+            return;
+        }
+
         Object.keys(ra2025ColumnMap).forEach(key => {
             if (ra2025ColumnMap[key] === normalizedCol) {
                 ra2025ColumnMap[key] = '';
@@ -14713,6 +15094,11 @@ downloadBtn.addEventListener('click', async () => {
             return;
         }
 
+        if (mapperCore && typeof mapperCore.setFieldMapping === 'function') {
+            mapperCore.setFieldMapping(ra2025ColumnMap, RA2025_MAP_FIELDS, fieldKey, normalizedCol);
+            return;
+        }
+
         clearColumnMapping(normalizedCol);
         ra2025ColumnMap[fieldKey] = normalizedCol;
     }
@@ -14720,6 +15106,11 @@ downloadBtn.addEventListener('click', async () => {
     function getMappedFieldForColumn(col) {
         const normalizedCol = normalizeColLetter(col);
         if (!normalizedCol) return '';
+
+        if (mapperCore && typeof mapperCore.getMappedFieldForColumn === 'function') {
+            return mapperCore.getMappedFieldForColumn(ra2025ColumnMap, normalizedCol);
+        }
+
         const entry = Object.entries(ra2025ColumnMap).find(([, mappedCol]) => mappedCol === normalizedCol);
         return entry ? entry[0] : '';
     }
@@ -14727,10 +15118,19 @@ downloadBtn.addEventListener('click', async () => {
     function isColumnMapped(col) {
         const normalizedCol = normalizeColLetter(col);
         if (!normalizedCol) return false;
+
+        if (mapperCore && typeof mapperCore.isColumnMapped === 'function') {
+            return mapperCore.isColumnMapped(ra2025ColumnMap, normalizedCol);
+        }
+
         return Object.values(ra2025ColumnMap).includes(normalizedCol);
     }
 
     function getCurrentMapping() {
+        if (mapperCore && typeof mapperCore.getMappingSnapshot === 'function') {
+            return mapperCore.getMappingSnapshot(ra2025ColumnMap);
+        }
+
         const mapping = {};
         Object.keys(ra2025ColumnMap).forEach(key => {
             mapping[key] = normalizeColLetter(ra2025ColumnMap[key]);
@@ -14790,6 +15190,10 @@ downloadBtn.addEventListener('click', async () => {
     }
 
     function colLetterToIndex(col) {
+        if (mapperCore && typeof mapperCore.colLetterToIndex === 'function') {
+            return mapperCore.colLetterToIndex(col);
+        }
+
         let index = 0;
         const safeCol = normalizeColLetter(col);
         for (let i = 0; i < safeCol.length; i++) {
@@ -14799,6 +15203,10 @@ downloadBtn.addEventListener('click', async () => {
     }
 
     function indexToColLetter(idx) {
+        if (mapperCore && typeof mapperCore.indexToColLetter === 'function') {
+            return mapperCore.indexToColLetter(idx);
+        }
+
         let letter = '';
         let value = idx + 1;
         while (value > 0) {
@@ -14896,6 +15304,10 @@ downloadBtn.addEventListener('click', async () => {
     function applyMappingDefaults(mappingDefaults, overwriteExisting) {
         if (!mappingDefaults || typeof mappingDefaults !== 'object') return 0;
 
+        if (mapperCore && typeof mapperCore.applyMappingDefaults === 'function') {
+            return mapperCore.applyMappingDefaults(ra2025ColumnMap, RA2025_MAP_FIELDS, mappingDefaults, overwriteExisting);
+        }
+
         let appliedCount = 0;
         RA2025_MAP_FIELDS.forEach(field => {
             const mappedCol = normalizeColLetter(mappingDefaults[field.key]);
@@ -14974,9 +15386,15 @@ downloadBtn.addEventListener('click', async () => {
     function updateMappingStatus(headerData) {
         renderMappingFeedback(headerData);
 
-        const requiredTotal = RA2025_MAP_FIELDS.filter(field => field.required).length;
-        const requiredMapped = RA2025_MAP_FIELDS.filter(field => field.required && ra2025ColumnMap[field.key]).length;
-        const mappedCount = Object.values(ra2025ColumnMap).filter(Boolean).length;
+        const requiredTotal = mapperCore && typeof mapperCore.getRequiredTotal === 'function'
+            ? mapperCore.getRequiredTotal(RA2025_MAP_FIELDS)
+            : RA2025_MAP_FIELDS.filter(field => field.required).length;
+        const requiredMapped = mapperCore && typeof mapperCore.getRequiredMappedCount === 'function'
+            ? mapperCore.getRequiredMappedCount(ra2025ColumnMap, RA2025_MAP_FIELDS)
+            : RA2025_MAP_FIELDS.filter(field => field.required && ra2025ColumnMap[field.key]).length;
+        const mappedCount = mapperCore && typeof mapperCore.getMappedCount === 'function'
+            ? mapperCore.getMappedCount(ra2025ColumnMap)
+            : Object.values(ra2025ColumnMap).filter(Boolean).length;
 
         if (requiredMapped < requiredTotal) {
             setStatusMessage('Map at least Task/Step Description to continue.', true);
@@ -15017,46 +15435,24 @@ downloadBtn.addEventListener('click', async () => {
 
         const headerData = ra2025AllRows.find(row => row._rowNum === headerRow) || null;
         const cols = getPreviewColumns();
-
-        let headerHtml = '<tr class="ra2025-map-row"><th>Map to</th>';
-        cols.forEach(col => {
-            const selectedField = getMappedFieldForColumn(col);
-            const mappedClass = selectedField ? 'selected-col' : '';
-            headerHtml += `<th class="${mappedClass}"><select class="ra2025-header-map-select" data-col="${col}" onchange="handleRA2025HeaderMapping(this)">${buildMapOptions(selectedField)}</select></th>`;
-        });
-        headerHtml += '</tr>';
-
-        headerHtml += `<tr><th>Header (row ${headerRow})</th>`;
-        cols.forEach(col => {
-            const headerText = headerData && headerData[col] ? String(headerData[col]) : col;
-            const mappedField = getMappedFieldForColumn(col);
-            const mappedLabel = mappedField ? getFieldLabel(mappedField) : '';
-            const mappedClass = mappedField ? 'selected-col' : '';
-            const badge = mappedLabel ? `<span class="ra2025-map-badge">${escapeHtml(mappedLabel)}</span>` : '';
-
-            headerHtml += `<th class="${mappedClass}" title="${escapeHtml(headerText)}"><span class="ra2025-header-col">${escapeHtml(col)}</span><span class="ra2025-header-title">${escapeHtml(truncateText(headerText, 42))}</span>${badge}</th>`;
-        });
-        headerHtml += '</tr>';
-        thead.innerHTML = headerHtml;
-
         const dataRows = ra2025AllRows.filter(row => row._rowNum >= dataStart && row._rowNum < dataStart + 30);
-        let bodyHtml = '';
 
-        dataRows.forEach(row => {
-            bodyHtml += `<tr><td class="ra2025-row-label">Row ${row._rowNum}</td>`;
-            cols.forEach(col => {
-                const value = row[col] || '';
-                const mappedClass = isColumnMapped(col) ? 'ra2025-col-mapped' : '';
-                bodyHtml += `<td class="${mappedClass}" title="${escapeHtml(value)}">${escapeHtml(truncateText(value, 48))}</td>`;
+        if (mapperUi && typeof mapperUi.renderColumnMappingPreview === 'function') {
+            const rendered = mapperUi.renderColumnMappingPreview({
+                columns: cols,
+                headerData: headerData,
+                dataRows: dataRows,
+                headerRowNumber: headerRow,
+                getMappedFieldForColumn: getMappedFieldForColumn,
+                getFieldLabel: getFieldLabel,
+                buildMapOptions: buildMapOptions,
+                mapOnChangeHandlerName: 'handleRA2025HeaderMapping',
+                isColumnMapped: isColumnMapped
             });
-            bodyHtml += '</tr>';
-        });
-
-        if (!bodyHtml) {
-            bodyHtml = `<tr><td colspan="${cols.length + 1}" style="text-align:center; padding:20px; color:#94a3b8;">No data found in selected rows</td></tr>`;
+            thead.innerHTML = rendered.theadHtml;
+            tbody.innerHTML = rendered.tbodyHtml;
         }
 
-        tbody.innerHTML = bodyHtml;
         updateMappingStatus(headerData);
         scheduleRA2025PreviewScrollSync(true);
     };
@@ -15689,11 +16085,167 @@ downloadBtn.addEventListener('click', async () => {
     let gyActiveSheetIdx = 1; // Currently selected sheet index
     let gyPerTabState = {}; // {sheetIdx: {colMap, fullData, imagesByRow, deletedRows, headerRow, dataStartRow}}
     let gyClipboardMapping = null; // Copied column mapping snapshot
+    const mapperCoreGy = window.RABExcelMapperCore;
+    const mapperUiGy = window.RABExcelMapperUI;
+    const LEGACY_GY_MAP_BINDINGS = [
+        { key: 'step', id: 'gyColStep' },
+        { key: 'desc', id: 'gyColDesc' },
+        { key: 'hSrc', id: 'gyColHazSource' },
+        { key: 'hGrp', id: 'gyColHazGroup' },
+        { key: 'hList', id: 'gyColHazList' },
+        { key: 'risk', id: 'gyColRisk' },
+        { key: 'ctrl', id: 'gyColControl' },
+        { key: 'freq', id: 'gyColFrequency' },
+        { key: 'sev', id: 'gyColSeverity' },
+        { key: 'like', id: 'gyColLikelihood' }
+    ];
+    const LEGACY_GY_MAP_FIELDS = [
+        { key: 'step', label: 'Step' },
+        { key: 'desc', label: 'Description' },
+        { key: 'hSrc', label: 'Hazard Source' },
+        { key: 'hGrp', label: 'Hazard Group' },
+        { key: 'hList', label: 'Hazard List' },
+        { key: 'risk', label: 'Risk' },
+        { key: 'ctrl', label: 'Controls' },
+        { key: 'freq', label: 'Frequency' },
+        { key: 'sev', label: 'Severity' },
+        { key: 'like', label: 'Likelihood' }
+    ];
+
+    function normalizeGyCol(value) {
+        if (mapperCoreGy && typeof mapperCoreGy.normalizeColLetter === 'function') {
+            return mapperCoreGy.normalizeColLetter(value);
+        }
+        return String(value || '').toUpperCase().trim();
+    }
+
+    function getGyColMapFromInputs() {
+        const rawMap = {};
+        LEGACY_GY_MAP_BINDINGS.forEach(binding => {
+            rawMap[binding.key] = String(document.getElementById(binding.id)?.value || '').toUpperCase().trim();
+        });
+
+        const mapperApi = window.RABClickMapper;
+        if (mapperApi && typeof mapperApi.normalizeMap === 'function') {
+            return mapperApi.normalizeMap(rawMap);
+        }
+
+        const map = {};
+        LEGACY_GY_MAP_BINDINGS.forEach(binding => {
+            map[binding.key] = binding.key === 'ctrl'
+                ? rawMap[binding.key]
+                : normalizeGyCol(rawMap[binding.key]);
+        });
+        return map;
+    }
+
+    function setGyColMapToInputs(map) {
+        LEGACY_GY_MAP_BINDINGS.forEach(binding => {
+            const el = document.getElementById(binding.id);
+            if (!el) return;
+            if (binding.key === 'ctrl') {
+                el.value = String((map && map[binding.key]) || '').toUpperCase();
+            } else {
+                el.value = normalizeGyCol(map && map[binding.key]);
+            }
+        });
+        if (typeof updateGyMappingUx === 'function') {
+            updateGyMappingUx();
+        }
+    }
+
+    function getGyMappedColumnsForField(map, fieldKey) {
+        const mapperApi = window.RABClickMapper;
+        if (mapperApi && typeof mapperApi.getFieldColumns === 'function') {
+            return mapperApi.getFieldColumns(map, fieldKey);
+        }
+
+        const raw = String((map && map[fieldKey]) || '');
+        return raw ? raw.split('|').map(v => normalizeGyCol(v)).filter(Boolean) : [];
+    }
+
+    function getGyMappedFieldForColumn(col) {
+        const target = normalizeGyCol(col);
+        if (!target) return '';
+
+        const currentMap = getGyColMapFromInputs();
+        const match = LEGACY_GY_MAP_FIELDS.find(field => {
+            return getGyMappedColumnsForField(currentMap, field.key).includes(target);
+        });
+        return match ? match.key : '';
+    }
+
+    function buildGyMapOptions(selectedField) {
+        const options = ['<option value="">Unmapped</option>'];
+        LEGACY_GY_MAP_FIELDS.forEach(field => {
+            const selected = selectedField === field.key ? ' selected' : '';
+            options.push(`<option value="${field.key}"${selected}>${field.label}</option>`);
+        });
+        return options.join('');
+    }
+
+    function applyGyFieldMapping(fieldKey, col) {
+        const currentMap = getGyColMapFromInputs();
+        const mapCopy = { ...currentMap };
+
+        const mapperApi = window.RABClickMapper;
+        if (mapperCoreGy && typeof mapperCoreGy.setFieldMapping === 'function' && fieldKey !== 'ctrl') {
+            const singleFields = LEGACY_GY_MAP_FIELDS.filter(field => field.key !== 'ctrl');
+            mapperCoreGy.setFieldMapping(mapCopy, singleFields, fieldKey, col);
+        } else {
+            LEGACY_GY_MAP_FIELDS.forEach(field => {
+                if (field.key === 'ctrl' && fieldKey === 'ctrl') return;
+                const cols = getGyMappedColumnsForField(mapCopy, field.key);
+                if (cols.includes(col)) mapCopy[field.key] = '';
+            });
+
+            mapCopy[fieldKey] = col;
+        }
+
+        if (fieldKey === 'ctrl' && mapperApi && typeof mapperApi.normalizeMap === 'function') {
+            mapCopy.ctrl = mapperApi.normalizeMap({ ctrl: mapCopy.ctrl }).ctrl;
+        }
+
+        setGyColMapToInputs(mapCopy);
+    }
+
+    window.handleGyHeaderMapping = function(selectEl) {
+        if (!selectEl) return;
+
+        const col = normalizeGyCol(selectEl.getAttribute('data-col'));
+        const fieldKey = String(selectEl.value || '');
+        if (!col) return;
+
+        if (!fieldKey) {
+            const currentMap = getGyColMapFromInputs();
+            LEGACY_GY_MAP_FIELDS.forEach(field => {
+                const cols = getGyMappedColumnsForField(currentMap, field.key);
+                if (cols.includes(col)) {
+                    currentMap[field.key] = field.key === 'ctrl'
+                        ? cols.filter(c => c !== col).join('|')
+                        : '';
+                }
+            });
+            setGyColMapToInputs(currentMap);
+        } else {
+            applyGyFieldMapping(fieldKey, col);
+        }
+
+        updateGyExcelPreview();
+        // Header dropdown selection is a discrete action (unlike keystrokes in the manual
+        // mapping boxes) - reprocess immediately instead of waiting on the typing debounce,
+        // so the chip cards below reflect the change right away.
+        if (gyRefreshTimeout) clearTimeout(gyRefreshTimeout);
+        if (gySheetDoc) reprocessData();
+    };
 
     const dropZone = document.getElementById('gyDropZone');
     const fileInput = document.getElementById('gyFileInput');
     const statusEl = document.getElementById('gyStatus');
     const refreshBtn = document.getElementById('gyRefreshBtn');
+    const clearMappingBtn = document.getElementById('gyClearMappingBtn');
+    const mapProgressEl = document.getElementById('gyMapProgress');
+    const mapHelpEl = document.getElementById('gyMapHelp');
     const exportBtn = document.getElementById('gyExportBtn');
     const forwardBtn = document.getElementById('gyForwardBtn');
     
@@ -15718,7 +16270,66 @@ downloadBtn.addEventListener('click', async () => {
     dropZone.ondragleave = e => { e.preventDefault(); dropZone.style.background = '#f0f8ff'; };
     dropZone.ondrop = e => { e.preventDefault(); loadFile(e.dataTransfer.files[0]); };
     refreshBtn.onclick = () => reprocessData();
+    if (clearMappingBtn) {
+        clearMappingBtn.onclick = () => {
+            setGyColMapToInputs({
+                step: '',
+                desc: '',
+                hSrc: '',
+                hGrp: '',
+                hList: '',
+                risk: '',
+                ctrl: '',
+                freq: '',
+                sev: '',
+                like: ''
+            });
+            updateGyExcelPreview();
+            if (typeof debouncedReprocess === 'function') debouncedReprocess();
+            if (statusEl) {
+                statusEl.textContent = 'Mapping cleared. Use the "Map to" header row to assign columns.';
+                statusEl.style.color = '#b45309';
+            }
+        };
+    }
     exportBtn.onclick = () => downloadJSON();
+
+    function updateGyMappingUx() {
+        const mappedCols = getGyColMapFromInputs();
+        let mappedCount = 0;
+        LEGACY_GY_MAP_FIELDS.forEach(field => {
+            const cols = getGyMappedColumnsForField(mappedCols, field.key);
+            if (cols.length > 0) mappedCount++;
+        });
+
+        if (mapProgressEl) {
+            mapProgressEl.textContent = `${mappedCount}/${LEGACY_GY_MAP_FIELDS.length} mapped`;
+            if (mappedCount <= 1) {
+                mapProgressEl.style.background = '#fee2e2';
+                mapProgressEl.style.borderColor = '#fca5a5';
+                mapProgressEl.style.color = '#b91c1c';
+            } else if (mappedCount < 5) {
+                mapProgressEl.style.background = '#fef3c7';
+                mapProgressEl.style.borderColor = '#fcd34d';
+                mapProgressEl.style.color = '#92400e';
+            } else {
+                mapProgressEl.style.background = '#dcfce7';
+                mapProgressEl.style.borderColor = '#86efac';
+                mapProgressEl.style.color = '#166534';
+            }
+        }
+
+        if (mapHelpEl) {
+            const hasDesc = getGyMappedColumnsForField(mappedCols, 'desc').length > 0;
+            if (!hasDesc) {
+                mapHelpEl.innerHTML = 'Map at least <strong>Description</strong> to continue. Use the <strong>Map to</strong> row in the preview table.';
+            } else if (mappedCount < 4) {
+                mapHelpEl.innerHTML = 'Good start. Next map <strong>Step</strong>, <strong>Hazard Group</strong>, and <strong>Risk</strong> for better extraction quality.';
+            } else {
+                mapHelpEl.innerHTML = 'Looks good. You can continue mapping optional fields or click <strong>Refresh</strong> to reprocess immediately.';
+            }
+        }
+    }
 
     // Connect Excel Tab file input to modal
     const excelUploadInput = document.getElementById('excelUpload');
@@ -15857,7 +16468,31 @@ downloadBtn.addEventListener('click', async () => {
         statusEl.textContent = `Deleted items cleared permanently.`;
         statusEl.style.color = '#64748b';
     };
-    
+
+    // Delete/restore a row directly from the expanded mapping preview table, reusing the same
+    // gyDeletedRows/gyDeletedItems tracking as the chip-card delete button and restore modal so
+    // both surfaces always agree.
+    window.gyDeleteRowFromPreview = (rowNum) => {
+        const item = gyFullData.find(i => i.row === rowNum);
+        if (item) {
+            window.gyRemoveRow(item.id);
+        } else {
+            gyDeletedRows.add(rowNum);
+        }
+        if (typeof updateGyExcelPreview === 'function') updateGyExcelPreview();
+    };
+
+    window.gyRestoreRowFromPreview = (rowNum) => {
+        const idx = gyDeletedItems.findIndex(i => i.row === rowNum);
+        if (idx >= 0) {
+            window.gyRestoreItem(idx);
+        } else {
+            gyDeletedRows.delete(rowNum);
+            if (typeof debouncedReprocess === 'function') debouncedReprocess();
+        }
+        if (typeof updateGyExcelPreview === 'function') updateGyExcelPreview();
+    };
+
     window.gyUpdateItem = (id, key, val) => {
         const item = gyFullData.find(i => i.id === id);
         if(item) item[key] = val;
@@ -15908,8 +16543,8 @@ downloadBtn.addEventListener('click', async () => {
         // Update status and buttons
         if(statusEl) statusEl.textContent = `✓ Added new step. Total: ${gyFullData.length}`;
         const hasData = true;
-        if(exportBtn) exportBtn.style.display = 'block';
-        if(forwardBtn) forwardBtn.style.display = 'block';
+        if(exportBtn) exportBtn.classList.remove('rab-hidden');
+        if(forwardBtn) forwardBtn.classList.remove('rab-hidden');
     };
 
 async function loadFile(file) {
@@ -15965,9 +16600,6 @@ async function loadFile(file) {
             
             gyActiveSheetIdx = bestSheetIdx;
             buildGySheetTabs(); // Render sheet tab bar
-            // Show batch button if multi-sheet
-            const batchBtnInit = document.getElementById('gyBatchAllBtn');
-            if (batchBtnInit) batchBtnInit.style.display = gyAllSheets.length > 1 ? 'inline-block' : 'none';
             const applyMapInit = document.getElementById('gyApplyMappingAll');
             if (applyMapInit) applyMapInit.style.display = gyAllSheets.length > 1 ? 'inline-block' : 'none';
             
@@ -16068,19 +16700,9 @@ async function loadFile(file) {
     
     // Save current tab state before switching away
     function saveCurrentTabState() {
+        const currentColMap = getGyColMapFromInputs();
         gyPerTabState[gyActiveSheetIdx] = {
-            colMap: {
-                step: document.getElementById('gyColStep').value,
-                desc: document.getElementById('gyColDesc').value,
-                hSrc: document.getElementById('gyColHazSource')?.value || '',
-                hGrp: document.getElementById('gyColHazGroup').value,
-                hList: document.getElementById('gyColHazList').value,
-                risk: document.getElementById('gyColRisk').value,
-                ctrl: document.getElementById('gyColControl').value,
-                freq: document.getElementById('gyColFrequency').value,
-                sev: document.getElementById('gyColSeverity').value,
-                like: document.getElementById('gyColLikelihood').value,
-            },
+            colMap: currentColMap,
             fullData: JSON.parse(JSON.stringify(gyFullData)),
             imagesByRow: Object.assign({}, gyImagesByRow),
             deletedRows: new Set(gyDeletedRows),
@@ -16095,16 +16717,7 @@ async function loadFile(file) {
         const state = gyPerTabState[sheetIdx];
         if (!state) return false;
         // Restore column mapping inputs
-        document.getElementById('gyColStep').value = state.colMap.step;
-        document.getElementById('gyColDesc').value = state.colMap.desc;
-        if (document.getElementById('gyColHazSource')) document.getElementById('gyColHazSource').value = state.colMap.hSrc;
-        document.getElementById('gyColHazGroup').value = state.colMap.hGrp;
-        document.getElementById('gyColHazList').value = state.colMap.hList;
-        document.getElementById('gyColRisk').value = state.colMap.risk;
-        document.getElementById('gyColControl').value = state.colMap.ctrl;
-        document.getElementById('gyColFrequency').value = state.colMap.freq;
-        document.getElementById('gyColSeverity').value = state.colMap.sev;
-        document.getElementById('gyColLikelihood').value = state.colMap.like;
+        setGyColMapToInputs(state.colMap || {});
         // Restore row settings
         if (document.getElementById('gyHeaderRow')) document.getElementById('gyHeaderRow').value = state.headerRow;
         if (document.getElementById('gyDataStartRow')) document.getElementById('gyDataStartRow').value = state.dataStartRow;
@@ -16170,9 +16783,6 @@ async function loadFile(file) {
             statusEl.style.color = '#27ae60';
         }
         
-        // Show/hide batch button based on multi-sheet
-        const batchBtn = document.getElementById('gyBatchAllBtn');
-        if (batchBtn) batchBtn.style.display = gyAllSheets.length > 1 ? 'inline-block' : 'none';
         const applyMapBtn = document.getElementById('gyApplyMappingAll');
         if (applyMapBtn) applyMapBtn.style.display = gyAllSheets.length > 1 ? 'inline-block' : 'none';
     }
@@ -16180,18 +16790,7 @@ async function loadFile(file) {
     // ===== APPLY MAPPING TO ALL TABS =====
     function applyMappingToAllTabs() {
         // Read current mapping from DOM
-        const colMap = {
-            step: document.getElementById('gyColStep').value,
-            desc: document.getElementById('gyColDesc').value,
-            hSrc: document.getElementById('gyColHazSource')?.value || '',
-            hGrp: document.getElementById('gyColHazGroup').value,
-            hList: document.getElementById('gyColHazList').value,
-            risk: document.getElementById('gyColRisk').value,
-            ctrl: document.getElementById('gyColControl').value,
-            freq: document.getElementById('gyColFrequency').value,
-            sev: document.getElementById('gyColSeverity').value,
-            like: document.getElementById('gyColLikelihood').value,
-        };
+        const colMap = getGyColMapFromInputs();
         const headerRow = document.getElementById('gyHeaderRow')?.value || '1';
         const dataStartRow = parseInt(document.getElementById('gyDataStartRow')?.value) || 2;
 
@@ -16207,16 +16806,16 @@ async function loadFile(file) {
             if (!xmlDoc) continue;
 
             const cm = {
-                step: colMap.step.toUpperCase().trim(),
-                desc: colMap.desc.toUpperCase().trim(),
-                hSrc: colMap.hSrc.toUpperCase().trim(),
-                hGrp: colMap.hGrp.toUpperCase().trim(),
-                hList: colMap.hList.toUpperCase().trim(),
-                risk: colMap.risk.toUpperCase().trim(),
-                ctrl: colMap.ctrl.toUpperCase().trim(),
-                freq: colMap.freq.toUpperCase().trim(),
-                sev: colMap.sev.toUpperCase().trim(),
-                like: colMap.like.toUpperCase().trim(),
+                step: normalizeGyCol(colMap.step),
+                desc: normalizeGyCol(colMap.desc),
+                hSrc: normalizeGyCol(colMap.hSrc),
+                hGrp: normalizeGyCol(colMap.hGrp),
+                hList: normalizeGyCol(colMap.hList),
+                risk: normalizeGyCol(colMap.risk),
+                ctrl: normalizeGyCol(colMap.ctrl),
+                freq: normalizeGyCol(colMap.freq),
+                sev: normalizeGyCol(colMap.sev),
+                like: normalizeGyCol(colMap.like)
             };
             const mapperApi = window.RABClickMapper;
             const ctrlCols = mapperApi && typeof mapperApi.getFieldColumns === 'function'
@@ -16327,16 +16926,16 @@ async function loadFile(file) {
     if (copyMappingBtn) {
         copyMappingBtn.onclick = function() {
             gyClipboardMapping = {
-                step:       (document.getElementById('gyColStep')?.value       || '').toUpperCase(),
-                desc:       (document.getElementById('gyColDesc')?.value       || '').toUpperCase(),
-                hazSource:  (document.getElementById('gyColHazSource')?.value  || '').toUpperCase(),
-                hazGroup:   (document.getElementById('gyColHazGroup')?.value   || '').toUpperCase(),
-                hazList:    (document.getElementById('gyColHazList')?.value    || '').toUpperCase(),
-                risk:       (document.getElementById('gyColRisk')?.value       || '').toUpperCase(),
-                control:    (document.getElementById('gyColControl')?.value    || '').toUpperCase(),
-                frequency:  (document.getElementById('gyColFrequency')?.value  || '').toUpperCase(),
-                severity:   (document.getElementById('gyColSeverity')?.value   || '').toUpperCase(),
-                likelihood: (document.getElementById('gyColLikelihood')?.value || '').toUpperCase(),
+                step:       normalizeGyCol(document.getElementById('gyColStep')?.value),
+                desc:       normalizeGyCol(document.getElementById('gyColDesc')?.value),
+                hazSource:  normalizeGyCol(document.getElementById('gyColHazSource')?.value),
+                hazGroup:   normalizeGyCol(document.getElementById('gyColHazGroup')?.value),
+                hazList:    normalizeGyCol(document.getElementById('gyColHazList')?.value),
+                risk:       normalizeGyCol(document.getElementById('gyColRisk')?.value),
+                control:    normalizeGyCol(document.getElementById('gyColControl')?.value),
+                frequency:  normalizeGyCol(document.getElementById('gyColFrequency')?.value),
+                severity:   normalizeGyCol(document.getElementById('gyColSeverity')?.value),
+                likelihood: normalizeGyCol(document.getElementById('gyColLikelihood')?.value),
                 headerRow:  document.getElementById('gyHeaderRow')?.value   || '1',
                 dataStart:  document.getElementById('gyDataStartRow')?.value || '2'
             };
@@ -16365,17 +16964,19 @@ async function loadFile(file) {
         pasteMappingBtn.onclick = function() {
             if (!gyClipboardMapping) return;
             const m = gyClipboardMapping;
+            setGyColMapToInputs({
+                step: m.step,
+                desc: m.desc,
+                hSrc: m.hazSource,
+                hGrp: m.hazGroup,
+                hList: m.hazList,
+                risk: m.risk,
+                ctrl: m.control,
+                freq: m.frequency,
+                sev: m.severity,
+                like: m.likelihood
+            });
             const setVal = (id, val) => { const el = document.getElementById(id); if (el) { el.value = val; } };
-            setVal('gyColStep',       m.step);
-            setVal('gyColDesc',       m.desc);
-            setVal('gyColHazSource',  m.hazSource);
-            setVal('gyColHazGroup',   m.hazGroup);
-            setVal('gyColHazList',    m.hazList);
-            setVal('gyColRisk',       m.risk);
-            setVal('gyColControl',    m.control);
-            setVal('gyColFrequency',  m.frequency);
-            setVal('gyColSeverity',   m.severity);
-            setVal('gyColLikelihood', m.likelihood);
             setVal('gyHeaderRow',     m.headerRow);
             setVal('gyDataStartRow',  m.dataStart);
             // Trigger reprocess so the table updates immediately
@@ -16393,6 +16994,10 @@ async function loadFile(file) {
 
     // Helper: Convert column letter to index (A=0, B=1, ..., Z=25, AA=26, etc.)
     function gyColLetterToIndex(col) {
+        if (mapperCoreGy && typeof mapperCoreGy.colLetterToIndex === 'function') {
+            return mapperCoreGy.colLetterToIndex(col);
+        }
+
         let index = 0;
         for (let i = 0; i < col.length; i++) {
             index = index * 26 + (col.charCodeAt(i) - 64);
@@ -16402,6 +17007,10 @@ async function loadFile(file) {
     
     // Helper: Convert index to column letter
     function gyIndexToColLetter(idx) {
+        if (mapperCoreGy && typeof mapperCoreGy.indexToColLetter === 'function') {
+            return mapperCoreGy.indexToColLetter(idx);
+        }
+
         let letter = '';
         idx++;
         while (idx > 0) {
@@ -16467,6 +17076,7 @@ async function loadFile(file) {
             if (thead) thead.innerHTML = '';
             if (tbody) tbody.innerHTML = '';
             if (emptyEl) emptyEl.style.display = 'block';
+            if (typeof updateGyMappingUx === 'function') updateGyMappingUx();
             return;
         }
         
@@ -16485,45 +17095,52 @@ async function loadFile(file) {
         }
         
         // Get current column mappings
-        const mappedCols = {
-            step: document.getElementById('gyColStep')?.value?.toUpperCase()?.trim() || '',
-            desc: document.getElementById('gyColDesc')?.value?.toUpperCase()?.trim() || '',
-            hSrc: document.getElementById('gyColHazSource')?.value?.toUpperCase()?.trim() || '',
-            hGrp: document.getElementById('gyColHazGroup')?.value?.toUpperCase()?.trim() || '',
-            hList: document.getElementById('gyColHazList')?.value?.toUpperCase()?.trim() || '',
-            risk: document.getElementById('gyColRisk')?.value?.toUpperCase()?.trim() || '',
-            ctrl: document.getElementById('gyColControl')?.value?.toUpperCase()?.trim() || '',
-            freq: document.getElementById('gyColFrequency')?.value?.toUpperCase()?.trim() || '',
-            sev: document.getElementById('gyColSeverity')?.value?.toUpperCase()?.trim() || '',
-            like: document.getElementById('gyColLikelihood')?.value?.toUpperCase()?.trim() || ''
-        };
-        const mappedColSet = new Set(Object.values(mappedCols).filter(v => v));
-        
-        // Render header
-        let headerHtml = '<tr>';
-        cols.forEach(col => {
-            const headerText = headerData ? (headerData[col] || col) : col;
-            const isMapped = mappedColSet.has(col);
-            headerHtml += `<th class="${isMapped ? 'gy-col-mapped-header' : ''}" title="${headerText}">${col}: ${(headerText || '').substring(0, 12)}</th>`;
+        const mappedCols = getGyColMapFromInputs();
+        const mappedColSet = new Set();
+        LEGACY_GY_MAP_FIELDS.forEach(field => {
+            getGyMappedColumnsForField(mappedCols, field.key).forEach(col => mappedColSet.add(col));
         });
-        headerHtml += '</tr>';
-        if (thead) thead.innerHTML = headerHtml;
-        
-        // Render data rows (show 15 rows from dataStart)
-        let bodyHtml = '';
-        const dataRows = gyAllRows.filter(r => r._rowNum >= dataStart && r._rowNum < dataStart + 15);
-        
-        dataRows.forEach(row => {
-            bodyHtml += '<tr>';
-            cols.forEach(col => {
-                const value = row[col] || '';
-                const isMapped = mappedColSet.has(col);
-                bodyHtml += `<td class="${isMapped ? 'gy-col-mapped' : ''}" title="${value}">${(value || '').substring(0, 20)}</td>`;
+        // Show every data row (not just a short preview slice) so the expanded panel doubles
+        // as a full manual-review surface with working per-row delete/restore.
+        const dataRows = gyAllRows.filter(r => r._rowNum >= dataStart);
+
+        if (mapperUiGy && typeof mapperUiGy.renderStandardPreview === 'function') {
+            const rendered = mapperUiGy.renderStandardPreview({
+                columns: cols,
+                headerData: headerData,
+                dataRows: dataRows,
+                isColumnMapped: col => mappedColSet.has(col),
+                headerMappedClass: 'gy-col-mapped-header',
+                cellMappedClass: 'gy-col-mapped',
+                headerMaxLen: 12,
+                cellMaxLen: 20,
+                mapping: {
+                    rowClass: 'gy-map-row',
+                    selectClass: 'gy-header-map-select',
+                    mappedHeaderClass: 'gy-col-mapped-header',
+                    firstCellLabel: 'Map to',
+                    onChangeHandlerName: 'handleGyHeaderMapping',
+                    getMappedFieldForColumn: getGyMappedFieldForColumn,
+                    buildMapOptions: buildGyMapOptions
+                },
+                rowActions: {
+                    getRowNum: row => row._rowNum,
+                    isDeleted: rowNum => gyDeletedRows.has(rowNum),
+                    deleteHandlerName: 'gyDeleteRowFromPreview',
+                    restoreHandlerName: 'gyRestoreRowFromPreview'
+                },
+                noDataColspan: 18,
+                noDataMessage: 'No data found'
             });
-            bodyHtml += '</tr>';
-        });
-        
-        if (tbody) tbody.innerHTML = bodyHtml || '<tr><td colspan="16" style="text-align:center; padding:16px; color:#94a3b8;">No data found</td></tr>';
+            if (thead) thead.innerHTML = rendered.theadHtml;
+            if (tbody) tbody.innerHTML = rendered.tbodyHtml;
+            if (typeof updateGyMappingUx === 'function') updateGyMappingUx();
+            return;
+        }
+
+        if (thead) thead.innerHTML = '';
+        if (tbody) tbody.innerHTML = '<tr><td colspan="18" style="text-align:center; padding:16px; color:#94a3b8;">No data found</td></tr>';
+        if (typeof updateGyMappingUx === 'function') updateGyMappingUx();
     }
     
     // Debounce helper for auto-refresh
@@ -16539,9 +17156,8 @@ async function loadFile(file) {
     
     // Update preview and auto-refresh data when column mappings change
     function setupGyColumnMappingListeners() {
-        const colInputs = ['gyColStep', 'gyColDesc', 'gyColHazSource', 'gyColHazGroup', 'gyColHazList', 'gyColRisk', 'gyColControl', 'gyColFrequency', 'gyColSeverity', 'gyColLikelihood'];
-        colInputs.forEach(id => {
-            const input = document.getElementById(id);
+        LEGACY_GY_MAP_BINDINGS.forEach(binding => {
+            const input = document.getElementById(binding.id);
             if (input) {
                 input.addEventListener('input', () => {
                     updateGyExcelPreview();
@@ -16551,6 +17167,7 @@ async function loadFile(file) {
         });
     }
     setupGyColumnMappingListeners();
+    updateGyMappingUx();
 
     function detectColumns(xmlDoc) {
         const keywords = {
@@ -16602,17 +17219,18 @@ async function loadFile(file) {
             }
             if(map.desc) break;
         }
-        document.getElementById('gyColStep').value = map.step || "A";
-        document.getElementById('gyColDesc').value = map.desc || "B";
-        const hazSrcInput = document.getElementById('gyColHazSource');
-        if (hazSrcInput) hazSrcInput.value = map.hSrc || "";
-        document.getElementById('gyColHazGroup').value = map.hGrp || "C";
-        document.getElementById('gyColHazList').value = map.hList || "D";
-        document.getElementById('gyColRisk').value = map.risk || "E";
-        document.getElementById('gyColControl').value = map.ctrl || "H";
-        document.getElementById('gyColFrequency').value = map.freq || "";
-        document.getElementById('gyColSeverity').value = map.sev || "";
-        document.getElementById('gyColLikelihood').value = map.like || "";
+        setGyColMapToInputs({
+            step: map.step || 'A',
+            desc: map.desc || 'B',
+            hSrc: map.hSrc || '',
+            hGrp: map.hGrp || 'C',
+            hList: map.hList || 'D',
+            risk: map.risk || 'E',
+            ctrl: map.ctrl || 'H',
+            freq: map.freq || '',
+            sev: map.sev || '',
+            like: map.like || ''
+        });
         
         // Update preview after columns are detected
         updateGyExcelPreview();
@@ -16620,18 +17238,7 @@ async function loadFile(file) {
 
     function reprocessData() {
         if(!gySheetDoc) return;
-        const colMap = {
-            step: document.getElementById('gyColStep').value.toUpperCase().trim(),
-            desc: document.getElementById('gyColDesc').value.toUpperCase().trim(),
-            hSrc: document.getElementById('gyColHazSource')?.value.toUpperCase().trim() || '',
-            hGrp: document.getElementById('gyColHazGroup').value.toUpperCase().trim(),
-            hList: document.getElementById('gyColHazList').value.toUpperCase().trim(),
-            risk: document.getElementById('gyColRisk').value.toUpperCase().trim(),
-            ctrl: document.getElementById('gyColControl').value.toUpperCase().trim(),
-            freq: document.getElementById('gyColFrequency').value.toUpperCase().trim(),
-            sev: document.getElementById('gyColSeverity').value.toUpperCase().trim(),
-            like: document.getElementById('gyColLikelihood').value.toUpperCase().trim(),
-        };
+        const colMap = getGyColMapFromInputs();
         const mapperApi = window.RABClickMapper;
         const ctrlCols = mapperApi && typeof mapperApi.getFieldColumns === 'function'
             ? mapperApi.getFieldColumns(colMap, 'ctrl')
@@ -16755,8 +17362,8 @@ async function loadFile(file) {
                         return opt.val;
                     }
                     
-                    // 2. Numeric match (e.g., "3.0" === "3")
-                    if (!isNaN(itemNum) && !isNaN(optNum) && itemNum === optNum) {
+                    // 2. Numeric match (e.g., "3.0" === "3"), tolerant of Excel floating-point noise
+                    if (!isNaN(itemNum) && !isNaN(optNum) && Math.abs(itemNum - optNum) < 0.001) {
                         console.log(`✓ MATCH: ${itemNum} matched ${optNum} (numeric)`);
                         return opt.val;
                     }
@@ -16883,8 +17490,8 @@ async function loadFile(file) {
             renderCardImage(item);
         });
         const hasData = gyFullData.length > 0;
-        if(exportBtn) exportBtn.style.display = hasData ? 'block' : 'none';
-        if(forwardBtn) forwardBtn.style.display = hasData ? 'block' : 'none'; // Safe check
+        if(exportBtn) exportBtn.classList.toggle('rab-hidden', !hasData);
+        if(forwardBtn) forwardBtn.classList.toggle('rab-hidden', !hasData);
     }
 
     function renderCardImage(item) {
@@ -17273,11 +17880,43 @@ async function loadSourceImages(sheetIndex) {
         });
     }
 
-    // --- BATCH PROCESS ALL TABS & DOWNLOAD ZIP (3-step wizard) ---
-    const batchAllBtn = document.getElementById('gyBatchAllBtn');
-    if (batchAllBtn) {
-        batchAllBtn.onclick = () => gyBatchProcessAllTabs();
-    }
+    // Top-level workflow tabs: "Single Sheet" is this modal's own content (clean up, then
+    // push to the main project table); "Multi Tab" opens the existing multi-sheet AI wizard
+    // overlay. The wizard is a self-contained full-screen overlay, so the "Multi Tab" tab is a
+    // trigger rather than a persistent panel - once the wizard closes we fall back to "Single
+    // Sheet" since that's the modal content still underneath.
+    window.switchGyTopTab = function(tab) {
+        const singleTabBtn = document.getElementById('gyTopTabSingle');
+        const multiTabBtn = document.getElementById('gyTopTabMulti');
+
+        if (tab === 'multi') {
+            if (!gyAllSheets || gyAllSheets.length <= 1) {
+                if (statusEl) {
+                    statusEl.textContent = gyAllSheets && gyAllSheets.length === 1
+                        ? '⚠️ This workbook only has one sheet — Multi Tab is for workbooks with several sheets.'
+                        : '⚠️ Upload an Excel workbook first, then switch to Multi Tab.';
+                    statusEl.style.color = '#d97706';
+                }
+                return;
+            }
+            if (singleTabBtn) singleTabBtn.classList.remove('gy-top-tab-active');
+            if (multiTabBtn) multiTabBtn.classList.add('gy-top-tab-active');
+            gyBatchProcessAllTabs();
+            // Revert to "Single Sheet" once the wizard overlay is closed, since that's the
+            // content still underneath.
+            const watcher = new MutationObserver(() => {
+                if (!document.getElementById('gyBatchOverlay')) {
+                    if (multiTabBtn) multiTabBtn.classList.remove('gy-top-tab-active');
+                    if (singleTabBtn) singleTabBtn.classList.add('gy-top-tab-active');
+                    watcher.disconnect();
+                }
+            });
+            watcher.observe(document.body, { childList: true });
+        } else {
+            if (multiTabBtn) multiTabBtn.classList.remove('gy-top-tab-active');
+            if (singleTabBtn) singleTabBtn.classList.add('gy-top-tab-active');
+        }
+    };
 
     // ============================================================
     // MULTI-TAB EXCEL → AI PIPELINE (v2 — full rewrite)
@@ -17543,6 +18182,7 @@ async function loadSourceImages(sheetIndex) {
         const RISK_CAT_COLOR = (cat) => ({CRITICAL:'#991b1b',HIGH:'#dc2626',MEDIUM:'#d97706',LOW:'#059669'})[cat] || '#475569';
         const HAZ_KEYS = Object.keys(HAZARD_REGISTRY);
         const CONS_LIST = CONSEQUENCE_REGISTRY;
+        const GRP_KEYS = [...new Set(Object.values(HAZARD_REGISTRY).map(v => v.group))].sort();
         const FREQ_KEYS = Object.keys(FREQUENCY_SCALE);
         const SEV_KEYS = Object.keys(SEVERITY_SCALE);
         const LIK_KEYS = Object.keys(LIKELIHOOD_SCALE);
@@ -17581,7 +18221,7 @@ async function loadSourceImages(sheetIndex) {
 
             const joined = samples.join(' ').trim();
             if (!joined) {
-                return normalizeLangCode(localStorage.getItem('appLanguage')) || 'en';
+                return 'en';
             }
 
             if (typeof window.detectLanguageFromContent === 'function') {
@@ -17596,13 +18236,25 @@ async function loadSourceImages(sheetIndex) {
             if (frHits > deHits && frHits >= 2) return 'fr';
             if (deHits > frHits && deHits >= 2) return 'de';
 
-            return normalizeLangCode(localStorage.getItem('appLanguage')) || 'en';
+            // Inconclusive - default to English rather than the app's UI chrome language
+            // (localStorage 'appLanguage'), which has nothing to do with the source document's
+            // actual language and previously caused English sheets to get silently rewritten
+            // in whatever language a reviewer last left the app's UI toggled to.
+            return 'en';
         }
 
         function getTabPromptLanguage(tab) {
-            const detected = normalizeLangCode(tab && tab.aiLanguage) || detectTemplateLanguageForTab(tab);
+            // An explicit master selection (wiz.masterAiLanguage) always wins, live - so
+            // changing it retroactively applies without needing to re-detect per tab.
+            const master = normalizeLangCode(wiz.masterAiLanguage);
+            if (master) return master;
+
+            const cached = normalizeLangCode(tab && tab.aiLanguage);
+            if (cached) return cached;
+
+            const detected = detectTemplateLanguageForTab(tab) || 'en';
             if (tab) tab.aiLanguage = detected;
-            return detected || 'en';
+            return detected;
         }
 
         function splitUserHazards(rawHazards) {
@@ -17666,38 +18318,130 @@ async function loadSourceImages(sheetIndex) {
             row.__rowOrigin = 'user';
         }
 
-        async function translateRowsForExport(rows, targetLang, cacheMap) {
+        async function translateRowsForExport(rows, targetLang, cacheMap, sourceLangHint) {
             const lang = normalizeLangCode(targetLang);
             if (!lang) return rows;
-            if (typeof window.translateText !== 'function') return rows;
 
             const cache = cacheMap instanceof Map ? cacheMap : new Map();
-            const out = [];
+            const srcHint = normalizeLangCode(sourceLangHint);
+            const cloned = (rows || []).map(row => ({ ...row }));
 
-            for (const row of (rows || [])) {
-                const cloned = { ...row };
+            const tasks = [];
+            cloned.forEach(row => {
                 for (const field of ['Steps', 'Hazard Source']) {
-                    const raw = String(cloned[field] || '').trim();
+                    const raw = String(row[field] || '').trim();
                     if (!raw) continue;
                     const key = `${lang}::${raw}`;
                     if (cache.has(key)) {
-                        cloned[field] = cache.get(key);
+                        row[field] = cache.get(key);
                         continue;
                     }
-                    try {
-                        const translated = await window.translateText(raw, lang);
-                        const finalText = String(translated || raw).trim() || raw;
-                        cache.set(key, finalText);
-                        cloned[field] = finalText;
-                    } catch (_) {
-                        cache.set(key, raw);
-                        cloned[field] = raw;
-                    }
+                    tasks.push({ row, field, raw, key });
                 }
-                out.push(cloned);
+            });
+
+            const batchSize = 25;
+            for (let i = 0; i < tasks.length; i += batchSize) {
+                const chunk = tasks.slice(i, i + batchSize);
+                const translated = await translateBatchViaAI(chunk, lang, srcHint);
+                chunk.forEach((task, idx) => {
+                    const finalText = translated[idx] || task.raw;
+                    cache.set(task.key, finalText);
+                    task.row[task.field] = finalText;
+                });
             }
 
-            return out;
+            return cloned;
+        }
+
+        // Translates a batch of plain-text snippets via the same AI backend already used for
+        // sheet processing (callAI), instead of the free MyMemory API. MyMemory's anonymous
+        // quota is extremely low (a handful of requests/day, shared across whoever else is on
+        // the same network egress IP) and, worse, its "no quota left" response is a warning
+        // STRING rather than an HTTP error - the old code had no way to tell that apart from a
+        // real translation and would silently store the warning text as if it were one.
+        async function translateBatchViaAI(items, targetLang, sourceLangHint) {
+            if (!items.length) return {};
+            const targetName = SUPPORTED_TEXT_LANGS[targetLang] || targetLang;
+            const sourceName = sourceLangHint && SUPPORTED_TEXT_LANGS[sourceLangHint] ? SUPPORTED_TEXT_LANGS[sourceLangHint] : '';
+            const payload = items.map((it, i) => ({ id: i, text: String(it.raw || '').slice(0, 500) }));
+            const prompt = `Translate each "text" value below${sourceName ? ` from ${sourceName}` : ''} into ${targetName}. Keep risk-assessment/safety terminology precise and professional. Preserve the original meaning exactly - do not summarize, explain, or add commentary. Reply with ONLY a JSON array, same order and same "id"s, like [{"id":0,"text":"<translated>"}].
+
+${JSON.stringify(payload)}`;
+
+            try {
+                const content = await callAI(prompt);
+                const start = content.indexOf('['), end = content.lastIndexOf(']');
+                if (start === -1 || end <= start) return {};
+                const parsed = JSON.parse(content.substring(start, end + 1));
+                if (!Array.isArray(parsed)) return {};
+                const out = {};
+                parsed.forEach(row => {
+                    if (row && typeof row.id === 'number' && typeof row.text === 'string') {
+                        out[row.id] = row.text.trim();
+                    }
+                });
+                return out;
+            } catch (_) {
+                return {};
+            }
+        }
+
+        async function hydrateReviewTranslations(rows, targetLang, cacheMap, sourceLangHint, onProgress) {
+            const lang = normalizeLangCode(targetLang);
+            if (!lang) return;
+
+            const cache = cacheMap instanceof Map ? cacheMap : new Map();
+            const srcHint = normalizeLangCode(sourceLangHint);
+
+            const tasks = [];
+            const fieldsToTranslate = ['Steps', 'Hazard Source', 'Current Control'];
+            for (const row of (rows || [])) {
+                if (!row || typeof row !== 'object') continue;
+                row.__translated = row.__translated || {};
+                row.__translated[lang] = row.__translated[lang] || {};
+                for (const field of fieldsToTranslate) {
+                    const raw = String(row[field] || '').trim();
+                    if (!raw) {
+                        row.__translated[lang][field] = '';
+                        continue;
+                    }
+                    if (row.__translated[lang][field]) continue;
+                    const key = `${lang}::${raw}`;
+                    if (cache.has(key)) {
+                        row.__translated[lang][field] = cache.get(key);
+                        continue;
+                    }
+                    tasks.push({ row, field, raw, key });
+                }
+            }
+
+            let completed = 0;
+            const total = tasks.length;
+            if (typeof onProgress === 'function') onProgress(completed, total);
+            if (!total) return;
+
+            const batchSize = 25; // one AI call covers many rows/fields instead of one HTTP call per string
+            for (let i = 0; i < tasks.length; i += batchSize) {
+                const chunk = tasks.slice(i, i + batchSize);
+                const translated = await translateBatchViaAI(chunk, lang, srcHint);
+                chunk.forEach((task, idx) => {
+                    const finalText = translated[idx] || task.raw;
+                    cache.set(task.key, finalText);
+                    task.row.__translated[lang][task.field] = finalText;
+                    completed++;
+                });
+                if (typeof onProgress === 'function') onProgress(completed, total);
+            }
+        }
+
+        function clearRowTranslationField(row, fieldName) {
+            if (!row || !row.__translated) return;
+            Object.keys(row.__translated).forEach(lang => {
+                if (row.__translated[lang] && Object.prototype.hasOwnProperty.call(row.__translated[lang], fieldName)) {
+                    delete row.__translated[lang][fieldName];
+                }
+            });
         }
 
         function levenshtein(a, b) {
@@ -17737,6 +18481,7 @@ async function loadSourceImages(sheetIndex) {
             const v = String(val||'').trim();
             if (field === 'hazard') return !HAZARD_REGISTRY[v];
             if (field === 'cons') return !CONS_LIST.includes(v);
+            if (field === 'group') return !GRP_KEYS.includes(v);
             if (field === 'freq') return !FREQ_KEYS.includes(String(v));
             if (field === 'sev') return !SEV_KEYS.includes(String(v));
             if (field === 'lik') return !LIK_KEYS.includes(String(v));
@@ -17747,6 +18492,7 @@ async function loadSourceImages(sheetIndex) {
             (rows||[]).forEach(r => {
                 if (isMismatch('hazard', r['Hazard List'])) n++;
                 if (isMismatch('cons', r['Risk/Consequences'])) n++;
+                if (isMismatch('group', r['Hazard Group'])) n++;
                 if (isMismatch('freq', r['Frequency'])) n++;
                 if (isMismatch('sev', r['Severity'])) n++;
                 if (isMismatch('lik', r['Likelihood'])) n++;
@@ -17765,13 +18511,99 @@ async function loadSourceImages(sheetIndex) {
                 processedAt: c.state.processedAt || '',
                 downloadedAt: c.state.downloadedAt || '',
                 errorMsg: '',
-                aiLanguage: ''
+                aiLanguage: '',
+                // Per-tab GOEHS assessment header overrides - empty means "use the default"
+                // (title/workstation = sheet name, date = when AI processing finished).
+                goehsTitle: '',
+                goehsDate: '',
+                goehsDepartment: '',
+                goehsWorkstation: ''
             })),
             activeIdx: 0,
             search: '',
             searchSelectedOnly: false,
-            exportTextLang: 'default'
+            // AI output language for ALL tabs, unless empty (= auto-detect from each sheet's
+            // own content). Deliberately separate from exportTextLang below, which only
+            // translates already-processed rows for the Step 3 export.
+            masterAiLanguage: '',
+            // Mandatory GOEHS header fields, applied to every downloaded GOEHS Excel file.
+            masterGoehsOrg: '',
+            masterGoehsLocation: '',
+            exportTextLang: 'default',
+            reviewTranslationCache: new Map(),
+            reviewTranslationSeq: 0,
+            isTranslating: false
         };
+
+        // Toggles the visible "Translating…" badge + disables the export-language select
+        // while a translation pass is in flight, so the language switch never looks like a
+        // silent no-op while rows are being rewritten in the background.
+        function updateTranslateBadge() {
+            const badge = document.getElementById('mtTranslateBadge');
+            if (badge) badge.style.display = wiz.isTranslating ? 'inline-flex' : 'none';
+            const sel = document.getElementById('mtExportLang');
+            if (sel) sel.disabled = !!wiz.isTranslating;
+        }
+
+        async function refreshReviewPaneTranslations() {
+            if (wiz.step !== 3) return;
+            // Bump the sequence first (before the language check) so switching back to
+            // "Template default" mid-translation also cancels any in-flight run.
+            const seq = ++wiz.reviewTranslationSeq;
+            const lang = normalizeLangCode(wiz.exportTextLang);
+            if (!lang) {
+                wiz.isTranslating = false;
+                updateTranslateBadge();
+                renderAccordion();
+                return;
+            }
+
+            wiz.isTranslating = true;
+            updateTranslateBadge();
+            const selected = wiz.tabs.filter(t => t.selected);
+            if (footerInfoEl) {
+                footerInfoEl.textContent = `Translating review text to ${SUPPORTED_TEXT_LANGS[lang] || lang.toUpperCase()}...`;
+            }
+
+            try {
+                for (let i = 0; i < selected.length; i++) {
+                    const tab = selected[i];
+                    await hydrateReviewTranslations(
+                        tab.aiRows || [],
+                        lang,
+                        wiz.reviewTranslationCache,
+                        tab.aiLanguage,
+                        (done, total) => {
+                            if (seq !== wiz.reviewTranslationSeq) return;
+                            if (!footerInfoEl) return;
+                            const tabLabel = tab && tab.sheet ? tab.sheet.name : `Tab ${i + 1}`;
+                            footerInfoEl.textContent = `Translating ${tabLabel} to ${SUPPORTED_TEXT_LANGS[lang] || lang.toUpperCase()} (${done}/${total})...`;
+                        }
+                    );
+                    if (seq !== wiz.reviewTranslationSeq) return;
+                    renderAccordion();
+                }
+            } finally {
+                if (seq !== wiz.reviewTranslationSeq) return;
+                wiz.isTranslating = false;
+                updateTranslateBadge();
+                renderAccordion();
+                const totalMM = selected.reduce((s, t) => s + countMismatches(t.aiRows), 0);
+                const totalRows = selected.reduce((s, t) => s + t.aiRows.length, 0);
+                if (footerInfoEl) {
+                    footerInfoEl.textContent = totalMM === 0
+                        ? `✓ All ${totalRows} rows validated — ready for export`
+                        : `${totalMM} mismatch item(s) need review · you can still export now`;
+                }
+            }
+        }
+
+        function getReviewFieldValue(row, fieldName) {
+            const lang = normalizeLangCode(wiz.exportTextLang);
+            if (!lang) return row[fieldName] || '';
+            const translated = row && row.__translated && row.__translated[lang] && row.__translated[lang][fieldName];
+            return translated || row[fieldName] || '';
+        }
 
         function persistTabMeta(tab) {
             if (!tab || !tab.sheet) return;
@@ -18327,9 +19159,8 @@ async function loadSourceImages(sheetIndex) {
         </div>
     </div>
     <div class="mt-drawer-f">
-        <div class="text-xs text-slate-500">Use Preview commits mapping and cleaned rows back to Step 1.</div>
+        <div class="text-xs text-slate-500">Changes apply automatically as you edit — just close when you're done.</div>
         <div style="display:flex;gap:8px;">
-            <button id="mtPrUse" class="rab-btn rab-c-emerald">Use Preview</button>
             <button id="mtPrClose" class="rab-btn rab-c-slate">Close</button>
         </div>
     </div>
@@ -18578,11 +19409,6 @@ async function loadSourceImages(sheetIndex) {
                                                             openStep1TabPreview(tabIdx, { viewState, noAnim: true, flashMsg: summaryMsg, flashColor: '#16a34a' });
                                                 });
 
-                                                drawer.querySelector('#mtPrUse')?.addEventListener('click', () => {
-                                                        if (!applyFromDrawer(false)) return;
-                                                        closeStep1TabPreview();
-                                                        renderStep1();
-                                                });
                                                 drawer.querySelector('#mtPrClose')?.addEventListener('click', () => { closeStep1TabPreview(); renderStep1(); });
                                                 drawer.querySelector('#mtPrCloseX')?.addEventListener('click', () => { closeStep1TabPreview(); renderStep1(); });
                                                 drawer.addEventListener('click', (e) => { if (e.target.id === 'mtStep1Drawer') { closeStep1TabPreview(); renderStep1(); } });
@@ -18962,7 +19788,17 @@ async function loadSourceImages(sheetIndex) {
         <button id="mtSelAll" class="rab-btn rab-c-slate">Select all</button>
         <button id="mtSelNone" class="rab-btn rab-c-slate" style="background:#94a3b8 !important;">Deselect all</button>
         <button id="mtSelNonEmpty" class="rab-btn rab-c-slate" style="background:#0f766e !important;">Only with >=3 rows</button>
+        <label style="display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.03em;margin-left:auto;">
+            AI output language
+            <select id="mtMasterAiLang" style="border:1px solid #cbd5e1;border-radius:6px;padding:5px 8px;font-size:12px;font-weight:600;color:#0f172a;background:#fff;text-transform:none;letter-spacing:normal;">
+                <option value="">Auto-detect per sheet</option>
+                ${Object.entries(SUPPORTED_TEXT_LANGS).map(([code, label]) =>
+                    `<option value="${code}" ${wiz.masterAiLanguage === code ? 'selected' : ''}>${escH(label)}</option>`
+                ).join('')}
+            </select>
+        </label>
     </div>
+    <div class="text-xs text-slate-500 mb-3">Applies to every selected sheet's AI processing. Leave on auto-detect unless the AI is writing results in the wrong language.</div>
 
     <div class="text-xs text-slate-500 mb-2">Showing ${visibleTotal} of ${total} sheet(s)${onlySelected ? ' · selected only' : ''}${queryRaw ? ` · search: "${escH(queryRaw)}"` : ''}</div>
 
@@ -19013,6 +19849,9 @@ async function loadSourceImages(sheetIndex) {
                         document.getElementById('mtSelNone').onclick = () => { wiz.tabs.forEach(t => t.selected = false); renderStep1(); };
                         document.getElementById('mtSelNonEmpty').onclick = () => { wiz.tabs.forEach(t => t.selected = t.state.fullData.length >= 3); renderStep1(); };
                         document.getElementById('mtSelOnlyToggle').onclick = () => { wiz.searchSelectedOnly = !wiz.searchSelectedOnly; renderStep1(); };
+                        document.getElementById('mtMasterAiLang').onchange = (e) => {
+                            wiz.masterAiLanguage = normalizeLangCode(e.target.value);
+                        };
 
                         const searchInput = document.getElementById('mtTabSearch');
                         if (searchInput) {
@@ -19410,6 +20249,11 @@ ${body}
                     return;
                 }
 
+                row.__sourceHasUserRatings = true;
+                row.__sourceFrequency = String(orig.userFrequency ?? '').trim();
+                row.__sourceSeverity = String(orig.userSeverity ?? '').trim();
+                row.__sourceLikelihood = String(orig.userLikelihood ?? '').trim();
+
                 const isUserHazardRow = rowLooksUserProvided(row, orig, perImageCounts[row.imageId] || 0);
                 if (isUserHazardRow) {
                     lockUserRatings(row, orig);
@@ -19505,11 +20349,37 @@ ${body}
                     <option value="pl" ${exportTextLang === 'pl' ? 'selected' : ''}>Polish</option>
                 </select>
             </label>
+            <span id="mtTranslateBadge" class="text-[11px] font-semibold text-indigo-600 items-center gap-1.5 px-2 py-1 rounded-md bg-indigo-50 border border-indigo-200" style="display:${wiz.isTranslating ? 'inline-flex' : 'none'};">
+                <span style="display:inline-block;width:12px;height:12px;border:2px solid #c7d2fe;border-top-color:#4f46e5;border-radius:50%;animation:mtSpin 0.8s linear infinite;"></span>
+                Translating…
+            </span>
       <span class="text-xs text-slate-500">${selected.length} tab(s) · ${totalRows} row(s) · <span class="${totalMM>0?'text-rose-600':'text-emerald-600'} font-bold">${totalMM} review item${totalMM===1?'':'s'}</span></span>
       <button id="mtFixAll" class="rab-btn rab-c-amber" ${totalMM===0?'disabled':''}>🔧 AI Fix All Tabs</button>
       <button id="mtExpAll" class="rab-btn rab-c-slate">Expand all</button>
       <button id="mtColAll" class="rab-btn rab-c-slate" style="background:#94a3b8 !important;">Collapse all</button>
     </div>
+  </div>
+  <div class="mb-4 p-3 bg-orange-50 border border-orange-200 rounded-lg flex items-center gap-4 flex-wrap">
+    <span class="text-xs font-bold text-orange-800 uppercase tracking-wide">GOEHS Assessment Header</span>
+    <label class="text-[11px] text-slate-600 font-semibold flex items-center gap-2">
+        Organization <span class="text-red-500">*</span>
+        <select id="mtGoehsOrg" class="border border-slate-300 rounded px-2 py-1 text-[11px] bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-orange-300">
+            <option value="">-- Select --</option>
+            ${Object.keys((typeof VENDOR_LOCATIONS !== 'undefined' ? VENDOR_LOCATIONS : {}) || {}).map(org =>
+                `<option value="${escAttr(org)}" ${wiz.masterGoehsOrg === org ? 'selected' : ''}>${escH(org)}</option>`
+            ).join('')}
+        </select>
+    </label>
+    <label class="text-[11px] text-slate-600 font-semibold flex items-center gap-2">
+        Location <span class="text-red-500">*</span>
+        <select id="mtGoehsLocation" class="border border-slate-300 rounded px-2 py-1 text-[11px] bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-orange-300" ${wiz.masterGoehsOrg ? '' : 'disabled'}>
+            <option value="">-- Select --</option>
+            ${((typeof VENDOR_LOCATIONS !== 'undefined' ? VENDOR_LOCATIONS : {})[wiz.masterGoehsOrg] || []).map(loc =>
+                `<option value="${escAttr(loc)}" ${wiz.masterGoehsLocation === loc ? 'selected' : ''}>${escH(loc)}</option>`
+            ).join('')}
+        </select>
+    </label>
+    <span class="text-[11px] text-slate-500">Applies to every downloaded GOEHS Excel file. Assessment Title/Date/Department/Workstation are set per tab below.</span>
   </div>
   <div id="mtAccordion"></div>
 </div>`;
@@ -19518,10 +20388,27 @@ ${body}
             document.getElementById('mtFixAll').onclick = aiFixAll;
             document.getElementById('mtExportLang')?.addEventListener('change', (e) => {
                 wiz.exportTextLang = String(e.target.value || 'default');
+                refreshReviewPaneTranslations();
+            });
+            document.getElementById('mtGoehsOrg')?.addEventListener('change', (e) => {
+                wiz.masterGoehsOrg = String(e.target.value || '');
+                wiz.masterGoehsLocation = '';
+                renderStep3();
+            });
+            document.getElementById('mtGoehsLocation')?.addEventListener('change', (e) => {
+                wiz.masterGoehsLocation = String(e.target.value || '');
             });
             renderAccordion();
+            if (normalizeLangCode(wiz.exportTextLang)) {
+                refreshReviewPaneTranslations();
+            }
 
-            footerInfoEl.textContent = totalMM === 0 ? `✓ All ${totalRows} rows validated — ready for export` : `${totalMM} mismatch item(s) need review · you can still export now`;
+            // Don't clobber the "Translating…" footer message that refreshReviewPaneTranslations()
+            // just set above (it runs synchronously up to its first await) with the static
+            // mismatch-count summary - only show that once translation is actually idle.
+            if (!wiz.isTranslating) {
+                footerInfoEl.textContent = totalMM === 0 ? `✓ All ${totalRows} rows validated — ready for export` : `${totalMM} mismatch item(s) need review · you can still export now`;
+            }
             footerBtnsEl.innerHTML = `
               <button id="mtBack" class="rab-btn rab-c-slate">← Back to selection</button>
               <button id="mtDl" class="rab-btn rab-c-emerald">📦 Download ZIP</button>`;
@@ -19548,6 +20435,7 @@ ${body}
       <div class="text-xs text-slate-500 mt-0.5">${t.aiRows.length} row(s) · ${t.state.fullData.length} source entries</div>
     </div>
     ${statusPill}
+    <button class="rab-btn rab-c-orange mt-goehs-tab" data-i="${i}" ${t.aiRows.length===0?'disabled':''} title="Download this sheet as a GOEHS-template Excel file" style="height:28px !important;font-size:11px !important;padding:4px 10px !important;">📥 GOEHS Excel</button>
     <button class="rab-btn rab-c-amber mt-fix-tab" data-i="${i}" ${mm===0?'disabled':''} style="height:28px !important;font-size:11px !important;padding:4px 10px !important;">🔧 AI Fix this tab</button>
   </div>
   <div class="mt-acc-body">
@@ -19576,6 +20464,9 @@ ${body}
             acc.querySelectorAll('.mt-fix-tab').forEach(b => {
                 b.onclick = (e) => { e.stopPropagation(); aiFixTab(parseInt(b.dataset.i)); };
             });
+            acc.querySelectorAll('.mt-goehs-tab').forEach(b => {
+                b.onclick = (e) => { e.stopPropagation(); downloadGoehsExcelForTab(parseInt(b.dataset.i)); };
+            });
 
             openTabs.forEach(i => {
                 const host = document.getElementById('mtTblHost-' + i);
@@ -19590,6 +20481,12 @@ ${body}
 
             const headers = ['Picture','AI','Steps','Hazard Group','Hazard List','Risk/Consequences','Frequency','Severity','Likelihood','Risk Score','Risk Category','Hazard Source','Current Control','Routine','Actions','Delete'];
 
+            const ddGroup = (val) => {
+                const mm = !GRP_KEYS.includes(val);
+                const opts = GRP_KEYS.map(g => `<option value="${escAttr(g)}" ${g===val?'selected':''}>${escH(g)}</option>`).join('');
+                const extra = mm && val ? `<option value="${escAttr(val)}" selected>${escH(val)} (unknown)</option>` : '';
+                return `<select class="mt-fld ${mm?'mt-mm':''}" data-fld="group">${extra}${opts}</select>`;
+            };
             const ddHaz = (val) => {
                 const mm = !HAZARD_REGISTRY[val];
                 const opts = HAZ_KEYS.map(k => `<option value="${escAttr(k)}" ${k===val?'selected':''}>${escH(k)}</option>`).join('');
@@ -19623,8 +20520,8 @@ ${body}
 <tr data-ri="${ri}" data-ladder="${escAttr(row['Countermeasure_Ladder']||'')}">
   <td class="text-center text-slate-300">—</td>
   <td class="text-center">${aiBadge}</td>
-  <td><textarea data-fld="Steps" rows="2">${escH(row['Steps']||'')}</textarea></td>
-  <td><input type="text" data-fld="Hazard Group" value="${escAttr(hg)}"></td>
+    <td><textarea data-fld="Steps" rows="2">${escH(getReviewFieldValue(row, 'Steps'))}</textarea></td>
+  <td>${ddGroup(hg)}</td>
   <td>${ddHaz(row['Hazard List']||'')}</td>
   <td>${ddCons(row['Risk/Consequences']||'')}</td>
   <td>${ddNum(row.Frequency,FREQ_KEYS,'freq',FREQUENCY_SCALE)}</td>
@@ -19632,8 +20529,8 @@ ${body}
   <td>${ddNum(row.Likelihood,LIK_KEYS,'lik',LIKELIHOOD_SCALE)}</td>
   <td class="mt-score" style="color:${RISK_CAT_COLOR(cat)}">${score.toFixed(2)}</td>
   <td><span class="inline-block px-2 py-0.5 rounded text-[10px] font-bold text-white" style="background:${RISK_CAT_COLOR(cat)}">${cat}</span></td>
-  <td><textarea data-fld="Hazard Source" rows="2">${escH(row['Hazard Source']||'')}</textarea></td>
-  <td><textarea data-fld="Current Control" rows="2">${escH(row['Current Control']||'')}</textarea></td>
+    <td><textarea data-fld="Hazard Source" rows="2">${escH(getReviewFieldValue(row, 'Hazard Source'))}</textarea></td>
+    <td><textarea data-fld="Current Control" rows="2">${escH(getReviewFieldValue(row, 'Current Control'))}</textarea></td>
   <td>
     <select data-fld="Routine/Non-Routine/Emergency Situation">
       ${['Routine','Non-Routine','Emergency Situation'].map(x=>`<option value="${x}" ${x===(row['Routine/Non-Routine/Emergency Situation']||'Routine')?'selected':''}>${x}</option>`).join('')}
@@ -19765,7 +20662,30 @@ ${body}
   </div>
 </details>`;
 
+            const effGoehsMeta = getEffectiveGoehsTabMeta(tab);
+            const goehsMetaPanel = `
+<div class="mb-3 p-3 bg-orange-50 border border-orange-200 rounded-lg flex flex-wrap gap-3 items-end">
+  <span class="text-[11px] font-bold text-orange-800 uppercase tracking-wide w-full">GOEHS Export Details (this sheet)</span>
+  <label class="text-[11px] text-slate-600 font-semibold flex flex-col gap-1">
+    Assessment Title
+    <input type="text" class="mt-goehs-title border border-slate-300 rounded px-2 py-1 text-[11px]" data-i="${tabIdx}" value="${escAttr(effGoehsMeta.title)}" style="min-width:200px;">
+  </label>
+  <label class="text-[11px] text-slate-600 font-semibold flex flex-col gap-1">
+    Assessment Date
+    <input type="date" class="mt-goehs-date border border-slate-300 rounded px-2 py-1 text-[11px]" data-i="${tabIdx}" value="${escAttr(effGoehsMeta.date)}">
+  </label>
+  <label class="text-[11px] text-slate-600 font-semibold flex flex-col gap-1">
+    Department
+    <input type="text" class="mt-goehs-dept border border-slate-300 rounded px-2 py-1 text-[11px]" data-i="${tabIdx}" value="${escAttr(tab.goehsDepartment || '')}" placeholder="Optional" style="min-width:140px;">
+  </label>
+  <label class="text-[11px] text-slate-600 font-semibold flex flex-col gap-1">
+    Workstation
+    <input type="text" class="mt-goehs-wkst border border-slate-300 rounded px-2 py-1 text-[11px]" data-i="${tabIdx}" value="${escAttr(effGoehsMeta.workstation)}" style="min-width:140px;">
+  </label>
+</div>`;
+
             return `
+${goehsMetaPanel}
 ${remapPanel}
 <div class="mt-tbl-wrap">
   <table class="mt-tbl">
@@ -19799,6 +20719,11 @@ ${remapPanel}
             const selected = wiz.tabs.filter(t => t.selected);
             const tab = selected[tabIdx];
 
+            host.querySelector('.mt-goehs-title')?.addEventListener('change', (e) => { tab.goehsTitle = e.target.value; });
+            host.querySelector('.mt-goehs-date')?.addEventListener('change', (e) => { tab.goehsDate = e.target.value; });
+            host.querySelector('.mt-goehs-dept')?.addEventListener('change', (e) => { tab.goehsDepartment = e.target.value; });
+            host.querySelector('.mt-goehs-wkst')?.addEventListener('change', (e) => { tab.goehsWorkstation = e.target.value; });
+
             host.querySelectorAll('tr[data-ri]').forEach(tr => {
                 const ri = parseInt(tr.dataset.ri);
                 tr.querySelectorAll('[data-fld]').forEach(el => {
@@ -19809,8 +20734,20 @@ ${remapPanel}
                             tab.aiRows[ri]['Hazard List'] = v;
                             tab.aiRows[ri]['Hazard Group'] = HAZARD_REGISTRY[v]?.group || tab.aiRows[ri]['Hazard Group'] || '';
                             el.classList.toggle('mt-mm', !HAZARD_REGISTRY[v]);
-                            const hgInput = tr.querySelector('input[data-fld="Hazard Group"]');
-                            if (hgInput) hgInput.value = tab.aiRows[ri]['Hazard Group'] || '';
+                            const hgSelect = tr.querySelector('select[data-fld="group"]');
+                            if (hgSelect) {
+                                const grp = tab.aiRows[ri]['Hazard Group'] || '';
+                                if (!Array.from(hgSelect.options).some(o => o.value === grp) && grp) {
+                                    const opt = document.createElement('option');
+                                    opt.value = grp; opt.textContent = grp;
+                                    hgSelect.insertBefore(opt, hgSelect.firstChild);
+                                }
+                                hgSelect.value = grp;
+                                hgSelect.classList.toggle('mt-mm', !GRP_KEYS.includes(grp));
+                            }
+                        } else if (fld === 'group') {
+                            tab.aiRows[ri]['Hazard Group'] = v;
+                            el.classList.toggle('mt-mm', !GRP_KEYS.includes(v));
                         } else if (fld === 'cons') {
                             tab.aiRows[ri]['Risk/Consequences'] = v;
                             el.classList.toggle('mt-mm', !CONS_LIST.includes(v));
@@ -19825,6 +20762,9 @@ ${remapPanel}
                             el.classList.toggle('mt-mm', !LIK_KEYS.includes(String(v)));
                         } else {
                             tab.aiRows[ri][fld] = v;
+                            if (fld === 'Steps' || fld === 'Hazard Source' || fld === 'Current Control') {
+                                clearRowTranslationField(tab.aiRows[ri], fld);
+                            }
                         }
                         const f = parseFloat(tab.aiRows[ri].Frequency) || 1;
                         const s = parseFloat(tab.aiRows[ri].Severity) || 5;
@@ -19974,6 +20914,7 @@ ${remapPanel}
                             setMsg(`⚠ AI returned only fallback rows — verify your mapping above`, '#dc2626');
                         } else {
                             tab.errorMsg = '';
+                            tab.aiLanguage = getTabPromptLanguage(tab);
                             setMsg(`✓ AI returned ${aiOut.length} row(s)`, '#16a34a');
                         }
                         persistTabMeta(tab);
@@ -20024,7 +20965,7 @@ ${remapPanel}
             const totalMM = selected.reduce((s,t) => s + countMismatches(t.aiRows), 0);
             const totalRows = selected.reduce((s,t) => s + t.aiRows.length, 0);
             if (globalFix) globalFix.disabled = (totalMM === 0);
-            if (footerInfoEl) footerInfoEl.textContent = totalMM === 0 ? `✓ All ${totalRows} rows validated — ready for export` : `${totalMM} mismatch item(s) need review · you can still export now`;
+            if (footerInfoEl && !wiz.isTranslating) footerInfoEl.textContent = totalMM === 0 ? `✓ All ${totalRows} rows validated — ready for export` : `${totalMM} mismatch item(s) need review · you can still export now`;
         }
 
         // ============== AI FIX (local fuzzy + AI fallback) ==============
@@ -20052,7 +20993,15 @@ ${remapPanel}
             // PASS 1: local fuzzy fix
             const unresolved = [];
             rows.forEach((r, idx) => {
-                const ratingLocked = !!r.__ratingLocked;
+                const sourceFreq = String(r.__sourceFrequency ?? '').trim();
+                const sourceSev = String(r.__sourceSeverity ?? '').trim();
+                const sourceLik = String(r.__sourceLikelihood ?? '').trim();
+                const rowFreq = String(r.Frequency ?? '').trim();
+                const rowSev = String(r.Severity ?? '').trim();
+                const rowLik = String(r.Likelihood ?? '').trim();
+                const preservesSourceTriplet = !!(sourceFreq && sourceSev && sourceLik) &&
+                    rowFreq === sourceFreq && rowSev === sourceSev && rowLik === sourceLik;
+                const ratingLocked = !!r.__ratingLocked || preservesSourceTriplet;
                 if (isMismatch('hazard', r['Hazard List'])) {
                     const snap = snapToList(r['Hazard List'], HAZ_KEYS);
                     const dist = levenshtein(String(r['Hazard List']||''), snap);
@@ -20071,6 +21020,20 @@ ${remapPanel}
                         unresolved.push({ idx, field: 'Risk/Consequences', value: r['Risk/Consequences'] });
                     }
                 }
+                // A valid Hazard List fix above already cascades the correct group, so
+                // only attempt an independent fix if it's still mismatched afterward.
+                if (isMismatch('group', r['Hazard Group'])) {
+                    if (HAZARD_REGISTRY[r['Hazard List']]) {
+                        r['Hazard Group'] = HAZARD_REGISTRY[r['Hazard List']].group;
+                    } else {
+                        const snap = snapToList(r['Hazard Group'], GRP_KEYS);
+                        if (levenshtein(String(r['Hazard Group']||''), snap) <= 4) {
+                            r['Hazard Group'] = snap;
+                        } else {
+                            unresolved.push({ idx, field: 'Hazard Group', value: r['Hazard Group'] });
+                        }
+                    }
+                }
                 if (!ratingLocked) {
                     if (isMismatch('freq', r.Frequency)) r.Frequency = snapToNumKey(r.Frequency, FREQ_KEYS);
                     if (isMismatch('sev', r.Severity)) r.Severity = snapToNumKey(r.Severity, SEV_KEYS);
@@ -20085,6 +21048,7 @@ ${remapPanel}
                     const prompt = `Map each item below to the closest registry value. Reply with ONLY a JSON array like [{"id":0,"mapped":"<exact registry value>"}].
 Hazard List registry: ${REG_HAZ}
 Risk/Consequences registry: ${REG_CONS}
+Hazard Group registry: ${JSON.stringify(GRP_KEYS)}
 Items:
 ${JSON.stringify(payload, null, 2)}`;
                     const content = await callAI(prompt);
@@ -20099,6 +21063,8 @@ ${JSON.stringify(payload, null, 2)}`;
                                 rows[u.idx]['Hazard Group'] = HAZARD_REGISTRY[target]?.group || '';
                             } else if (u.field === 'Risk/Consequences' && CONS_LIST.includes(target)) {
                                 rows[u.idx]['Risk/Consequences'] = target;
+                            } else if (u.field === 'Hazard Group' && GRP_KEYS.includes(target)) {
+                                rows[u.idx]['Hazard Group'] = target;
                             }
                         });
                     }
@@ -20107,7 +21073,117 @@ ${JSON.stringify(payload, null, 2)}`;
         }
 
         // ============== DOWNLOAD ZIP ==============
+        // Adapts a cleaned wizard export row (Steps/Hazard Group/Hazard List/Frequency/...) into
+        // the GOEHS hazard shape buildGoehsBatchWorkbook() expects, reusing the same field
+        // mapping helpers (goehs-integration.js) the RA2025 batch-GOEHS importer already relies
+        // on for this exact conversion, so there's one shared definition of "what a GOEHS export
+        // looks like" instead of three divergent ones.
+        function wizardRowsToGoehsHazards(rows) {
+            return (rows || []).map(row => {
+                const sourceCategory = row['Hazard Group'] || '';
+                const sourceSubHazard = row['Hazard List'] || '';
+                const goehsCategory = (typeof findMatchingGoehsCategory === 'function' && findMatchingGoehsCategory(sourceCategory)) || sourceCategory;
+                const goehsSubHazard = goehsCategory && typeof findMatchingGoehsSubHazard === 'function'
+                    ? (findMatchingGoehsSubHazard(goehsCategory, sourceSubHazard) || sourceSubHazard)
+                    : sourceSubHazard;
+
+                const freq = mapFrequencyToGOEHS(row.Frequency);
+                const sev = mapSeverityToGOEHS(row.Severity);
+                const like = mapLikelihoodToGOEHS(row.Likelihood);
+                const score = parseFloat(freq) * parseFloat(sev) * parseFloat(like);
+                const rating = getRiskRating(score);
+                const controlText = row['Current Control'] || '';
+                const ladderSuggestions = suggestCountermeasureLadder(controlText) || [];
+
+                return {
+                    taskName: row.Steps || 'Unspecified Task',
+                    mode: row['Routine/Non-Routine/Emergency Situation'] || 'Routine',
+                    hazardCategory: goehsCategory,
+                    subHazard: goehsSubHazard,
+                    outcome: row['Risk/Consequences'] || '',
+                    description: row['Hazard Source'] || '',
+                    initFreq: freq, initSev: sev, initLike: like,
+                    initScore: score.toFixed(2), initRating: rating,
+                    counterDesc: controlText,
+                    counterLadder: Array.isArray(ladderSuggestions) ? ladderSuggestions.join(', ') : String(ladderSuggestions || ''),
+                    // No separate residual/predictive assessment exists in the wizard's data -
+                    // residual mirrors initial (matches the RA2025 batch importer's convention).
+                    resFreq: freq, resSev: sev, resLike: like, resScore: score.toFixed(2), resRating: rating,
+                    predDesc: '', predLadder: '', predFreq: '', predSev: '', predLike: '', predScore: '', predRating: ''
+                };
+            });
+        }
+
+        // Defaults: Assessment Title/Workstation fall back to the sheet name, Assessment Date
+        // falls back to when AI processing finished for that tab (today if it hasn't yet).
+        // Any of these can be overridden per tab via the GOEHS header fields in Step 3.
+        function getEffectiveGoehsTabMeta(tab) {
+            const sheetName = tab && tab.sheet ? tab.sheet.name : 'Sheet';
+            const processedDate = tab && tab.processedAt ? tab.processedAt.slice(0, 10) : '';
+            return {
+                title: (tab.goehsTitle || '').trim() || sheetName,
+                date: (tab.goehsDate || '').trim() || processedDate || new Date().toISOString().slice(0, 10),
+                department: (tab.goehsDepartment || '').trim(),
+                workstation: (tab.goehsWorkstation || '').trim() || sheetName
+            };
+        }
+
+        function buildGoehsMetaForTab(tab) {
+            const t = getEffectiveGoehsTabMeta(tab);
+            return {
+                orgName: wiz.masterGoehsOrg || '',
+                location: wiz.masterGoehsLocation || '',
+                department: t.department,
+                workstation: t.workstation,
+                assessmentTitle: t.title,
+                date: t.date,
+                equipment: '',
+                type: '',
+                approver: '(Site Admin)',
+                teamMembers: '',
+                completedBy: ''
+            };
+        }
+
+        // Organization/Location are mandatory on the GOEHS vendor template - refuse to build a
+        // file without them rather than silently exporting blank required columns.
+        function validateGoehsMasterFields() {
+            if (!wiz.masterGoehsOrg || !wiz.masterGoehsLocation) {
+                alert('Please select an Organization and Location (GOEHS Assessment Header, above the tab list) before downloading a GOEHS Excel file.');
+                return false;
+            }
+            return true;
+        }
+
+        function downloadGoehsExcelForTab(tabIdx) {
+            const selected = wiz.tabs.filter(t => t.selected);
+            const tab = selected[tabIdx];
+            if (!tab) return;
+            if (typeof window.buildGoehsBatchWorkbook !== 'function' || typeof XLSX === 'undefined') {
+                alert('GOEHS export module not loaded.');
+                return;
+            }
+            if (!validateGoehsMasterFields()) return;
+            const rows = (tab.aiRows || []).map(row => ({
+                ...row,
+                Steps: getReviewFieldValue(row, 'Steps'),
+                'Hazard Source': getReviewFieldValue(row, 'Hazard Source'),
+                'Current Control': getReviewFieldValue(row, 'Current Control')
+            }));
+            const hazards = wizardRowsToGoehsHazards(rows);
+            if (hazards.length === 0) {
+                alert('No processed rows to export for this sheet yet.');
+                return;
+            }
+            const lang = normalizeLangCode(wiz.exportTextLang) || 'en';
+            const wb = window.buildGoehsBatchWorkbook(hazards, buildGoehsMetaForTab(tab), lang);
+            if (!wb) return;
+            const safeName = String(tab.sheet.name || 'Sheet').replace(/[^a-zA-Z0-9]/g, '_');
+            XLSX.writeFile(wb, `GOEHS_${safeName}.xlsx`);
+        }
+
         async function downloadZip() {
+            if (!validateGoehsMasterFields()) return;
             const btn = document.getElementById('mtDl');
             btn.disabled = true; btn.textContent = '⏳ Building ZIP…';
             try {
@@ -20149,7 +21225,7 @@ ${JSON.stringify(payload, null, 2)}`;
                     });
 
                     const exportRows = shouldTranslateText
-                        ? await translateRowsForExport(tableRows, requestedExportLang, translationCache)
+                        ? await translateRowsForExport(tableRows, requestedExportLang, translationCache, tab.aiLanguage)
                         : tableRows;
 
                     const projectJSON = {
@@ -20179,6 +21255,19 @@ ${JSON.stringify(payload, null, 2)}`;
                         XLSX.utils.book_append_sheet(wb, ws, 'Risk Assessment');
                         const buf = XLSX.write(wb, { type: 'array', bookType: 'xlsx' });
                         folder.file(`Risk_Assessment_${sheetName}.xlsx`, buf);
+
+                        // GOEHS vendor-template export - reuses the same translated exportRows
+                        // so the GOEHS file matches the plain CSV/XLSX in this same folder.
+                        if (typeof window.buildGoehsBatchWorkbook === 'function') {
+                            const hazards = wizardRowsToGoehsHazards(exportRows);
+                            if (hazards.length > 0) {
+                                const goehsWb = window.buildGoehsBatchWorkbook(hazards, buildGoehsMetaForTab(tab), requestedExportLang || 'en');
+                                if (goehsWb) {
+                                    const goehsBuf = XLSX.write(goehsWb, { type: 'array', bookType: 'xlsx' });
+                                    folder.file(`GOEHS_${sheetName}.xlsx`, goehsBuf);
+                                }
+                            }
+                        }
                     }
                 }
 
@@ -21225,26 +22314,26 @@ ${JSON.stringify(payload, null, 2)}`;
         'infrastructure design': 'Workplace / Infrastructure Design',
         'workplace layout': 'Workplace / Infrastructure Design',
         // Mechanical
-        'mechanical hazards': 'Mechanical / Machinery hazards',
-        'machinery hazards': 'Mechanical / Machinery hazards',
-        'machine hazards': 'Mechanical / Machinery hazards',
-        'mechanical / machinery': 'Mechanical / Machinery hazards',
+        'mechanical hazards': 'Mechanical / Machinery Hazards',
+        'machinery hazards': 'Mechanical / Machinery Hazards',
+        'machine hazards': 'Mechanical / Machinery Hazards',
+        'mechanical / machinery': 'Mechanical / Machinery Hazards',
         // Chemical
-        'chemical hazard': 'Chemical hazards',
-        'chemicals': 'Chemical hazards',
+        'chemical hazard': 'Chemical Hazards',
+        'chemicals': 'Chemical Hazards',
         // Ergonomic
-        'ergonomic hazard': 'Ergonomic hazards',
-        'ergonomics': 'Ergonomic hazards',
-        'ergonomic': 'Ergonomic hazards',
-        'musculoskeletal hazards': 'Ergonomic hazards',
+        'ergonomic hazard': 'Ergonomic Hazards',
+        'ergonomics': 'Ergonomic Hazards',
+        'ergonomic': 'Ergonomic Hazards',
+        'musculoskeletal hazards': 'Ergonomic Hazards',
         // Biological
-        'biological hazards': 'Biological hazard',
-        'biological': 'Biological hazard',
-        'biohazard': 'Biological hazard',
+        'biological hazards': 'Biological Hazards',
+        'biological': 'Biological Hazards',
+        'biohazard': 'Biological Hazards',
         // Physical health
-        'physical hazards': 'Physical health hazards',
-        'physical health hazard': 'Physical health hazards',
-        'physical health': 'Physical health hazards',
+        'physical hazards': 'Physical Health Hazards',
+        'physical health hazard': 'Physical Health Hazards',
+        'physical health': 'Physical Health Hazards',
         // Hazardous Energy
         'hazardous energy hazards': 'Hazardous Energy',
         'energy hazards': 'Hazardous Energy',
@@ -21255,10 +22344,10 @@ ${JSON.stringify(payload, null, 2)}`;
         'psychosocial': 'Organizational and Psychosocial',
         'organizational': 'Organizational and Psychosocial',
         // Fire
-        'fire hazards': 'Fire and explosion',
-        'fire and explosion hazards': 'Fire and explosion',
-        'fire': 'Fire and explosion',
-        'explosion hazards': 'Fire and explosion'
+        'fire hazards': 'Fire and Explosion',
+        'fire and explosion hazards': 'Fire and Explosion',
+        'fire': 'Fire and Explosion',
+        'explosion hazards': 'Fire and Explosion'
     };
 
     // Resolve a hazard group name using the alias map first, then exact match against valid groups
@@ -21276,14 +22365,14 @@ ${JSON.stringify(payload, null, 2)}`;
         const keywordMap = [
             { keywords: ['transport', 'traffic', 'vehicle', 'vehicular', 'forklift', 'stacker', 'truck', 'driving'], group: 'Transportation' },
             { keywords: ['workstation', 'workplace', 'infrastructure', 'layout', 'floor', 'building'], group: 'Workplace / Infrastructure Design' },
-            { keywords: ['mechanical', 'machinery', 'machine', 'tool'], group: 'Mechanical / Machinery hazards' },
-            { keywords: ['chemical', 'toxic', 'corrosive', 'flammable material'], group: 'Chemical hazards' },
-            { keywords: ['ergonomic', 'musculoskeletal', 'posture', 'lifting'], group: 'Ergonomic hazards' },
-            { keywords: ['biological', 'bacteria', 'virus', 'pathogen'], group: 'Biological hazard' },
-            { keywords: ['physical health', 'noise', 'vibration', 'radiation'], group: 'Physical health hazards' },
+            { keywords: ['mechanical', 'machinery', 'machine', 'tool'], group: 'Mechanical / Machinery Hazards' },
+            { keywords: ['chemical', 'toxic', 'corrosive', 'flammable material'], group: 'Chemical Hazards' },
+            { keywords: ['ergonomic', 'musculoskeletal', 'posture', 'lifting'], group: 'Ergonomic Hazards' },
+            { keywords: ['biological', 'bacteria', 'virus', 'pathogen'], group: 'Biological Hazards' },
+            { keywords: ['physical health', 'noise', 'vibration', 'radiation'], group: 'Physical Health Hazards' },
             { keywords: ['energy', 'electrical', 'electric'], group: 'Hazardous Energy' },
             { keywords: ['psychosocial', 'organizational', 'stress', 'harassment'], group: 'Organizational and Psychosocial' },
-            { keywords: ['fire', 'explosion', 'ignition'], group: 'Fire and explosion' }
+            { keywords: ['fire', 'explosion', 'ignition'], group: 'Fire and Explosion' }
         ];
         for (const entry of keywordMap) {
             if (entry.keywords.some(kw => lower.includes(kw))) return entry.group;
