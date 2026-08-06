@@ -1,0 +1,188 @@
+Hazard / Sub-Hazard Options
+Generated: 2026-07-17
+
+- Biological Hazards
+  - Viruses, bacteria, fungi
+  - Legionella (specific bacteria)
+  - Molds or allergens
+  - Handling human or animal bodily fluids
+  - Bloodborne pathogens
+  - Contaminated waste or biological material
+  - Potability of water
+  - Food hygiene
+  - Animal or insect bites/stings
+  - Animal waste
+  - Hazardous vegetation
+
+- Chemical Hazards
+  - Explosive materials
+  - Flammable materials
+  - Oxidising materials
+  - Corrosive materials
+  - Acute toxicity materials
+  - Health hazard, sensitizers, allergens materials
+  - Carcinogens, mutagens, reprotoxic (CMRs) materials
+  - Gas under pressure
+  - Asbestos
+  - Fibers other than asbestos
+  - Oil
+  - Crystalline silica
+  - Organic peroxides
+  - Nanomaterials
+  - Endocrine disrupters
+  - Lead-containing material
+  - Particulate material (dust, smoke, fog, aerosol)
+  - Improper labeling or storage
+  - Incompatible chemical reactions
+  - Chemical spills or leaks
+  - Water reactive substances
+  - Shock / vibration sensitive substances
+  - Chemicals [Generic]
+
+- Ergonomic Hazards
+  - Postures (Hit list)
+  - Force
+  - Lifting/Lowering
+  - Pushing
+  - Pulling
+  - Carrying
+  - Soft tissue compression
+  - Ill-fitting gloves
+  - Standing or Sitting for long periods
+  - Computer workstation / Screen
+  - Inadequate tool or workstation design
+  - Poor ergonomics [Generic]
+
+- Fire and Explosion
+  - Flammable and combustible materials
+  - Ignition sources (open flames, sparks, static)
+  - Dust explosions (e.g., black, wood, metal dust)
+  - Oxygen-enriched environments
+
+- Hazardous Energy
+  - Electricity
+  - Electrostatic
+  - Electromagnetic fields
+  - Arc flash
+  - Magnetic
+  - Equipment under pressure
+  - Compressed air
+  - Vacuum
+  - Hydraulic
+  - Pneumatic
+  - Thermal energy (steam, heated surfaces)
+  - Kinetic energy
+  - Gravity
+  - Stored energy (pneumatic, hydraulic, mechanical, electrical)
+  - Exothermic chemical reaction
+  - Hazardous Energy [Generic]
+
+- Mechanical / Machinery Hazards
+  - Hand tools (cut, impact, puncture, etc.)
+  - Powered tools
+  - Pinch / nip points
+  - Rotating parts (entanglement)
+  - Moving parts (cutting)
+  - Moving parts (crushing)
+  - Ejection (parts, materials)
+  - Angular, sharp and cutting elements
+  - Degraded or malfunctioning equipment
+  - Equipment failure
+  - Improper use of tools/machines
+  - Inadequate guarding
+  - Use of lifting equipment and accessories
+  - Use of suspension equipment (jacks, etc.)
+  - Acceleration / deceleration
+
+- Organizational and Psychosocial
+  - Ambiguity of the roles and responsibilities
+  - Inadequate staffing
+  - High job demands (physical or mental workload)
+  - Low job control or autonomy
+  - Monotonous or repetitive tasks
+  - Unclear job roles or expectations
+  - Job insecurity or precarious employment
+  - Long working hours or shift work
+  - Unrealistic deadlines
+  - Coactivity
+  - Unfamiliar work
+  - New hire / temporary worker
+  - Insufficient / inadequate training
+  - Violations of rules
+  - Misuse of computer systems / equipment
+  - Lack of adherence to standard
+  - Lack of standard
+  - Disrupted sleep pattern (shift work)
+  - Incompatible simultaneous activities
+  - Distraction
+  - Isolation (especially in remote work or lone working roles)
+  - Workplace bullying or harassment
+  - Discrimination (e.g. gender, race, age)
+  - Poor supervisor or managerial support
+  - Inconsistent communication during organizational change
+  - Lack of transparency or trust in leadership
+  - Poor organizational justice (unfair treatment)
+  - Lack of recognition or reward
+  - Lack of communication or feedback
+  - Lack of employee involvement in decision-making
+  - Dealing with aggressive or violent people
+  - Exposure to distressing situations (e.g. emergency services, healthcare, customer complaints)
+  - Lack of privacy or personal space
+  - Inadequate rest areas
+  - Overcrowded or chaotic workspaces
+  - Remote Work Specific Hazards
+  - Work-Life Balance
+  - Employment restriction (e.g. Pregnant/breastfeeding, handicap)
+
+- Physical Health Hazards
+  - Noise exposure
+  - Vibration / Impact (hand-arm, whole-body)
+  - Heat stress
+  - Cold stress
+  - Poor lighting (intensity, glare, reflection)
+  - Electro-magnetic fields
+  - Ionizing radiation (X-rays, radioactive elements)
+  - Non-ionizing radiation (UV, microwave, laser, welding radiations)
+  - Severe draft (e.g. cold air current)
+  - Smoke and fumes
+  - Physical health [Generic]
+
+- Transportation
+  - Interaction pedestrian/pedestrian
+  - Interaction pedestrian/bicycle
+  - Interaction pedestrian/Vehicle
+  - Interaction bicycle/bicycle
+  - Interaction bicycle/Vehicle
+  - Interaction Vehicle/Vehicle
+  - Interaction Vehicle/Stationary items
+  - Poor road or yard conditions
+  - Unintentional vehicle movement
+  - High speed vehicle, tire grip loss
+  - Inadequate load securing
+  - Traffic [Generic]
+
+- Workplace / Infrastructure Design
+  - Slips, trips, and falls (same level or height)
+  - Slippery, uneven, unstable or damaged floor
+  - Congested or obstructed workplace
+  - Clutter / Mess
+  - Protrusion (bump, puncture, cut, etc.)
+  - Hot surface
+  - Cold surface
+  - Rough surface
+  - Unsecured items at height
+  - Work at height (less than 1.2m / 4 feet)
+  - Work at height (1.2m / 4 feet or more)
+  - Poor ventilation
+  - Extreme heat
+  - Extreme cold
+  - Snow or ice
+  - Extreme wind
+  - Other adverse weather conditions
+  - Confined spaces
+  - Lone work
+  - Temporary works or unstable structures
+  - Engulfment
+  - Inclined surface
+  - Poor visibility
+  - Coactivity area

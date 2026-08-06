@@ -1225,6 +1225,21 @@
         setTimeout(() => URL.revokeObjectURL(currentUrl), 100);
     }
 
+    function setTool(toolName) {
+        if (!toolbar || !canvas) return;
+        setActiveTool(toolName);
+    }
+
+    function registerAutoBlurResult(imageId, originalSrc, blurredSrc) {
+        if (!imageId) return;
+        if (originalSrc && !state.originalImages.has(imageId)) {
+            state.originalImages.set(imageId, originalSrc);
+        }
+        if (blurredSrc) {
+            state.baseImages.set(imageId, blurredSrc);
+        }
+    }
+
     // ─── EXPOSE API ─────────────────────────────────────────────────────
     window.ImageEditor = {
         init,
@@ -1237,6 +1252,8 @@
         bakeAllAnnotations,
         getAnnotations: () => getAnnotations(),
         getState: () => state,
+        setTool,
+        registerAutoBlurResult,
         render,
         recalcLayout,
     };

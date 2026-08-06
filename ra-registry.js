@@ -52,8 +52,8 @@ const HAZARD_CATEGORIES = {
         'Standing or Sitting for long periods'
     ],
     'Fire and Explosion': [
-        'Dust explosions (e.g., coal, wood, metal dust)', 'Flammable and combustible materials',
-        'Ignition sources', 'Ignition sources (open flames, sparks, static)', 'Oxygen-enriched environments'
+        'Dust explosions (e.g., black, wood, metal dust)', 'Flammable and combustible materials',
+        'Ignition sources (open flames, sparks, static)', 'Oxygen-enriched environments'
     ],
     'Hazardous Energy': [
         'Arc flash', 'Compressed air', 'Electricity', 'Electromagnetic fields', 'Electrostatic',
@@ -173,14 +173,45 @@ const GOEHS_CONDITION_TRANSLATIONS = {
 
 // Returns the translated display label for a GOEHS dropdown value in the current UI language.
 // The option value attribute always stays in English — only the visible text is translated.
+function normalizeRegistryTranslationKey(value) {
+    return String(value || '')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .replace(/&/g, ' and ')
+        .replace(/[^a-z0-9]+/g, ' ')
+        .trim()
+        .split(' ')
+        .filter(Boolean)
+        .map(token => (token.length > 3 && token.endsWith('s') ? token.slice(0, -1) : token))
+        .join(' ');
+}
+
 function goehsUiLabel(val) {
     if (!val) return val;
     const lang = localStorage.getItem('appLanguage') || 'en';
     if (lang === 'en') return val;
     // Ladder levels use GOEHS_LADDER_TRANSLATIONS
     if (GOEHS_LADDER_TRANSLATIONS[lang]?.[val]) return GOEHS_LADDER_TRANSLATIONS[lang][val];
+
     // Everything else (hazard categories, sub-hazards, outcomes) uses window.TRANSLATIONS
-    return window.TRANSLATIONS?.[lang]?.[val] || val;
+    const langMap = window.TRANSLATIONS?.[lang];
+    if (!langMap) return val;
+    if (langMap[val]) return langMap[val];
+
+    // Fallback 1: case-insensitive key lookup
+    const valueLower = String(val).toLowerCase();
+    for (const [key, translated] of Object.entries(langMap)) {
+        if (key.toLowerCase() === valueLower) return translated;
+    }
+
+    // Fallback 2: normalized lookup (handles punctuation/plural/casing drift)
+    const normalizedValue = normalizeRegistryTranslationKey(val);
+    for (const [key, translated] of Object.entries(langMap)) {
+        if (normalizeRegistryTranslationKey(key) === normalizedValue) return translated;
+    }
+
+    return val;
 }
 
 // ============================================================
@@ -247,8 +278,8 @@ const TRANSLATIONS = {
     "Cold surface": "Cold surface",
     "Rough surface": "Rough surface",
     "Unsecured items at height": "Unsecured items at height",
-    "Work at height (<1.2m - <4 feet)": "Work at height (<1.2m - <4 feet)",
-    "Work at height (≥1.2m - ≥4 feet)": "Work at height (≥1.2m - ≥4 feet)",
+    "Work at height (less than 1.2m / 4 feet)": "Work at height (less than 1.2m / 4 feet)",
+    "Work at height (1.2m / 4 feet or more)": "Work at height (1.2m / 4 feet or more)",
     "Poor ventilation": "Poor ventilation",
     "Extreme heat": "Extreme heat",
     "Extreme cold": "Extreme cold",
@@ -388,7 +419,7 @@ const TRANSLATIONS = {
     "Flammable and combustible materials": "Flammable and combustible materials",
     "Ignition sources": "Ignition sources",
     "Ignition sources (open flames, sparks, static)": "Ignition sources (open flames, sparks, static)",
-    "Dust explosions (e.g., coal, wood, metal dust)": "Dust explosions (e.g., coal, wood, metal dust)",
+    "Dust explosions (e.g., black, wood, metal dust)": "Dust explosions (e.g., black, wood, metal dust)",
     "Oxygen-enriched environments": "Oxygen-enriched environments",
     // Risk/Consequences (English)
     "Abrasion, Scratches": "Abrasion, Scratches",
@@ -529,8 +560,8 @@ const TRANSLATIONS = {
     "Cold surface": "Surface froide",
     "Rough surface": "Surface rugueuse",
     "Unsecured items at height": "Objets non sécurisés en hauteur",
-    "Work at height (<1.2m - <4 feet)": "Travail en hauteur (<1,2 m)",
-    "Work at height (≥1.2m - ≥4 feet)": "Travail en hauteur (≥1,2 m)",
+    "Work at height (less than 1.2m / 4 feet)": "Travail en hauteur (<1,2 m)",
+    "Work at height (1.2m / 4 feet or more)": "Travail en hauteur (≥1,2 m)",
     "Poor ventilation": "Mauvaise ventilation",
     "Extreme heat": "Chaleur extrême",
     "Extreme cold": "Froid extrême",
@@ -678,7 +709,7 @@ const TRANSLATIONS = {
     "Flammable and combustible materials": "Matières inflammables et combustibles",
     "Ignition sources": "Sources d'ignition (flammes, étincelles, électricité statique)",
     "Ignition sources (open flames, sparks, static)": "Sources d'ignition (flammes, étincelles, électricité statique)",
-    "Dust explosions (e.g., coal, wood, metal dust)": "Explosion de poussières (ex. : poussières de bois, métal, charbon)",
+    "Dust explosions (e.g., black, wood, metal dust)": "Explosion de poussières (ex. : poussières de noir de carbone, bois, métal)",
     "Oxygen-enriched environments": "Environnement enrichi en oxygène",
     // Risk/Consequences (French) - GOEHS Official Translations (Blessure/Maladie)
     // Injuries
@@ -1031,8 +1062,8 @@ const TRANSLATIONS = {
     "Cold surface": "Kalte Oberfläche",
     "Rough surface": "Raue Oberfläche",
     "Unsecured items at height": "Ungesicherte Gegenstände in der Höhe",
-    "Work at height (<1.2m - <4 feet)": "Arbeit in Höhe (<1,2 m - <4 Fuß)",
-    "Work at height (≥1.2m - ≥4 feet)": "Arbeit in Höhe (≥1,2 m - ≥4 Fuß)",
+    "Work at height (less than 1.2m / 4 feet)": "Arbeit in Höhe (<1,2 m - <4 Fuß)",
+    "Work at height (1.2m / 4 feet or more)": "Arbeit in Höhe (≥1,2 m - ≥4 Fuß)",
     "Poor ventilation": "Schlechte Belüftung",
     "Extreme heat": "Extreme Hitze",
     "Extreme cold": "Extreme Kälte",
@@ -1172,7 +1203,7 @@ const TRANSLATIONS = {
     "Flammable and combustible materials": "Entzündliche und brennbare Materialien",
     "Ignition sources": "Zündquellen",
     "Ignition sources (open flames, sparks, static)": "Zündquellen (offene Flammen, Funken, statisch)",
-    "Dust explosions (e.g., coal, wood, metal dust)": "Staubexplosionen (z.B. Kohle, Holz, Metalstaub)",
+    "Dust explosions (e.g., black, wood, metal dust)": "Staubexplosionen (z.B. Ruß, Holz, Metallstaub)",
     "Oxygen-enriched environments": "Sauerstoffangereicherte Umgebungen",
     // Risk/Consequences (German)
     "Abrasion, Scratches": "Abrasionen, Kratzer",
