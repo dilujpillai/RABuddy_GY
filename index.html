@@ -2626,30 +2626,42 @@
                 <div class="p-6 sm:p-8 bg-white border-t border-slate-200">
                     <div class="rab-row">
                         <button id="goehsIntegrationBtn" class="rab-btn rab-c-orange"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" /></svg>GOEHS Integration</button>
-                        <button id="saveProjectBtn2" class="rab-btn rab-c-yellow" data-en-text="Save Project"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"/></svg>Save Project</button>
-                        <button id="downloadProjectZipBtn" class="rab-btn rab-c-blue" onclick="downloadProjectZip()" title="Download ZIP with both full-size and optimized images"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>Download Project ZIP</button>
-                        <button id="translateTableBtn" class="rab-btn rab-c-slate"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129"/></svg>Translate</button>
+
+                        <div class="rab-dropdown">
+                            <button type="button" id="projectMenuBtn" class="rab-btn rab-c-yellow">📁 Project ▾</button>
+                            <div id="projectMenuPanel" class="rab-dropdown-panel">
+                                <button id="saveProjectBtn2" class="rab-btn rab-c-yellow" data-en-text="Save Project"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"/></svg>Save Project</button>
+                                <button id="downloadProjectZipBtn" class="rab-btn rab-c-blue" onclick="downloadProjectZip()" title="Download ZIP with both full-size and optimized images"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>Download Project ZIP</button>
+                            </div>
+                        </div>
+
+                        <div class="rab-dropdown">
+                            <button type="button" id="languageMenuBtn" class="rab-btn rab-c-slate">🌐 Language ▾</button>
+                            <div id="languageMenuPanel" class="rab-dropdown-panel">
+                                <button id="translateTableBtn" class="rab-btn rab-c-slate"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129"/></svg>Translate</button>
+                                <label class="text-[11px] text-slate-600 font-semibold flex items-center gap-2 px-2 py-1.5 rounded-md border border-slate-200 bg-white" title="Language shown in the Hazard Group and Hazard List dropdowns. Auto-detected from imported Excel sheets when possible.">
+                                    🌐 Hazard dropdown
+                                    <select id="hazardLangSelect" class="border border-slate-300 rounded px-2 py-1 text-[11px] bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-300" style="flex:1;">
+                                        <option value="en">English</option>
+                                        <option value="fr">Français</option>
+                                        <option value="de">Deutsch</option>
+                                        <option value="es">Español</option>
+                                        <option value="pl">Polski</option>
+                                        <option value="pt">Português</option>
+                                        <option value="sl">Slovenščina</option>
+                                        <option value="tr">Türkçe</option>
+                                        <option value="zh">中文</option>
+                                        <option value="th">ไทย</option>
+                                    </select>
+                                </label>
+                            </div>
+                        </div>
+
                         <button id="remapColumnsBtn" class="rab-btn rab-c-slate rab-hidden" title="Re-map Excel columns if data wasn't imported correctly"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/></svg>Remap Columns</button>
-                    </div>
-                    <div class="rab-row" style="margin-top:8px;">
+
                         <button id="aiFixMainTableBtn" class="rab-btn rab-c-amber" title="Scan all rows and auto-correct Hazard Group / Hazard List / Risk-Consequences values that don't match the standard dropdown options">🔧 AI Fix Hazard/Risk</button>
                         <button id="aiClosestMatchBtn" class="rab-btn rab-c-blue" title="For any Hazard Group / Hazard List / Risk-Consequences dropdown still outlined red after AI Fix, apply the closest standard entry as a best-guess suggestion for you to review">🎯 Suggest Closest Match</button>
                         <span id="mainTableIssuePill" title="Hazard Group / Hazard List / Risk-Consequences dropdowns that don't match a standard entry" class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-700">✓ 0 issues</span>
-                        <label class="text-[11px] text-slate-600 font-semibold flex items-center gap-2 px-2 py-1 rounded-md border border-slate-200 bg-white" title="Language shown in the Hazard Group and Hazard List dropdowns. Auto-detected from imported Excel sheets when possible.">
-                            🌐 Hazard dropdown language
-                            <select id="hazardLangSelect" class="border border-slate-300 rounded px-2 py-1 text-[11px] bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-300">
-                                <option value="en">English</option>
-                                <option value="fr">Français</option>
-                                <option value="de">Deutsch</option>
-                                <option value="es">Español</option>
-                                <option value="pl">Polski</option>
-                                <option value="pt">Português</option>
-                                <option value="sl">Slovenščina</option>
-                                <option value="tr">Türkçe</option>
-                                <option value="zh">中文</option>
-                                <option value="th">ไทย</option>
-                            </select>
-                        </label>
                     </div>
                 </div>
                 <div class="table-wrapper overflow-x-auto" id="table-container">
@@ -9073,6 +9085,43 @@ window.LIKELIHOOD_SCALE = LIKELIHOOD_SCALE;
                 window.relabelHazardDropdownsInLanguage(window.hazardDropdownLang);
             });
         }
+
+        // ---- Toolbar flyout menus (Project / Language) ----
+        function initRabDropdown(toggleBtn, panel) {
+            if (!toggleBtn || !panel) return;
+            // Reparent to <body> so the panel escapes ancestor overflow:hidden cards
+            // (e.g. #dashboard-container) that would otherwise clip it - position is
+            // computed from the toggle button's live location each time it opens.
+            document.body.appendChild(panel);
+            toggleBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const isOpen = panel.classList.contains('rab-dropdown-open');
+                document.querySelectorAll('.rab-dropdown-panel.rab-dropdown-open').forEach(p => p.classList.remove('rab-dropdown-open'));
+                if (!isOpen) {
+                    const rect = toggleBtn.getBoundingClientRect();
+                    panel.style.top = (rect.bottom + 6) + 'px';
+                    panel.style.left = rect.left + 'px';
+                    panel.classList.add('rab-dropdown-open');
+                }
+            });
+            // Clicking anything inside the panel (e.g. Save Project) closes it afterward,
+            // except the Hazard dropdown language <select> itself - closing on its own
+            // click would swallow the option-picking interaction.
+            panel.addEventListener('click', (e) => {
+                if (e.target.closest('select')) return;
+                panel.classList.remove('rab-dropdown-open');
+            });
+        }
+        initRabDropdown(document.getElementById('projectMenuBtn'), document.getElementById('projectMenuPanel'));
+        initRabDropdown(document.getElementById('languageMenuBtn'), document.getElementById('languageMenuPanel'));
+        document.addEventListener('click', () => {
+            document.querySelectorAll('.rab-dropdown-panel.rab-dropdown-open').forEach(p => p.classList.remove('rab-dropdown-open'));
+        });
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                document.querySelectorAll('.rab-dropdown-panel.rab-dropdown-open').forEach(p => p.classList.remove('rab-dropdown-open'));
+            }
+        });
 
         if (translateCancelBtn) {
             translateCancelBtn.onclick = () => translationModal.style.display = 'none';

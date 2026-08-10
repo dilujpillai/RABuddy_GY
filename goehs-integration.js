@@ -5330,9 +5330,11 @@ async function generateExcelWithSheets() {
         return;
     }
 
-    // ── Language detection ──
-    // Reads from localStorage (same key used by the main app language switcher)
-    const exportLang = localStorage.getItem('appLanguage') || 'en';
+    // ── Language ──
+    // Uses the modal's own Hazard dropdown language (goehsHazardDropdownLang), not the
+    // global appLanguage UI toggle - that only covers en/fr/de and is a different control
+    // from the one the user actually sees next to the Hazard/Sub-Hazard dropdowns here.
+    const exportLang = goehsHazardDropdownLang || 'en';
 
     const meta = {
         orgName: document.getElementById('goehsOrgName').value,
