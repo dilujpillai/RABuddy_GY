@@ -2635,6 +2635,21 @@
                         <button id="aiFixMainTableBtn" class="rab-btn rab-c-amber" title="Scan all rows and auto-correct Hazard Group / Hazard List / Risk-Consequences values that don't match the standard dropdown options">🔧 AI Fix Hazard/Risk</button>
                         <button id="aiClosestMatchBtn" class="rab-btn rab-c-blue" title="For any Hazard Group / Hazard List / Risk-Consequences dropdown still outlined red after AI Fix, apply the closest standard entry as a best-guess suggestion for you to review">🎯 Suggest Closest Match</button>
                         <span id="mainTableIssuePill" title="Hazard Group / Hazard List / Risk-Consequences dropdowns that don't match a standard entry" class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-700">✓ 0 issues</span>
+                        <label class="text-[11px] text-slate-600 font-semibold flex items-center gap-2 px-2 py-1 rounded-md border border-slate-200 bg-white" title="Language shown in the Hazard Group and Hazard List dropdowns. Auto-detected from imported Excel sheets when possible.">
+                            🌐 Hazard dropdown language
+                            <select id="hazardLangSelect" class="border border-slate-300 rounded px-2 py-1 text-[11px] bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-300">
+                                <option value="en">English</option>
+                                <option value="fr">Français</option>
+                                <option value="de">Deutsch</option>
+                                <option value="es">Español</option>
+                                <option value="pl">Polski</option>
+                                <option value="pt">Português</option>
+                                <option value="sl">Slovenščina</option>
+                                <option value="tr">Türkçe</option>
+                                <option value="zh">中文</option>
+                                <option value="th">ไทย</option>
+                            </select>
+                        </label>
                     </div>
                 </div>
                 <div class="table-wrapper overflow-x-auto" id="table-container">
@@ -4143,6 +4158,85 @@
             return langMap[key] || key;
         };
 
+        // ============================================================
+        // Hazard Group / Hazard List dropdown language - deliberately independent
+        // from currentLang (the full UI chrome toggle above, which only has en/fr/de
+        // and would show a half-translated page for the other languages). This only
+        // ever changes the *option labels* of the Hazard Group and Hazard List
+        // dropdowns; the underlying <option value> is always the canonical English
+        // registry key, so switching languages never invalidates existing selections.
+        // ============================================================
+        const HAZARD_LANG_NAMES = {
+            en: 'English', fr: 'Français', de: 'Deutsch', es: 'Español',
+            pl: 'Polski', pt: 'Português', sl: 'Slovenščina', tr: 'Türkçe',
+            zh: '中文', th: 'ไทย'
+        };
+        // Lives on window, not as a local let: this modal/toolbar code is split across
+        // two separate isolated IIFEs ("App 1" / "App 2") elsewhere in this file, so a
+        // plain top-level variable here would be invisible to code in the other scope -
+        // same reason buildTableFromData etc. are exposed via window elsewhere in this file.
+        window.hazardDropdownLang = localStorage.getItem('hazardDropdownLang') || 'en';
+        function tHazard(key, lang) {
+            if (!key) return key;
+            const l = lang || window.hazardDropdownLang;
+            if (l === 'en') return key;
+            // Reads window.TRANSLATIONS directly rather than the module-scoped TRANSLATIONS
+            // const above (bound to `window.TRANSLATIONS || {}` before ra-registry.js has
+            // actually loaded and populated it, since that <script src> tag sits near the
+            // bottom of the page - the local const permanently keeps its empty fallback).
+            const langMap = window.TRANSLATIONS?.[l];
+            if (!langMap) return key;
+            return langMap[key] || key;
+        }
+        // Relabels every option of a hazard-registry <select> in place - value and
+        // selection are untouched, only the visible text changes.
+        function relabelHazardSelect(sel, lang) {
+            if (!sel) return;
+            Array.from(sel.options).forEach(opt => {
+                if (opt.value) opt.textContent = tHazard(opt.value, lang);
+            });
+        }
+        function relabelHazardDropdownsInLanguage(lang) {
+            document.querySelectorAll('#table-container .group select').forEach(sel => relabelHazardSelect(sel, lang));
+            document.querySelectorAll('#table-container .hazard-list-cell select').forEach(sel => relabelHazardSelect(sel, lang));
+        }
+        window.relabelHazardDropdownsInLanguage = relabelHazardDropdownsInLanguage;
+        window.tHazard = tHazard;
+        // Scores each candidate language by how many of the sample values exactly
+        // match one of its translated Hazard Group/List strings, and only returns a
+        // language when the match is confident - a single coincidental match (e.g. a
+        // short generic word) should not silently flip the whole table's language.
+        function detectHazardDropdownLanguage(sampleTexts) {
+            const samples = (sampleTexts || []).map(s => String(s || '').trim()).filter(Boolean);
+            if (samples.length === 0) return '';
+            const scores = {};
+            Object.keys(window.TRANSLATIONS || {}).forEach(lang => {
+                if (lang === 'en') return;
+                const valueSet = new Set(Object.values(window.TRANSLATIONS[lang]).map(v => String(v).toLowerCase()));
+                const hits = samples.filter(s => valueSet.has(s.toLowerCase())).length;
+                if (hits > 0) scores[lang] = hits;
+            });
+            let best = '', bestScore = 0;
+            Object.entries(scores).forEach(([lang, score]) => { if (score > bestScore) { bestScore = score; best = lang; } });
+            const threshold = Math.max(2, Math.ceil(samples.length * 0.3));
+            return bestScore >= threshold ? best : '';
+        }
+        window.detectHazardDropdownLanguage = detectHazardDropdownLanguage;
+        function autoDetectAndApplyHazardLang(rows) {
+            const samples = [];
+            (rows || []).slice(0, 30).forEach(row => {
+                if (row['Hazard Group']) samples.push(row['Hazard Group']);
+                if (row['Hazard List']) samples.push(row['Hazard List']);
+            });
+            const detected = detectHazardDropdownLanguage(samples);
+            if (detected && detected !== window.hazardDropdownLang) {
+                window.hazardDropdownLang = detected;
+                localStorage.setItem('hazardDropdownLang', detected);
+                const sel = document.getElementById('hazardLangSelect');
+                if (sel) sel.value = detected;
+            }
+        }
+
         // --- NEW: Moved helper functions and classes to IIFE scope ---
         // --- NEW: Helper function to split an array into chunks ---
         const chunkArray = (arr, size) =>
@@ -4637,6 +4731,12 @@ data.forEach((row, index) => {
             // Update control measure indicators on all rows
             updateAllControlIndicators();
             // --- END NEW ---
+            // Detect the Hazard Group/List language from the incoming data (e.g. an
+            // Excel sheet already in Spanish) and switch the dropdowns to match; if
+            // detection is inconclusive this leaves whatever language was already
+            // selected (including a prior manual choice) untouched.
+            autoDetectAndApplyHazardLang(data);
+            relabelHazardDropdownsInLanguage(window.hazardDropdownLang);
             if (typeof updateMainTableIssuePill === 'function') updateMainTableIssuePill();
         }
 
@@ -8962,6 +9062,16 @@ window.LIKELIHOOD_SCALE = LIKELIHOOD_SCALE;
         const aiClosestMatchBtn = document.getElementById('aiClosestMatchBtn');
         if (aiClosestMatchBtn) {
             aiClosestMatchBtn.onclick = closestMatchRemainingMismatches;
+        }
+
+        const hazardLangSelect = document.getElementById('hazardLangSelect');
+        if (hazardLangSelect) {
+            hazardLangSelect.value = window.hazardDropdownLang;
+            hazardLangSelect.addEventListener('change', (e) => {
+                window.hazardDropdownLang = e.target.value;
+                localStorage.setItem('hazardDropdownLang', window.hazardDropdownLang);
+                window.relabelHazardDropdownsInLanguage(window.hazardDropdownLang);
+            });
         }
 
         if (translateCancelBtn) {
@@ -18287,9 +18397,14 @@ async function loadSourceImages(sheetIndex) {
         }
 
         function rowLooksUserProvided(row, sourceItem, rowsForImage) {
+            // "user" is a strong positive signal - trust it outright. "ai" is NOT trusted
+            // the same way: it's the model's own self-tagging, and when a preset rating
+            // exists but the step wasn't actually split into multiple distinct hazards
+            // (rowsForImage === 1), a mistaken "ai" tag must not be allowed to veto the
+            // one row that should be carrying the user's original F/S/L values - that was
+            // silently dropping presets whenever the model mislabeled the row's origin.
             const hint = rowOriginHint(row);
             if (hint === 'user') return true;
-            if (hint === 'ai') return false;
 
             const userHazards = splitUserHazards(sourceItem && sourceItem.hazards);
             if (userHazards.length > 0) {
@@ -20154,7 +20269,7 @@ ${body}
    * Reflect the user's hazard text in the "Hazard Source" field to preserve their original observation.
 4. **User Pre-Rated Hazards (PRIORITY):** If the ENTRY contains USER RATINGS (Frequency, Severity, Likelihood), you MUST preserve those exact numeric values in JSON objects for hazards they identified.
 5. **AI Additional Hazard Identification (Fill the Gaps):** After capturing all user hazards, identify ANY ADDITIONAL plausible direct, indirect, and hidden hazards the user may have missed. For EACH, create a separate JSON object. The same "Steps" value will appear in multiple objects when a step has multiple hazards.
-6. **Row Origin Tag (required for rating retention):** Add "__rowOrigin":"user" for rows that represent user-provided hazards. Add "__rowOrigin":"ai" for rows created as additional AI hazards.
+6. **Row Origin Tag (required for rating retention):** Add "__rowOrigin":"user" for rows that represent user-provided hazards. Add "__rowOrigin":"ai" ONLY for a row covering a genuinely different additional hazard you identified yourself. If an ENTRY has USER RATINGS and you are creating only ONE JSON object for it (no additional hazard was split out), that single object always represents the user's own hazard - tag it "__rowOrigin":"user", never "ai".
 7. **Match Hazard:** Select the single most appropriate "Hazard List" item from the Registry (EXACT registry value).
 8. **Match Consequence:** Select the single most appropriate "Risk/Consequences" item from the Registry (EXACT registry value).
 9. **Infer Details:** Infer "Hazard Source", suggest "Current Control", and classify "Routine/Non-Routine/Emergency Situation" as one of: "Routine", "Non-Routine", "Emergency Situation".
@@ -21438,6 +21553,21 @@ ${JSON.stringify(payload, null, 2)}`;
                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
                                 Add Row
                             </button>
+                            <label class="text-[11px] text-slate-600 font-semibold flex items-center gap-2 px-2 py-1 rounded-md border border-slate-200 bg-white" title="Language shown in the Hazard Category and Sub-Hazard dropdowns below. Auto-detected from imported Excel sheets when possible.">
+                                🌐 Hazard dropdown language
+                                <select id="goehsHazardLangSelect" class="border border-slate-300 rounded px-2 py-1 text-[11px] bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-300">
+                                    <option value="en">English</option>
+                                    <option value="fr">Français</option>
+                                    <option value="de">Deutsch</option>
+                                    <option value="es">Español</option>
+                                    <option value="pl">Polski</option>
+                                    <option value="pt">Português</option>
+                                    <option value="sl">Slovenščina</option>
+                                    <option value="tr">Türkçe</option>
+                                    <option value="zh">中文</option>
+                                    <option value="th">ไทย</option>
+                                </select>
+                            </label>
                         </div>
                     </div>
                     <div class="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">

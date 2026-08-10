@@ -1698,6 +1698,40 @@ function goehsUiLabel(val) {
     return val;
 }
 
+// ============================================================
+// GOEHS hazard-category/sub-hazard dropdown language - deliberately independent from
+// the appLanguage used by goehsUiLabel() above for everything else in this modal (ladder
+// levels, outcomes, general chrome), since only Hazard Category/Sub-Hazard translations
+// exist for the newer languages (es/pl/pt/sl/tr/zh/th). Defaults to whatever the main
+// table's own hazard-dropdown language is already set to, since GOEHS hazards are
+// populated FROM the main table and are usually already in that same language.
+// ============================================================
+let goehsHazardDropdownLang = localStorage.getItem('goehsHazardDropdownLang')
+    || localStorage.getItem('hazardDropdownLang') || 'en';
+// Once the user picks a language directly in this modal, stop auto-inheriting from the
+// main table for the rest of the session - their explicit choice here should stick.
+let goehsHazardDropdownLangManual = false;
+function goehsHazardLabel(englishKey, lang) {
+    if (!englishKey) return englishKey;
+    const l = lang || goehsHazardDropdownLang;
+    if (l === 'en') return englishKey;
+    const langMap = window.TRANSLATIONS?.[l];
+    if (!langMap) return englishKey;
+    return langMap[englishKey] || englishKey;
+}
+function relabelGoehsHazardSelect(sel, lang) {
+    if (!sel) return;
+    Array.from(sel.options).forEach(opt => {
+        if (opt.value) opt.textContent = goehsHazardLabel(opt.value, lang);
+    });
+}
+function relabelGoehsHazardDropdownsInLanguage(lang) {
+    document.querySelectorAll('#hazardTableBody .hazard-category').forEach(sel => relabelGoehsHazardSelect(sel, lang));
+    document.querySelectorAll('#hazardTableBody .hazard-sub').forEach(sel => relabelGoehsHazardSelect(sel, lang));
+}
+window.relabelGoehsHazardDropdownsInLanguage = relabelGoehsHazardDropdownsInLanguage;
+window.goehsHazardLabel = goehsHazardLabel;
+
 const GOEHS_CONDITION_MODES = ['Routine', 'Non-Routine', 'Emergency Situation'];
 
 function parseGoehsConditionMode(rawValue) {
@@ -2857,8 +2891,24 @@ function populateGoehsHazardsFromTable(tableData) {
     // Auto-apply countermeasure ladder suggestions based on control descriptions
     setTimeout(() => autoApplyCountermeasureSuggestions(), 100);
 
+    // Inherit the main table's hazard-dropdown language rather than re-detecting: the
+    // hazard/category values pulled in above (h.hazardGroup / h.hazardList) are always the
+    // canonical English registry key (that's what the main table's <select> value holds,
+    // by design, regardless of what language it's currently displayed in), so there is
+    // nothing non-English left to detect from by the time data reaches this modal. The
+    // main table already did the real detection when the Excel sheet was imported: reuse
+    // that result here, unless the user has explicitly picked a different language in this
+    // modal's own dropdown, which then sticks for the rest of the session.
+    if (!goehsHazardDropdownLangManual && window.hazardDropdownLang && window.hazardDropdownLang !== goehsHazardDropdownLang) {
+        goehsHazardDropdownLang = window.hazardDropdownLang;
+        localStorage.setItem('goehsHazardDropdownLang', goehsHazardDropdownLang);
+        const sel = document.getElementById('goehsHazardLangSelect');
+        if (sel) sel.value = goehsHazardDropdownLang;
+    }
+    relabelGoehsHazardDropdownsInLanguage(goehsHazardDropdownLang);
+
     scheduleGoehsIssueCounterRefresh();
-    
+
     console.log(`✅ Populated ${tableData.hazards.length} hazards in table format from risk table`);
 }
 
@@ -2926,7 +2976,7 @@ function addHazardTableRow() {
     ).join('');
 
     const categoryOptions = Object.keys(HAZARD_CATEGORIES).map(cat =>
-        `<option value="${cat}">${goehsUiLabel(cat)}</option>`
+        `<option value="${cat}">${goehsHazardLabel(cat)}</option>`
     ).join('');
 
     const freqOpts = (vals) => vals.map(v => `<option value="${v}">${v}</option>`).join('');
@@ -3088,7 +3138,7 @@ function updateTableSubHazards(selectElement, hazardId) {
         HAZARD_CATEGORIES[hazardCategory].forEach(sub => {
             const opt = document.createElement('option');
             opt.value = sub;
-            opt.textContent = goehsUiLabel(sub);
+            opt.textContent = goehsHazardLabel(sub);
             subSelect.appendChild(opt);
         });
     }
@@ -3714,6 +3764,17 @@ document.addEventListener('DOMContentLoaded', function() {
             syncGoehsHazardFieldToMainTable(sourceRowIndex, 'currentControl', e.target.value);
         }
     });
+
+    const goehsHazardLangSelect = document.getElementById('goehsHazardLangSelect');
+    if (goehsHazardLangSelect) {
+        goehsHazardLangSelect.value = goehsHazardDropdownLang;
+        goehsHazardLangSelect.addEventListener('change', (e) => {
+            goehsHazardDropdownLang = e.target.value;
+            goehsHazardDropdownLangManual = true;
+            localStorage.setItem('goehsHazardDropdownLang', goehsHazardDropdownLang);
+            relabelGoehsHazardDropdownsInLanguage(goehsHazardDropdownLang);
+        });
+    }
 
     // AI Assist button in Final Review header
     const goehsAiAssistBtn = document.getElementById('goehsAiAssistBtn');
