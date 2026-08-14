@@ -371,6 +371,17 @@
             outline-offset: 1px;
         }
         .text-hazard-invalid { color: #ef4444; font-weight: 600; }
+        /* Risk/Consequences: a value not in the internal English registry is usually just
+           localized/imported text, not an error - flagged with a softer indigo outline
+           (vs. red for Hazard Group/List) and never auto-overwritten by AI Fix. */
+        .consequence-nonstandard {
+            outline: 2px solid #a5b4fc;
+            outline-offset: 1px;
+        }
+        .modal-consequence-nonstandard {
+            outline: 2px solid #a5b4fc;
+            outline-offset: 1px;
+        }
         
         /* GOEHS Visual Highlighting Styles */
         .goehs-empty-required {
@@ -585,6 +596,57 @@
         }
 
         #goehsModal .goehs-btn-ai:hover {
+            background: linear-gradient(90deg, #db2777 0%, #be123c 100%);
+        }
+
+        /* Same visual style as #goehsModal .goehs-btn above, but NOT scoped to #goehsModal -
+           needed because the Fix Countermeasure Ladder flyout panel is reparented to <body>
+           (see window.initRabDropdown) to escape the modal's scroll clipping, which also
+           takes it out of #goehsModal's DOM subtree and out of reach of that scoped CSS. */
+        .goehs-flyout-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: flex-start;
+            gap: 0.45rem;
+            width: 100%;
+            min-height: 38px;
+            padding: 0.55rem 0.95rem;
+            border-radius: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.24);
+            color: #ffffff;
+            font-size: 0.8rem;
+            font-weight: 600;
+            line-height: 1;
+            box-shadow: 0 6px 16px rgba(15, 23, 42, 0.13);
+            transition: transform 0.18s ease, box-shadow 0.18s ease, filter 0.18s ease;
+            cursor: pointer;
+        }
+
+        .goehs-flyout-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 10px 20px rgba(15, 23, 42, 0.2);
+            filter: brightness(1.02);
+        }
+
+        .goehs-flyout-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .goehs-flyout-btn-indigo {
+            background: #002c5f;
+        }
+
+        .goehs-flyout-btn-indigo:hover {
+            background: #001f43;
+        }
+
+        .goehs-flyout-btn-ai {
+            background: linear-gradient(90deg, #ec4899 0%, #e11d48 100%);
+        }
+
+        .goehs-flyout-btn-ai:hover {
             background: linear-gradient(90deg, #db2777 0%, #be123c 100%);
         }
 
@@ -1586,6 +1648,11 @@
         .batch-review-table .hz-select { max-width: 180px; }
         .batch-review-table .hz-select.mismatch {
             border: 2px solid #ef4444; color: #dc2626; background: #fef2f2;
+        }
+        /* Risk/Consequences: not in the internal English registry is usually just localized/
+           imported text, not an error - soft indigo instead of red, never auto-fixed. */
+        .batch-review-table .hz-select.nonstandard {
+            border: 2px solid #a5b4fc; color: #3730a3; background: #eef2ff;
         }
 
     </style>
@@ -2659,9 +2726,9 @@
 
                         <button id="remapColumnsBtn" class="rab-btn rab-c-slate rab-hidden" title="Re-map Excel columns if data wasn't imported correctly"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/></svg>Remap Columns</button>
 
-                        <button id="aiFixMainTableBtn" class="rab-btn rab-c-amber" title="Scan all rows and auto-correct Hazard Group / Hazard List / Risk-Consequences values that don't match the standard dropdown options">🔧 AI Fix Hazard/Risk</button>
-                        <button id="aiClosestMatchBtn" class="rab-btn rab-c-blue" title="For any Hazard Group / Hazard List / Risk-Consequences dropdown still outlined red after AI Fix, apply the closest standard entry as a best-guess suggestion for you to review">🎯 Suggest Closest Match</button>
-                        <span id="mainTableIssuePill" title="Hazard Group / Hazard List / Risk-Consequences dropdowns that don't match a standard entry" class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-700">✓ 0 issues</span>
+                        <button id="aiFixMainTableBtn" class="rab-btn rab-c-amber" title="Scan all rows and auto-correct Hazard Group / Hazard List values that don't match the standard dropdown options. Risk/Consequences is left as-is (see the indigo-outlined dropdown) since it's often localized/imported text.">🔧 AI Fix Hazard/Risk</button>
+                        <button id="aiClosestMatchBtn" class="rab-btn rab-c-blue" title="For any Hazard Group / Hazard List dropdown still outlined red after AI Fix, apply the closest standard entry as a best-guess suggestion for you to review">🎯 Suggest Closest Match</button>
+                        <span id="mainTableIssuePill" title="Hazard Group / Hazard List dropdowns that don't match a standard entry" class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-700">✓ 0 issues</span>
                     </div>
                 </div>
                 <div class="table-wrapper overflow-x-auto" id="table-container">
@@ -4724,13 +4791,15 @@ data.forEach((row, index) => {
                     }
                 });
 
-                // Mark consequence dropdowns that are not in the standard registry
+                // Mark consequence dropdowns that are not in the standard registry - soft
+                // indigo outline, not red, since this is usually just localized/imported
+                // text rather than a genuine error (see .consequence-nonstandard above).
                 const consequenceCells = tableContainer.querySelectorAll('.consequence-cell select');
                 consequenceCells.forEach(sel => {
                     if (!CONSEQUENCE_REGISTRY.includes(sel.value)) {
-                        sel.classList.add('hazard-invalid');
+                        sel.classList.add('consequence-nonstandard');
                     } else {
-                        sel.classList.remove('hazard-invalid');
+                        sel.classList.remove('consequence-nonstandard');
                     }
                 });
             
@@ -5091,9 +5160,9 @@ data.forEach((row, index) => {
                 const consequenceSelect = consequenceTd.querySelector('select');
                 if (consequenceSelect) {
                     if (CONSEQUENCE_REGISTRY.includes(consequenceSelect.value)) {
-                        consequenceSelect.classList.remove('hazard-invalid');
+                        consequenceSelect.classList.remove('consequence-nonstandard');
                     } else {
-                        consequenceSelect.classList.add('hazard-invalid');
+                        consequenceSelect.classList.add('consequence-nonstandard');
                     }
                 }
             }
@@ -5101,19 +5170,20 @@ data.forEach((row, index) => {
             updateDashboardMetrics();
         }
 
-        // ===== Live "N issues" pill: counts Hazard Group / Hazard List / Risk-Consequences =====
-        // ===== dropdowns that don't match a standard entry, kept in sync via one delegated =====
-        // ===== change listener on #table-container rather than threading update calls =====
-        // ===== through every place a row can be built, fixed, or edited. =====
+        // ===== Live "N issues" pill: counts Hazard Group / Hazard List dropdowns that =====
+        // ===== don't match a standard entry, kept in sync via one delegated change =====
+        // ===== listener on #table-container rather than threading update calls through =====
+        // ===== every place a row can be built, fixed, or edited. Risk/Consequences is =====
+        // ===== intentionally excluded - a non-registry value there is normal for =====
+        // ===== localized/imported text (soft indigo outline, not a red "issue"), and =====
+        // ===== is never auto-overwritten by AI Fix / Suggest Closest Match. =====
         function countMainTableIssues() {
             const rows = document.querySelectorAll('#table-container tbody tr:not(.deleted-row)');
             let n = 0;
             rows.forEach(row => {
                 const groupSel = row.querySelector('.group select');
                 const hazSel = row.querySelector('.hazard-list-cell select');
-                const consSel = row.querySelector('.consequence-cell select');
                 if (hazSel && !HAZARD_REGISTRY[hazSel.value]) n++;
-                if (consSel && !CONSEQUENCE_REGISTRY.includes(consSel.value)) n++;
                 if (groupSel && !HAZARD_GROUPS.includes(groupSel.value)) n++;
             });
             return n;
@@ -5197,12 +5267,14 @@ data.forEach((row, index) => {
             select.addEventListener('focus', clearGlow, { once: true });
         }
 
-        // Second pass: for any Hazard Group / Hazard List / Risk-Consequences field still
-        // mismatched after AI Fix (either never run, or the AI genuinely couldn't resolve
-        // it), apply the closest standard entry purely by edit-distance as a starting
-        // suggestion - no AI call, no confidence threshold, always picks something. Marked
-        // with a dashed amber outline (not the solid green "confident fix" one) so the user
-        // knows to double-check it rather than trust it outright.
+        // Second pass: for any Hazard Group / Hazard List field still mismatched after AI
+        // Fix (either never run, or the AI genuinely couldn't resolve it), apply the
+        // closest standard entry purely by edit-distance as a starting suggestion - no AI
+        // call, no confidence threshold, always picks something. Marked with a dashed
+        // amber outline (not the solid green "confident fix" one) so the user knows to
+        // double-check it rather than trust it outright. Risk/Consequences is intentionally
+        // left alone here - snapping it to the (English-only) registry would silently
+        // translate away localized/imported text; see .consequence-nonstandard above.
         function closestMatchRemainingMismatches() {
             const rows = Array.from(document.querySelectorAll('#table-container tbody tr'));
             if (rows.length === 0) {
@@ -5215,14 +5287,9 @@ data.forEach((row, index) => {
             rows.forEach(row => {
                 const groupSel = row.querySelector('.group select');
                 const hazSel = row.querySelector('.hazard-list-cell select');
-                const consSel = row.querySelector('.consequence-cell select');
 
                 if (hazSel && !HAZARD_REGISTRY[hazSel.value]) {
                     setSelectValueAndFire(hazSel, snapToRegistryList(hazSel.value, HAZ_KEYS_LOCAL), true);
-                    count++;
-                }
-                if (consSel && !CONSEQUENCE_REGISTRY.includes(consSel.value)) {
-                    setSelectValueAndFire(consSel, snapToRegistryList(consSel.value, CONSEQUENCE_REGISTRY), true);
                     count++;
                 }
                 // Re-check group after the hazard fix above may already have cascaded it.
@@ -5261,7 +5328,10 @@ data.forEach((row, index) => {
             rows.forEach(row => {
                 const groupSel = row.querySelector('.group select');
                 const hazSel = row.querySelector('.hazard-list-cell select');
-                const consSel = row.querySelector('.consequence-cell select');
+                // Risk/Consequences is intentionally NOT touched here - snapping/AI-fixing it
+                // against the English-only CONSEQUENCE_REGISTRY would silently translate away
+                // localized/imported text. It keeps its original value; see the soft indigo
+                // .consequence-nonstandard outline instead of a red "fix me" one.
 
                 if (hazSel && !HAZARD_REGISTRY[hazSel.value]) {
                     const orig = hazSel.value;
@@ -5272,18 +5342,6 @@ data.forEach((row, index) => {
                         localFixed++;
                     } else {
                         unresolved.push({ field: 'hazard', value: orig, select: hazSel });
-                    }
-                }
-
-                if (consSel && !CONSEQUENCE_REGISTRY.includes(consSel.value)) {
-                    const orig = consSel.value;
-                    const snap = snapToRegistryList(orig, CONSEQUENCE_REGISTRY);
-                    const dist = levenshteinDist(orig, snap);
-                    if (dist <= 6) {
-                        setSelectValueAndFire(consSel, snap);
-                        localFixed++;
-                    } else {
-                        unresolved.push({ field: 'cons', value: orig, select: consSel });
                     }
                 }
 
@@ -5315,10 +5373,9 @@ data.forEach((row, index) => {
                 // structurally prevented it from picking off the wrong list.
                 const fieldConfig = {
                     hazard: { registry: HAZ_KEYS_LOCAL, label: 'Hazard List' },
-                    cons: { registry: CONSEQUENCE_REGISTRY, label: 'Risk/Consequences' },
                     group: { registry: HAZARD_GROUPS, label: 'Hazard Group' }
                 };
-                const byField = { hazard: [], cons: [], group: [] };
+                const byField = { hazard: [], group: [] };
                 unresolved.forEach(u => byField[u.field].push(u));
 
                 for (const field of Object.keys(byField)) {
@@ -5378,7 +5435,7 @@ ${JSON.stringify(payload, null, 2)}`;
             showCustomAlert(
                 total > 0
                     ? `✅ AI Fix: ${total} fixed (${localFixed} local + ${aiFixedCount} AI).${remaining > 0 ? ` ${remaining} remaining unresolved — click "Suggest Closest Match" for a best-guess starting point on those.` : ''}`
-                    : 'No Hazard Group / Hazard List / Risk-Consequences mismatches found.',
+                    : 'No Hazard Group / Hazard List mismatches found.',
                 total > 0 ? 'success' : 'info'
             );
         }
@@ -6706,9 +6763,9 @@ ${JSON.stringify(payload, null, 2)}`;
             if (consequenceSelect) {
                 const applyConsequenceValidity = () => {
                     if (!CONSEQUENCE_REGISTRY.includes(consequenceSelect.value)) {
-                        consequenceSelect.classList.add('modal-hazard-invalid');
+                        consequenceSelect.classList.add('modal-consequence-nonstandard');
                     } else {
-                        consequenceSelect.classList.remove('modal-hazard-invalid');
+                        consequenceSelect.classList.remove('modal-consequence-nonstandard');
                     }
                 };
                 applyConsequenceValidity();
@@ -9112,9 +9169,18 @@ window.LIKELIHOOD_SCALE = LIKELIHOOD_SCALE;
                 panel.classList.remove('rab-dropdown-open');
             });
         }
+        // Exposed so goehs-integration.js can wire up its own flyout menus (e.g. the
+        // Fix Countermeasure Ladder AI/Intelligent picker) with this same proven
+        // open/close/reposition/outside-click-close behavior instead of duplicating it.
+        window.initRabDropdown = initRabDropdown;
         initRabDropdown(document.getElementById('projectMenuBtn'), document.getElementById('projectMenuPanel'));
         initRabDropdown(document.getElementById('languageMenuBtn'), document.getElementById('languageMenuPanel'));
-        document.addEventListener('click', () => {
+        // Only treat this as an "outside click" if it didn't originate inside an open
+        // panel - panels handle their own internal clicks (see initRabDropdown above),
+        // and opening a <select> fires a click that bubbles here before an option is
+        // even chosen, which would otherwise hide the panel (display:none) mid-interaction.
+        document.addEventListener('click', (e) => {
+            if (e.target.closest('.rab-dropdown-panel')) return;
             document.querySelectorAll('.rab-dropdown-panel.rab-dropdown-open').forEach(p => p.classList.remove('rab-dropdown-open'));
         });
         document.addEventListener('keydown', (e) => {
@@ -18641,10 +18707,13 @@ ${JSON.stringify(payload)}`;
             }
             return best;
         }
+        // NOTE: 'cons' (Risk/Consequences) is intentionally NOT a recognized field here - a
+        // value not in the English-only CONS_LIST registry is usually just localized/imported
+        // text, not an error. It's never counted as a mismatch and never auto-snapped/AI-fixed
+        // (see ddCons/wireTabTable for its own soft indigo indicator instead).
         function isMismatch(field, val) {
             const v = String(val||'').trim();
             if (field === 'hazard') return !HAZARD_REGISTRY[v];
-            if (field === 'cons') return !CONS_LIST.includes(v);
             if (field === 'group') return !GRP_KEYS.includes(v);
             if (field === 'freq') return !FREQ_KEYS.includes(String(v));
             if (field === 'sev') return !SEV_KEYS.includes(String(v));
@@ -18655,7 +18724,6 @@ ${JSON.stringify(payload)}`;
             let n = 0;
             (rows||[]).forEach(r => {
                 if (isMismatch('hazard', r['Hazard List'])) n++;
-                if (isMismatch('cons', r['Risk/Consequences'])) n++;
                 if (isMismatch('group', r['Hazard Group'])) n++;
                 if (isMismatch('freq', r['Frequency'])) n++;
                 if (isMismatch('sev', r['Severity'])) n++;
@@ -18946,6 +19014,9 @@ ${JSON.stringify(payload)}`;
   .mt-tbl input[type=text]:focus, .mt-tbl textarea:focus { border-color: #64748b; outline: none; box-shadow: 0 0 0 2px rgba(71,85,105,0.15); }
     .mt-tbl select { border: 1px solid #e2e8f0; border-radius: 4px; padding: 4px; font-size: 0.7rem; background: #fff; min-width: 72px; max-width: 180px; width: 100%; }
   .mt-tbl select.mt-mm { border: 2px solid #ef4444 !important; background: #fef2f2 !important; color: #b91c1c !important; font-weight: 600; box-shadow: 0 0 0 2px rgba(239,68,68,0.12); }
+  /* Risk/Consequences: not in the internal English registry is usually just localized/
+     imported text, not an error - soft indigo instead of red, and never auto-snapped. */
+  .mt-tbl select.mt-mm-soft { border: 2px solid #a5b4fc !important; background: #eef2ff !important; color: #3730a3 !important; font-weight: 600; box-shadow: 0 0 0 2px rgba(165,180,252,0.12); }
   .mt-tbl .mt-score { font-weight: 700; font-size: 0.82rem; }
   .mt-pill.mt-active { background: rgba(255,255,255,0.95) !important; color: #002c5f !important; opacity: 1 !important; }
   .mt-pill.mt-done { background: rgba(34,197,94,0.85) !important; color: #fff !important; opacity: 1 !important; }
@@ -20661,7 +20732,9 @@ ${body}
                 const mm = !CONS_LIST.includes(val);
                 const opts = CONS_LIST.map(c => `<option value="${escAttr(c)}" ${c===val?'selected':''}>${escH(c)}</option>`).join('');
                 const extra = mm && val ? `<option value="${escAttr(val)}" selected>${escH(val)} (unknown)</option>` : '';
-                return `<select class="mt-fld ${mm?'mt-mm':''}" data-fld="cons">${extra}${opts}</select>`;
+                // Soft indigo, not red - a non-registry value here is usually just localized/
+                // imported text, not an error, and is never auto-snapped by AI Fix.
+                return `<select class="mt-fld ${mm?'mt-mm-soft':''}" data-fld="cons">${extra}${opts}</select>`;
             };
             const ddNum = (val, keys, field, scale) => {
                 const mm = !keys.includes(String(val));
@@ -20914,7 +20987,7 @@ ${remapPanel}
                             el.classList.toggle('mt-mm', !GRP_KEYS.includes(v));
                         } else if (fld === 'cons') {
                             tab.aiRows[ri]['Risk/Consequences'] = v;
-                            el.classList.toggle('mt-mm', !CONS_LIST.includes(v));
+                            el.classList.toggle('mt-mm-soft', !CONS_LIST.includes(v));
                         } else if (fld === 'freq') {
                             tab.aiRows[ri].Frequency = v;
                             el.classList.toggle('mt-mm', !FREQ_KEYS.includes(String(v)));
@@ -21176,14 +21249,10 @@ ${remapPanel}
                         unresolved.push({ idx, field: 'Hazard List', value: r['Hazard List'] });
                     }
                 }
-                if (isMismatch('cons', r['Risk/Consequences'])) {
-                    const snap = snapToList(r['Risk/Consequences'], CONS_LIST);
-                    if (levenshtein(String(r['Risk/Consequences']||''), snap) <= 6) {
-                        r['Risk/Consequences'] = snap;
-                    } else {
-                        unresolved.push({ idx, field: 'Risk/Consequences', value: r['Risk/Consequences'] });
-                    }
-                }
+                // Risk/Consequences is intentionally NOT touched here - snapping/AI-fixing it
+                // against the English-only CONS_LIST would silently translate away localized/
+                // imported text. It keeps its original value (soft indigo .mt-mm-soft outline
+                // instead of a red "fix me" one).
                 // A valid Hazard List fix above already cascades the correct group, so
                 // only attempt an independent fix if it's still mismatched afterward.
                 if (isMismatch('group', r['Hazard Group'])) {
@@ -21211,7 +21280,6 @@ ${remapPanel}
                     const payload = unresolved.map((u, i) => ({ id: i, field: u.field, value: String(u.value || '').slice(0, 200) }));
                     const prompt = `Map each item below to the closest registry value. Reply with ONLY a JSON array like [{"id":0,"mapped":"<exact registry value>"}].
 Hazard List registry: ${REG_HAZ}
-Risk/Consequences registry: ${REG_CONS}
 Hazard Group registry: ${JSON.stringify(GRP_KEYS)}
 Items:
 ${JSON.stringify(payload, null, 2)}`;
@@ -21225,8 +21293,6 @@ ${JSON.stringify(payload, null, 2)}`;
                             if (u.field === 'Hazard List' && HAZARD_REGISTRY[target]) {
                                 rows[u.idx]['Hazard List'] = target;
                                 rows[u.idx]['Hazard Group'] = HAZARD_REGISTRY[target]?.group || '';
-                            } else if (u.field === 'Risk/Consequences' && CONS_LIST.includes(target)) {
-                                rows[u.idx]['Risk/Consequences'] = target;
                             } else if (u.field === 'Hazard Group' && GRP_KEYS.includes(target)) {
                                 rows[u.idx]['Hazard Group'] = target;
                             }
@@ -21585,13 +21651,19 @@ ${JSON.stringify(payload, null, 2)}`;
                             <p class="text-slate-600 text-sm">Review and refine GOEHS batch upload rows before downloading the vendor XLSX.</p>
                         </div>
                         <div class="flex gap-2 flex-wrap goehs-actions">
-                            <button type="button" onclick="aiPopulateHazardFields()" class="goehs-btn goehs-btn-indigo" title="Use keyword matching to suggest Countermeasure Ladder">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
-                                ⚡ Intelligent Fill
-                            </button>
-                            <button type="button" id="goehsAiAssistBtn" class="goehs-btn goehs-btn-ai" title="Use AI (OpenRouter) to suggest controls and outcomes">
+                            <div class="rab-dropdown">
+                                <button type="button" id="goehsFixLadderBtn" class="goehs-btn goehs-btn-indigo" aria-haspopup="true" aria-expanded="false" title="Fix Countermeasure Ladder (Current + Predictive) - AI or local keyword matching">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                                    🎯 Fix Countermeasure Ladder ▾
+                                </button>
+                                <div id="goehsFixLadderPanel" class="rab-dropdown-panel" role="menu" aria-label="Fix Countermeasure Ladder options">
+                                    <button type="button" id="goehsFixLadderAiBtn" class="goehs-flyout-btn goehs-flyout-btn-ai" title="AI call - classifies control descriptions the local keyword engine couldn't match">🤖 AI</button>
+                                    <button type="button" id="goehsFixLadderIntelligentBtn" class="goehs-flyout-btn goehs-flyout-btn-indigo" title="Local keyword matching only - free and instant, may miss unusual phrasing">⚡ Intelligent</button>
+                                </div>
+                            </div>
+                            <button type="button" id="goehsAiAssistBtn" class="goehs-btn goehs-btn-ai" title="Use AI (OpenRouter) to correct Hazard / Sub-Hazard classification">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" /></svg>
-                                🤖 AI Assist
+                                🤖 AI Fix Hazard/Sub-Hazard
                             </button>
                             <span id="goehsIssueCounter" class="goehs-issue-badge" role="status" aria-live="polite" title="No unresolved issues in Final Review. Deleted rows are excluded.">Issues: 0</span>
                             <button type="button" onclick="resyncHazardsFromTable()" class="goehs-btn goehs-btn-indigo">
@@ -22455,7 +22527,11 @@ ${JSON.stringify(payload, null, 2)}`;
                 'Steps': item.task_name || '',
                 'Hazard Group': resolvedGroup,
                 'Hazard List': normalizedHazardType || 'Hand tools (cut, impact, puncture, etc.)',
-                'Risk/Consequences': normalizedConsequence || 'Laceration, Cut, Open wound',
+                // Risk/Consequences: keep the original imported/translated text when it doesn't
+                // match the English-only registry, instead of silently replacing it with an
+                // unrelated hardcoded default - see batchDetectMismatches for why this field
+                // isn't treated as a blocking mismatch either.
+                'Risk/Consequences': normalizedConsequence || consequence || 'Laceration, Cut, Open wound',
                 'Hazard Source': item.risk_scenario?.source || '',
                 'Current Control': item.mitigation_plan?.current_controls || '',
                 'Countermeasure_Ladder': cmLadder,
@@ -22584,7 +22660,12 @@ ${JSON.stringify(payload, null, 2)}`;
         return ''; // Not matched
     }
 
-    // ---- Detect mismatches: hazard list, consequence, group, AND missing countermeasures ----
+    // ---- Detect mismatches: hazard list, group, AND missing countermeasures ----
+    // Risk/Consequences is intentionally NOT flagged here - a value not in the English-only
+    // CONSEQUENCE_REGISTRY is usually just localized/imported text, not an error. Treating it
+    // as a mismatch would block "Ready" status and get it auto-translated away by the AI/local
+    // fuzzy fixers below. The Manual Review grid still shows it with a soft indigo outline
+    // (see .hz-select.nonstandard) purely as an FYI, never enforced.
     function batchDetectMismatches(tableData) {
         const mismatches = [];
         const validGroups = [...new Set(Object.values(HAZARD_REGISTRY).map(v => v.group))];
@@ -22597,16 +22678,6 @@ ${JSON.stringify(payload, null, 2)}`;
                     originalValue: row._rawHazardType || row['Hazard List'],
                     currentValue: row['Hazard List'],
                     type: 'hazardList'
-                });
-            }
-            // Consequence mismatch
-            if (!CONSEQUENCE_REGISTRY.includes(row['Risk/Consequences'])) {
-                mismatches.push({
-                    rowIndex: idx,
-                    field: 'Risk/Consequences',
-                    originalValue: row._rawConsequence || row['Risk/Consequences'],
-                    currentValue: row['Risk/Consequences'],
-                    type: 'consequence'
                 });
             }
             // Hazard Group not in known groups
@@ -22850,10 +22921,11 @@ ${JSON.stringify(payload, null, 2)}`;
                 ${hazardMismatch ? `<option value="${escapeHTML(curHazard)}" selected style="color:#dc2626">��  ${escapeHTML(curHazard)}</option>` : ''}
                 ${allHazardKeys.map(h => `<option value="${escapeHTML(h)}" ${!hazardMismatch && h === curHazard ? 'selected' : ''}>${escapeHTML(h)}</option>`).join('')}
             </select></td>`;
-            // Consequences (dropdown from CONSEQUENCE_REGISTRY)
-            html += `<td><select class="hz-select${consMismatch ? ' mismatch' : ''}" onchange="batchEditCell(${fileIdx},${rowIdx},'Risk/Consequences',this.value);this.classList.remove('mismatch')">
+            // Consequences (dropdown from CONSEQUENCE_REGISTRY) - soft indigo, not red, when
+            // not in the registry: usually just localized/imported text, never auto-fixed.
+            html += `<td><select class="hz-select${consMismatch ? ' nonstandard' : ''}" onchange="batchEditCell(${fileIdx},${rowIdx},'Risk/Consequences',this.value);this.classList.remove('nonstandard')">
                 <option value="">-- Select --</option>
-                ${consMismatch ? `<option value="${escapeHTML(curCons)}" selected style="color:#dc2626">��  ${escapeHTML(curCons)}</option>` : ''}
+                ${consMismatch ? `<option value="${escapeHTML(curCons)}" selected style="color:#3730a3">${escapeHTML(curCons)}</option>` : ''}
                 ${allConsequences.map(c => `<option value="${escapeHTML(c)}" ${!consMismatch && c === curCons ? 'selected' : ''}>${escapeHTML(c)}</option>`).join('')}
             </select></td>`;
             // Hazard Source (text)

@@ -546,12 +546,17 @@ function convertRA2025ToTableFormat(riskItems) {
     });
 }
 
-// Map control hierarchy text to Countermeasure Ladder values
+// Map control hierarchy text to Countermeasure Ladder values.
+// Returns '' (not a guessed default) when there's no text or no keyword match - a blank
+// field correctly signals "needs classification" so it surfaces to the Fix Countermeasure
+// Ladder AI/Intelligent tools (and the live issue counter) instead of silently looking
+// pre-resolved with a fabricated "Level 2 - Administrative Controls" that has no basis in
+// the actual content (this previously misclassified any non-English or unrecognized text).
 function mapHierarchyToCountermeasureLadder(hierarchy) {
-    if (!hierarchy) return 'Level 2 - Administrative Controls';
-    
+    if (!hierarchy) return '';
+
     const h = hierarchy.toLowerCase();
-    
+
     if (h.includes('elimination') || h.includes('eliminate') || h.includes('remove')) {
         return 'Level 6 - Elimination';
     }
@@ -570,9 +575,8 @@ function mapHierarchyToCountermeasureLadder(hierarchy) {
     if (h.includes('ppe') || h.includes('individual') || h.includes('personal') || h.includes('glove') || h.includes('goggle') || h.includes('helmet')) {
         return 'Level 1 - Individual Target';
     }
-    
-    // Default
-    return 'Level 2 - Administrative Controls';
+
+    return '';
 }
 
 // Helper: Enumerate all sheets in an Excel file
@@ -2720,14 +2724,10 @@ function populateGoehsHazardsFromTable(tableData) {
         const goehsCategory = findMatchingGoehsCategory(sourceCategory) || '';
         const goehsSubHazard = goehsCategory ? findMatchingGoehsSubHazard(goehsCategory, sourceSubHazard) : '';
 
-        const normalizedOutcome = window.reverseTranslate
-            ? (window.reverseTranslate(sourceOutcome) || sourceOutcome)
-            : sourceOutcome;
-        const outcomeRegistry = getGoehsOutcomeRegistry();
-
+        // Potential Outcome is confirmed free text in the GOEHS vendor template (no fixed
+        // whitelist) - unlike Hazard/Sub-Hazard, it's never validated against a registry.
         const categoryMismatch = !!sourceCategory && !goehsCategory;
         const subHazardMismatch = !!sourceSubHazard && !goehsSubHazard;
-        const outcomeMismatch = !!normalizedOutcome && !outcomeRegistry.includes(normalizedOutcome);
 
         const goehsFreq = mapFrequencyToGOEHS(hazard.frequency);
         const goehsSev = mapSeverityToGOEHS(hazard.severity);
@@ -2808,22 +2808,19 @@ function populateGoehsHazardsFromTable(tableData) {
                 </select>
             </td>
             <td class="p-1 border-r border-slate-200 bg-orange-50">
-                <select class="hazard-category w-full p-1 border border-slate-300 rounded text-xs bg-white${categoryMismatch ? ' goehs-mismatch' : ''}" onchange="this.classList.remove('goehs-mismatch');updateTableSubHazards(this, '${hazardId}')">
-                    <option value="">--</option>
+                <select class="hazard-category w-full p-1 border border-slate-300 rounded text-xs bg-white${categoryMismatch ? ' goehs-mismatch' : ''}"${categoryMismatch && sourceCategory ? ` data-raw-value="${escapeHtml(sourceCategory)}" title="No exact GOEHS match - imported value was: ${escapeHtml(sourceCategory)}"` : ''} onchange="this.classList.remove('goehs-mismatch');updateTableSubHazards(this, '${hazardId}')">
+                    <option value="">${categoryMismatch && sourceCategory ? escapeHtml(sourceCategory) + ' (unmatched)' : '--'}</option>
                     ${categoryOptions}
                 </select>
             </td>
             <td class="p-1 border-r border-slate-200 bg-orange-50">
-                <select class="hazard-sub w-full p-1 border border-slate-300 rounded text-xs bg-white${subHazardMismatch ? ' goehs-mismatch' : ''}" onchange="this.classList.remove('goehs-mismatch')">
-                    <option value="">--</option>
+                <select class="hazard-sub w-full p-1 border border-slate-300 rounded text-xs bg-white${subHazardMismatch ? ' goehs-mismatch' : ''}"${subHazardMismatch && sourceSubHazard ? ` data-raw-value="${escapeHtml(sourceSubHazard)}" title="No exact GOEHS match - imported value was: ${escapeHtml(sourceSubHazard)}"` : ''} onchange="this.classList.remove('goehs-mismatch')">
+                    <option value="">${subHazardMismatch && sourceSubHazard ? escapeHtml(sourceSubHazard) + ' (unmatched)' : '--'}</option>
                     ${subHazardOptions}
                 </select>
             </td>
             <td class="p-1 border-r border-slate-200">
-                <select class="hazard-outcome w-full p-1 border border-slate-300 rounded text-xs bg-white${outcomeMismatch ? ' goehs-mismatch' : ''}" onchange="this.classList.remove('goehs-mismatch')">
-                    <option value="">-- Select --</option>
-                    ${renderGoehsOutcomeOptions(hazard.consequence)}
-                </select>
+                <input type="text" class="hazard-outcome w-full p-1 border border-slate-300 rounded text-xs bg-white" value="${escapeHtml(goehsUiLabel(sourceOutcome))}" placeholder="Potential Outcome" title="Free text - GOEHS accepts any wording here">
             </td>
             <td class="p-1 border-r border-slate-200">
                 <input type="text" class="hazard-desc w-full p-1 border border-slate-300 rounded text-xs" value="${escapeHtml(goehsUiLabel(hazard.hazardSource || hazard.hazardList))}" placeholder="Description">
@@ -3023,10 +3020,7 @@ function addHazardTableRow() {
             </select>
         </td>
         <td class="p-1 border-r border-slate-200">
-            <select class="hazard-outcome w-full p-1 border border-slate-300 rounded text-xs bg-white" onchange="this.classList.remove('goehs-mismatch')">
-                <option value="">-- Select --</option>
-                ${renderGoehsOutcomeOptions('')}
-            </select>
+            <input type="text" class="hazard-outcome w-full p-1 border border-slate-300 rounded text-xs bg-white" placeholder="Potential Outcome" title="Free text - GOEHS accepts any wording here">
         </td>
         <td class="p-1 border-r border-slate-200">
             <input type="text" class="hazard-desc w-full p-1 border border-slate-300 rounded text-xs" placeholder="Description">
@@ -3776,13 +3770,29 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // AI Assist button in Final Review header
+    // AI Assist button in Final Review header - Hazard / Sub-Hazard correction only
+    // (Countermeasure Ladder and Outcome each have their own dedicated controls - see below
+    // and populateGoehsHazardsFromTable respectively).
     const goehsAiAssistBtn = document.getElementById('goehsAiAssistBtn');
     if (goehsAiAssistBtn && goehsAiAssistBtn.dataset.goehsBound !== '1') {
         goehsAiAssistBtn.addEventListener('click', aiAssistHazardFields);
         goehsAiAssistBtn.dataset.goehsBound = '1';
     }
-    
+
+    // Fix Countermeasure Ladder flyout - AI (network call, for text the local keyword
+    // engine can't classify) and Intelligent (local keyword matching only, free/instant).
+    // Reuses the main table's proven flyout mechanism (see window.initRabDropdown).
+    const goehsFixLadderBtn = document.getElementById('goehsFixLadderBtn');
+    const goehsFixLadderPanel = document.getElementById('goehsFixLadderPanel');
+    if (goehsFixLadderBtn && goehsFixLadderPanel && goehsFixLadderBtn.dataset.goehsBound !== '1') {
+        if (typeof window.initRabDropdown === 'function') {
+            window.initRabDropdown(goehsFixLadderBtn, goehsFixLadderPanel);
+        }
+        document.getElementById('goehsFixLadderAiBtn')?.addEventListener('click', aiFixCountermeasureLadder);
+        document.getElementById('goehsFixLadderIntelligentBtn')?.addEventListener('click', aiPopulateHazardFields);
+        goehsFixLadderBtn.dataset.goehsBound = '1';
+    }
+
     // Remap Columns button - opens manual column mapper with existing file
     document.getElementById('remapColumnsBtn')?.addEventListener('click', function() {
         if (window.ra2025LoadedFile) {
@@ -4023,6 +4033,11 @@ async function aiPopulateHazardFields() {
     }
     
     let updated = 0;
+    // Tracked separately from `updated` so the end message can tell "nothing to read" apart
+    // from "read plenty of text, none of it matched a recognized keyword" - the latter is
+    // common for non-English or site-specific control text (e.g. internal policy codes)
+    // that this local keyword engine was never going to recognize.
+    let hadUnmatchedText = false;
     hazardRows.forEach(row => {
         const counterDesc = row.querySelector('.hazard-counter-desc')?.value || '';
         const hazardDesc = row.querySelector('.hazard-desc')?.value || '';
@@ -4033,7 +4048,7 @@ async function aiPopulateHazardFields() {
 
         const hasSelectedLadder = (selectEl) => !!selectEl && Array.from(selectEl.selectedOptions || []).length > 0;
         const ladderSourceText = [counterDesc, hazardDesc, outcomeText].map(v => String(v || '').trim()).filter(Boolean).join(' | ');
-        
+
         // Suggest countermeasure ladder based on description
         if (ladderSourceText && counterLadderSelect && !hasSelectedLadder(counterLadderSelect)) {
             const suggestions = suggestCountermeasureLadder(ladderSourceText);
@@ -4048,11 +4063,13 @@ async function aiPopulateHazardFields() {
                 // Add visual indicator
                 counterLadderSelect.classList.add('goehs-ai-prefilled');
                 updated++;
+            } else {
+                hadUnmatchedText = true;
             }
         } else if (counterLadderSelect && hasSelectedLadder(counterLadderSelect)) {
             counterLadderSelect.classList.add('goehs-ai-prefilled');
         }
-        
+
         if (predDesc && predLadderSelect) {
             const suggestions = suggestCountermeasureLadder(predDesc);
             if (suggestions.length > 0) {
@@ -4064,14 +4081,193 @@ async function aiPopulateHazardFields() {
                 // Add visual indicator
                 predLadderSelect.classList.add('goehs-ai-prefilled');
                 updated++;
+            } else if (predDesc.trim()) {
+                hadUnmatchedText = true;
             }
         }
     });
-    
+
     if (updated > 0) {
         showGoehsAlert(`✅ Intelligent Fill: Updated ${updated} countermeasure ladder field(s) based on control description keywords.`, 'success');
+    } else if (hadUnmatchedText) {
+        showGoehsAlert('ℹ️ Control descriptions were found, but none matched a recognized keyword (e.g. "guard", "training", "eliminate", "PPE"). This is common for non-English or site-specific text (policy codes, internal program names, etc.) - try 🤖 AI instead, which reads the description\'s meaning rather than matching fixed keywords.', 'info');
     } else {
         showGoehsAlert('ℹ️ No control descriptions found to analyze. Enter control descriptions first.', 'info');
+    }
+}
+
+// Applies a list of Countermeasure Ladder level values to a (multi-select) ladder <select>,
+// clearing any prior selection first. Shared by the local and AI passes below.
+function applyLadderSelection(selectEl, levels) {
+    if (!selectEl || !levels || levels.length === 0) return false;
+    Array.from(selectEl.options).forEach(opt => { opt.selected = false; });
+    let matched = 0;
+    levels.forEach(level => {
+        const opt = Array.from(selectEl.options).find(o => o.value === level);
+        if (opt) { opt.selected = true; matched++; }
+    });
+    if (matched > 0) selectEl.classList.add('goehs-ai-prefilled');
+    return matched > 0;
+}
+
+// AI Fix Countermeasure Ladder - the "AI" option in the Fix Countermeasure Ladder flyout.
+// Covers BOTH Current and Predictive ladder fields, same scope as Intelligent Fill
+// (aiPopulateHazardFields above). Runs the same free local keyword pass first (so nothing
+// costs an API call unless it has to), then sends only the rows the keyword engine
+// couldn't classify - e.g. "L1", "(2)", or phrasing with no recognized synonym - to the
+// AI, batched to avoid payload-too-large errors on large tables.
+async function aiFixCountermeasureLadder() {
+    const hazardRows = getActiveHazardTableRows();
+    if (hazardRows.length === 0) {
+        showGoehsAlert('No hazards to fix. Add hazards first.', 'warning');
+        return;
+    }
+
+    const btn = document.getElementById('goehsFixLadderAiBtn');
+    const originalText = btn ? btn.innerHTML : '';
+    // Same spinner SVG + animate-spin utility already used elsewhere in this app (e.g. the
+    // main loading overlay) - inline via currentColor so it matches the button's text color.
+    const spinnerSVG = `<svg class="animate-spin h-3.5 w-3.5 inline-block align-middle" style="margin-right:4px" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle style="opacity:.25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path style="opacity:.75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>`;
+    const setBtnLabel = (label) => { if (btn) btn.innerHTML = `${spinnerSVG}${label}`; };
+    if (btn) { setBtnLabel('AI…'); btn.disabled = true; }
+
+    try {
+        const hasSelectedLadder = (selectEl) => !!selectEl && Array.from(selectEl.selectedOptions || []).length > 0;
+
+        // PASS 1: local keyword engine (free), for any ladder field not already selected.
+        let localFixed = 0;
+        let alreadySelected = 0;
+        let noTextFound = 0;
+        const needsAi = []; // { select, text }
+
+        hazardRows.forEach(row => {
+            const counterDesc = row.querySelector('.hazard-counter-desc')?.value || '';
+            const hazardDesc = row.querySelector('.hazard-desc')?.value || '';
+            const outcomeText = row.querySelector('.hazard-outcome')?.value || '';
+            const counterLadderSelect = row.querySelector('.hazard-counter-ladder');
+            const predDesc = row.querySelector('.hazard-pred-desc')?.value || '';
+            const predLadderSelect = row.querySelector('.hazard-pred-ladder');
+
+            const currentText = [counterDesc, hazardDesc, outcomeText].map(v => String(v || '').trim()).filter(Boolean).join(' | ');
+            if (counterLadderSelect) {
+                if (hasSelectedLadder(counterLadderSelect)) {
+                    alreadySelected++;
+                } else if (currentText) {
+                    if (applyLadderSelection(counterLadderSelect, suggestCountermeasureLadder(currentText))) {
+                        localFixed++;
+                    } else {
+                        needsAi.push({ select: counterLadderSelect, text: currentText });
+                    }
+                } else {
+                    noTextFound++;
+                }
+            }
+
+            const predText = String(predDesc || '').trim();
+            if (predLadderSelect) {
+                if (hasSelectedLadder(predLadderSelect)) {
+                    alreadySelected++;
+                } else if (predText) {
+                    if (applyLadderSelection(predLadderSelect, suggestCountermeasureLadder(predText))) {
+                        localFixed++;
+                    } else {
+                        needsAi.push({ select: predLadderSelect, text: predText });
+                    }
+                } else {
+                    noTextFound++;
+                }
+            }
+        });
+
+        if (needsAi.length === 0) {
+            let message;
+            let type;
+            if (localFixed > 0) {
+                message = `✅ AI Fix: ${localFixed} field(s) matched via local keyword engine. No AI call needed.`;
+                type = 'success';
+            } else if (alreadySelected > 0 && noTextFound === 0) {
+                message = `ℹ️ All ${alreadySelected} ladder field(s) already have a selection - nothing left to fix. Clear a selection first if you want it re-classified.`;
+                type = 'info';
+            } else {
+                message = 'ℹ️ No control descriptions found to analyze. Enter control descriptions first.';
+                type = 'info';
+            }
+            showGoehsAlert(message, type);
+            return;
+        }
+
+        // PASS 2: AI for whatever the local pass couldn't classify, batched.
+        const BATCH_SIZE = 20;
+        let aiFixed = 0;
+        let batchErrors = 0;
+        const totalBatches = Math.ceil(needsAi.length / BATCH_SIZE);
+
+        for (let start = 0; start < needsAi.length; start += BATCH_SIZE) {
+            const batchNum = Math.floor(start / BATCH_SIZE) + 1;
+            setBtnLabel(totalBatches > 1 ? `AI… (${batchNum}/${totalBatches})` : 'AI…');
+            const batch = needsAi.slice(start, start + BATCH_SIZE);
+            const prompt = `You are a workplace safety expert classifying control measures onto a Countermeasure Ladder.
+
+COUNTERMEASURE LADDER LEVELS:
+- "Level 6 - Elimination" - Completely removing the hazard
+- "Level 5 - Substitution" - Replacing with something safer
+- "Level 4 - Engineering Controls" - Physical changes (guards, barriers, interlocks, ventilation)
+- "Level 3 - Visual Controls" - Visual warnings (signs, labels, floor markings, mirrors)
+- "Level 2 - Administrative Controls" - Procedures (training, SOPs, permits, inspections)
+- "Level 1 - Individual Target" - PPE (gloves, goggles, helmets, safety shoes)
+
+CONTROL DESCRIPTIONS TO CLASSIFY (0-based index) - some may use shorthand like "L1", "(2)", or a level number alone; infer the intended level(s):
+${batch.map((c, i) => `${i}. "${c.text}"`).join('\n')}
+
+IMPORTANT:
+1. Each description can match MULTIPLE levels.
+2. Use EXACT level names from the list above.
+3. "index" in your response MUST match the 0-based index shown above exactly.
+
+Return ONLY a valid JSON array (no explanation, no markdown):
+[{"index": 0, "levels": ["Level X - Name", "Level Y - Name"]}, ...]`;
+
+            try {
+                const response = await fetch(GOEHS_GLOBAL_API_ENDPOINT, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ model: 'openai/gpt-4o-mini', prompt })
+                });
+                if (!response.ok) throw new Error(`API request failed: ${response.status}`);
+
+                const data = await response.json();
+                const content = data.choices?.[0]?.message?.content || '';
+                const jsonMatch = content.match(/\[[\s\S]*\]/);
+                if (!jsonMatch) throw new Error('AI did not return valid JSON array');
+
+                const suggestions = JSON.parse(jsonMatch[0]);
+                suggestions.forEach(s => {
+                    const item = batch[Number(s.index)];
+                    if (!item) return;
+                    const validatedLevels = (s.levels || [])
+                        .map(l => COUNTERMEASURE_LADDER.find(v => v.toLowerCase() === String(l).toLowerCase()))
+                        .filter(Boolean);
+                    if (applyLadderSelection(item.select, validatedLevels)) {
+                        aiFixed++;
+                    }
+                });
+            } catch (batchError) {
+                console.error('AI Fix Countermeasure Ladder batch failed:', batchError);
+                batchErrors++;
+            }
+        }
+
+        const total = localFixed + aiFixed;
+        scheduleGoehsIssueCounterRefresh();
+        showGoehsAlert(
+            `✅ AI Fix Countermeasure Ladder: ${total} field(s) fixed (${localFixed} local + ${aiFixed} AI).${batchErrors > 0 ? ` ${batchErrors} batch(es) failed - try again.` : ''}`,
+            total > 0 ? 'success' : 'info'
+        );
+    } catch (err) {
+        console.error('AI Fix Countermeasure Ladder error:', err);
+        showGoehsAlert(`❌ AI Fix Countermeasure Ladder failed: ${err.message}. Try Intelligent instead.`, 'error');
+    } finally {
+        if (btn) { btn.innerHTML = originalText; btn.disabled = false; }
     }
 }
 
@@ -4580,9 +4776,10 @@ async function aiAssistHazardFields() {
 
             const hazardNeedsFix = !!hazardSelect && (!hazardSelect.value || hazardSelect.classList.contains('goehs-mismatch'));
             const subHazardNeedsFix = !!subHazardSelect && (!subHazardSelect.value || subHazardSelect.classList.contains('goehs-mismatch'));
-            const outcomeNeedsFix = !!outcomeSelect && (!outcomeSelect.value || outcomeSelect.classList.contains('goehs-mismatch'));
+            // Outcome is free text (no GOEHS whitelist) so it never "needs fixing" - see
+            // populateGoehsHazardsFromTable.
 
-            if (!hazardNeedsFix && !subHazardNeedsFix && !outcomeNeedsFix) {
+            if (!hazardNeedsFix && !subHazardNeedsFix) {
                 return;
             }
 
@@ -4593,13 +4790,14 @@ async function aiAssistHazardFields() {
                 currentControl,
                 hazardSelect,
                 subHazardSelect,
-                outcomeSelect,
                 hazardNeedsFix,
                 subHazardNeedsFix,
-                outcomeNeedsFix,
-                currentHazard: hazardSelect?.value?.trim() || '',
-                currentSubHazard: subHazardSelect?.value?.trim() || '',
-                currentOutcome: outcomeSelect?.value?.trim() || '',
+                // When a select has no matching option its value is '' - fall back to the
+                // dataset.rawValue captured at populate time (see populateGoehsHazardsFromTable)
+                // so the AI still gets the originally imported text to work from, instead of
+                // an empty string that gives it nothing to base a suggestion on.
+                currentHazard: hazardSelect?.value?.trim() || hazardSelect?.dataset?.rawValue || '',
+                currentSubHazard: subHazardSelect?.value?.trim() || subHazardSelect?.dataset?.rawValue || '',
                 // Sub-hazard options cascade off the selected Hazard Group so they can
                 // legitimately differ row to row - kept per-row. Hazard Group and Outcome
                 // are the SAME static list on every row; sending them per-row multiplied
@@ -4622,10 +4820,10 @@ async function aiAssistHazardFields() {
         }
 
         // 2) AI pass only for rows with missing/mismatched dropdown fields.
-        // Hazard Group and Outcome are the same static dropdown on every row, so grab
-        // them once instead of repeating a full copy inside each row's JSON below.
+        // Hazard Group is the same static dropdown on every row, so grab it once instead
+        // of repeating a full copy inside each row's JSON below. Outcome is free text and
+        // is not part of this AI-fix pass at all - see populateGoehsHazardsFromTable.
         const sharedHazardOptions = toOptionValues(rowsNeedingDropdownAssist[0].hazardSelect);
-        const sharedOutcomeOptions = toOptionValues(rowsNeedingDropdownAssist[0].outcomeSelect);
 
         // Batch in chunks of 20 rows per call - even with the shared-lists fix above, a
         // single call covering hundreds of rows (each still carrying its own cascaded
@@ -4645,10 +4843,8 @@ async function aiAssistHazardFields() {
                 currentControl: item.currentControl,
                 needsHazard: item.hazardNeedsFix,
                 needsSubHazard: item.subHazardNeedsFix,
-                needsOutcome: item.outcomeNeedsFix,
                 currentHazard: item.currentHazard,
                 currentSubHazard: item.currentSubHazard,
-                currentOutcome: item.currentOutcome,
                 allowedSubHazards: item.subHazardOptions
             }));
 
@@ -4660,14 +4856,12 @@ Do NOT propose or rewrite control text.
 
 Rules:
 - "hazard" must come from the allowedHazards list below (used for every row that needs it).
-- "outcome" must come from the allowedOutcomes list below (used for every row that needs it).
 - "subHazard" must come from that row's own allowedSubHazards list.
 - Return values exactly from the relevant allowed option list - do not invent new text.
 - Only fill fields flagged as needed.
 - If unsure, choose the best closest allowed option.
 
 allowedHazards (for every row's "hazard"): ${JSON.stringify(sharedHazardOptions)}
-allowedOutcomes (for every row's "outcome"): ${JSON.stringify(sharedOutcomeOptions)}
 
 ROWS:
 ${JSON.stringify(promptRows, null, 2)}
@@ -4677,8 +4871,7 @@ Return ONLY valid JSON array:
   {
     "assistIndex": 0,
     "hazard": "exact allowed option or empty string",
-    "subHazard": "exact allowed option or empty string",
-    "outcome": "exact allowed option or empty string"
+    "subHazard": "exact allowed option or empty string"
   }
 ]`;
 
@@ -4720,7 +4913,6 @@ Return ONLY valid JSON array:
 
                     const suggestedHazard = (suggestion.hazard || '').toString().trim();
                     const suggestedSubHazard = (suggestion.subHazard || '').toString().trim();
-                    const suggestedOutcome = (suggestion.outcome || '').toString().trim();
 
                     if (controlItem.hazardNeedsFix && suggestedHazard && controlItem.hazardSelect) {
                         const matchedHazard = matchSelectOption(controlItem.hazardSelect, suggestedHazard);
@@ -4745,17 +4937,6 @@ Return ONLY valid JSON array:
                             controlItem.subHazardSelect.classList.remove('goehs-mismatch');
                             controlItem.subHazardSelect.classList.add('goehs-ai-prefilled');
                             if (!Number.isNaN(sourceRowIndex)) syncGoehsHazardFieldToMainTable(sourceRowIndex, 'subHazard', matchedSubHazard.value);
-                            rowUpdated = true;
-                        }
-                    }
-
-                    if (controlItem.outcomeNeedsFix && suggestedOutcome && controlItem.outcomeSelect) {
-                        const matchedOutcome = matchSelectOption(controlItem.outcomeSelect, suggestedOutcome);
-                        if (matchedOutcome) {
-                            controlItem.outcomeSelect.value = matchedOutcome.value;
-                            controlItem.outcomeSelect.classList.remove('goehs-mismatch');
-                            controlItem.outcomeSelect.classList.add('goehs-ai-prefilled');
-                            if (!Number.isNaN(sourceRowIndex)) syncGoehsHazardFieldToMainTable(sourceRowIndex, 'outcome', matchedOutcome.value);
                             rowUpdated = true;
                         }
                     }
