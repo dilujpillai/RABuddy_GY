@@ -126,6 +126,34 @@ function showDirectGoehsAlert(message, type = 'info') {
     }
 }
 
+// After an RA2025 auto-detect parse, tell the user up front if Frequency/Severity/Likelihood
+// couldn't actually be detected/read for some rows (they were filled with a scale default
+// instead) - the per-cell dashed amber outline (.scale-value-unverified) marks exactly which
+// rows, but a banner right after upload means it can't be missed or scrolled past unnoticed.
+function warnIfRA2025ScaleColumnsUnverified(riskItems) {
+    if (!Array.isArray(riskItems) || riskItems.length === 0) return;
+
+    const counts = { frequency: 0, severity: 0, likelihood: 0 };
+    riskItems.forEach(item => {
+        const a = item.assessment_pre_control || {};
+        if (a.frequency_unverified) counts.frequency++;
+        if (a.severity_unverified) counts.severity++;
+        if (a.likelihood_unverified) counts.likelihood++;
+    });
+
+    const flagged = Object.entries(counts).filter(([, n]) => n > 0);
+    if (flagged.length === 0) return;
+
+    const parts = flagged.map(([field, n]) => `${n} row(s) with no ${field}`);
+    setTimeout(() => {
+        showDirectGoehsAlert(
+            `⚠️ Could not auto-detect: ${parts.join(', ')}. These were filled with a default value (dashed amber outline in the table) - please verify or use "Remap Columns" to map them manually.`,
+            'warning'
+        );
+    }, 600);
+}
+window.warnIfRA2025ScaleColumnsUnverified = warnIfRA2025ScaleColumnsUnverified;
+
 // Handle Direct GOEHS Excel Upload (RA 2025 Template format)
 // Now with fallback to manual column mapping if auto-detection fails
 async function handleDirectGoehsUpload(event) {
@@ -241,7 +269,8 @@ async function handleDirectGoehsUpload(event) {
         }, 300);
         
         showDirectGoehsAlert(`✅ Loaded ${data.risk_items.length} risk items from "${file.name}". Review the table, then use "Open GOEHS Integration" to upload to GOEHS.`, 'success');
-        
+        warnIfRA2025ScaleColumnsUnverified(data.risk_items);
+
     } catch (error) {
         console.error('Direct GOEHS Upload Error:', error);
         
@@ -414,6 +443,7 @@ async function processSelectedSheetsRA2025(file, sheetIndices) {
     let msg = `✅ Loaded ${allRiskItems.length} risk items from ${sheetIndices.length} sheet(s) in "${file.name}".`;
     if (errors.length > 0) msg += ` � ️ ${errors.length} sheet(s) had issues.`;
     showDirectGoehsAlert(msg, 'success');
+    warnIfRA2025ScaleColumnsUnverified(allRiskItems);
 }
 
 // Process selected sheets for RA 2025 batch workflow.
@@ -541,6 +571,13 @@ function convertRA2025ToTableFormat(riskItems) {
             'Severity': item.assessment_pre_control.severity || 5,
             'Likelihood': item.assessment_pre_control.likelihood || 3,
             'Risk Score': item.assessment_pre_control.calculated_score,
+            // Flags a Frequency/Severity/Likelihood that couldn't be detected/parsed from the
+            // Excel file at all (column not found, or cell content in an unrecognized format) -
+            // as opposed to a genuinely-read value that happens to equal the same number. Lets
+            // the table/GOEHS modal visibly mark it instead of silently showing an indistinguishable default.
+            '_frequencyUnverified': !!item.assessment_pre_control.frequency_unverified,
+            '_severityUnverified': !!item.assessment_pre_control.severity_unverified,
+            '_likelihoodUnverified': !!item.assessment_pre_control.likelihood_unverified,
             'imageId': null
         };
     });
@@ -768,20 +805,20 @@ const RA2025_KEYWORDS = {
     },
     // Data row header keywords (Zone B - Row 14)
     columnKeywords: {
-        taskId: ['task id', 'id tâche', 'aufgaben-id', 'görev id', 'no', 'nr', '#', 'id'],
-        taskDesc: ['task description', 'job step', 'description', 'beschreibung', 'açıklama', 'description de la tâche', 'tâche', 'aufgabe', 'görev'],
-        hazardGroup: ['hazard group', 'groupe de risque', 'gefahrengruppe', 'tehlike grubu', 'categoria', 'catégorie', 'hazard category', 'groupe de danger'],
-        hazardDetail: ['hazard detail', 'hazard list', 'détail du risque', 'gefahrendetail', 'tehlike detayı', 'tipo', 'type de danger', 'liste des dangers'],
-        consequence: ['consequence', 'conséquence', 'konsequenz', 'sonuç', 'injury', 'blessure', 'verletzung', 'illness', 'maladie', 'risk/consequence', 'risque/conséquence', 'injury/illness', 'blessure/maladie', 'verletzung/krankheit'],
-        source: ['source', 'quelle', 'kaynak', 'origen', 'hazard source', 'source du danger'],
-        currentControl: ['current control', 'contrôle actuel', 'aktuelle kontrolle', 'mevcut kontrol', 'control actual', 'counter measure', 'countermeasure', 'maßnahme', 'mesure existante'],
-        routine: ['routine', 'non-routine', 'non routine', 'emergency situation', 'condition mode', 'work mode', 'mode de travail', 'mode de condition', 'routine/non-routine', 'routine/non routine'],
-        frequency: ['frequency', 'frequency (f)', 'frequency f', 'fréquence', 'häufigkeit', 'sıklık', 'frecuencia', 'freq', 'freq.'],
-        severity: ['severity', 'severity (s)', 'severity s', 'gravité', 'schweregrad', 'şiddet', 'severidad', 'sev', 'sev.'],
-        likelihood: ['likelihood', 'likelihood (l)', 'likelihood l', 'probability', 'probability of occurrence', 'probability of happen', 'probabilité', 'wahrscheinlichkeit', 'olasılık', 'probabilidad', 'vraisemblance'],
-        riskScore: ['risk score', 'score de risque', 'risikobewertung', 'risk skoru', 'puntuación', 'note de risque', 'score', 'initial risk'],
-        newControl: ['new control', 'nouveau contrôle', 'neue kontrolle', 'yeni kontrol', 'proposed', 'mesure proposée', 'action'],
-        hierarchy: ['hierarchy', 'hiérarchie', 'hierarchie', 'hiyerarşi', 'level', 'niveau', 'ladder', 'échelle']
+        taskId: ['task id', 'id tâche', 'aufgaben-id', 'görev id', 'id da tarefa', 'no', 'nr', '#', 'id'],
+        taskDesc: ['task description', 'job step', 'description', 'beschreibung', 'açıklama', 'description de la tâche', 'tâche', 'aufgabe', 'görev', 'descrição da tarefa', 'descrição', 'etapa'],
+        hazardGroup: ['hazard group', 'groupe de risque', 'gefahrengruppe', 'tehlike grubu', 'categoria', 'catégorie', 'hazard category', 'groupe de danger', 'grupo de risco', 'grupo de perigo'],
+        hazardDetail: ['hazard detail', 'hazard list', 'détail du risque', 'gefahrendetail', 'tehlike detayı', 'tipo', 'type de danger', 'liste des dangers', 'detalhe do risco', 'lista de riscos', 'tipo de risco'],
+        consequence: ['consequence', 'conséquence', 'konsequenz', 'sonuç', 'injury', 'blessure', 'verletzung', 'illness', 'maladie', 'risk/consequence', 'risque/conséquence', 'injury/illness', 'blessure/maladie', 'verletzung/krankheit', 'consequência', 'lesão', 'ferimento', 'risco/consequência'],
+        source: ['source', 'quelle', 'kaynak', 'origen', 'hazard source', 'source du danger', 'fonte', 'fonte do risco'],
+        currentControl: ['current control', 'contrôle actuel', 'aktuelle kontrolle', 'mevcut kontrol', 'control actual', 'counter measure', 'countermeasure', 'maßnahme', 'mesure existante', 'controle atual', 'contramedida'],
+        routine: ['routine', 'non-routine', 'non routine', 'emergency situation', 'condition mode', 'work mode', 'mode de travail', 'mode de condition', 'routine/non-routine', 'routine/non routine', 'rotina', 'não rotineira', 'situação de emergência'],
+        frequency: ['frequency', 'frequency (f)', 'frequency f', 'fréquence', 'häufigkeit', 'sıklık', 'frecuencia', 'frequência', 'frequencia', 'freq', 'freq.'],
+        severity: ['severity', 'severity (s)', 'severity s', 'gravité', 'schweregrad', 'şiddet', 'severidad', 'gravidade', 'severidade', 'sev', 'sev.'],
+        likelihood: ['likelihood', 'likelihood (l)', 'likelihood l', 'probability', 'probability of occurrence', 'probability of happen', 'probabilité', 'wahrscheinlichkeit', 'olasılık', 'probabilidad', 'probabilidade', 'vraisemblance'],
+        riskScore: ['risk score', 'score de risque', 'risikobewertung', 'risk skoru', 'puntuación', 'note de risque', 'score', 'initial risk', 'pontuação de risco', 'pontuação', 'risco inicial'],
+        newControl: ['new control', 'nouveau contrôle', 'neue kontrolle', 'yeni kontrol', 'proposed', 'mesure proposée', 'action', 'novo controle', 'controle proposto'],
+        hierarchy: ['hierarchy', 'hiérarchie', 'hierarchie', 'hiyerarşi', 'level', 'niveau', 'ladder', 'échelle', 'hierarquia', 'nível']
     }
 };
 
@@ -903,26 +940,26 @@ const RA2025_LIKELIHOOD_VALUES = [1, 3, 5, 8, 10];
 
 const RA2025_FSL_KEYWORDS = {
     frequency: [
-        { value: 2, keywords: ['permanent', 'continuous', 'constant', 'always', 'daily', 'every day', 'everyday', 'all day', 'permanent exposure', 'en permanence', 'toujours', 'surekli', 'dauerhaft', 'standig', 'stets'] },
-        { value: 1.75, keywords: ['frequent', 'frequently', 'often', 'souvent', 'haeufig', 'sik', '1-3 days', '1 to 3 days', '1-3 days/wk', '1-3 day/wk'] },
-        { value: 1.5, keywords: ['intermediate', 'intermediaire', 'intermittent', 'medium', 'middle', 'mittel', '2-8', '2 to 8', '2-8 hours', '2 to 8 hours', '2-8 hrs', '2 to 8 hrs'] },
-        { value: 1.25, keywords: ['occasional', 'occasionally', 'occasion', 'occasionnel', 'occasionnelle', 'gelegentlich', 'ara sira', 'sometimes', 'sporadic', 'sporadically'] },
-        { value: 1, keywords: ['rarely', 'rare', 'seldom', 'infrequent', 'rarement', 'selten', 'nadiren', '<30 min', 'under 30 min', 'less than 30 min'] }
+        { value: 2, keywords: ['permanent', 'continuous', 'constant', 'always', 'daily', 'every day', 'everyday', 'all day', 'permanent exposure', 'en permanence', 'toujours', 'surekli', 'dauerhaft', 'standig', 'stets', 'permanente', 'continuo', 'constante', 'diario', 'diaria', 'todos os dias'] },
+        { value: 1.75, keywords: ['frequent', 'frequently', 'often', 'souvent', 'haeufig', 'sik', '1-3 days', '1 to 3 days', '1-3 days/wk', '1-3 day/wk', 'frequente', 'frecuente', 'frecuentemente'] },
+        { value: 1.5, keywords: ['intermediate', 'intermediaire', 'intermittent', 'medium', 'middle', 'mittel', '2-8', '2 to 8', '2-8 hours', '2 to 8 hours', '2-8 hrs', '2 to 8 hrs', 'intermediario', 'intermitente'] },
+        { value: 1.25, keywords: ['occasional', 'occasionally', 'occasion', 'occasionnel', 'occasionnelle', 'gelegentlich', 'ara sira', 'sometimes', 'sporadic', 'sporadically', 'ocasional', 'ocasionalmente'] },
+        { value: 1, keywords: ['rarely', 'rare', 'seldom', 'infrequent', 'rarement', 'selten', 'nadiren', '<30 min', 'under 30 min', 'less than 30 min', 'raramente', 'raro', 'rara'] }
     ],
     severity: [
-        { value: 10, keywords: ['fatality', 'fatal', 'death', 'deces', 'mortal', 'olum', 'totlich', 'potential of fatality', 'potential fatality'] },
-        { value: 9, keywords: ['sia', 'serious injury', 'serious incident', 'severe injury', 'blessure grave', 'schwere verletzung', 'ciddi yaralanma', 'potential of sia'] },
-        { value: 7, keywords: ['dart', 'days away', 'restricted work', 'restricted duty', 'job transfer', 'lost time', 'arbeitseinschrankung', 'potential of dart'] },
-        { value: 5, keywords: ['medical treatment', 'medical treat', 'traitement medical', 'medizinische behandlung', 'tibbi tedavi', 'recordable', 'potential of medical treatment'] },
-        { value: 3, keywords: ['first aid', 'premiers soins', 'erste hilfe', 'ilk yardim', 'potential of first aid'] },
-        { value: 1, keywords: ['no injury', 'without injury', 'aucune blessure', 'keine verletzung', 'yaralanma yok', 'potential of no injury', 'no potential of injury', 'no potential injury'] }
+        { value: 10, keywords: ['fatality', 'fatal', 'death', 'deces', 'mortal', 'olum', 'totlich', 'potential of fatality', 'potential fatality', 'fatalidade', 'morte', 'potencial de fatalidade'] },
+        { value: 9, keywords: ['sia', 'serious injury', 'serious incident', 'severe injury', 'blessure grave', 'schwere verletzung', 'ciddi yaralanma', 'potential of sia', 'lesao grave', 'lesion grave'] },
+        { value: 7, keywords: ['dart', 'days away', 'restricted work', 'restricted duty', 'job transfer', 'lost time', 'arbeitseinschrankung', 'potential of dart', 'afastamento', 'restricao de trabalho'] },
+        { value: 5, keywords: ['medical treatment', 'medical treat', 'traitement medical', 'medizinische behandlung', 'tibbi tedavi', 'recordable', 'potential of medical treatment', 'tratamento medico'] },
+        { value: 3, keywords: ['first aid', 'premiers soins', 'erste hilfe', 'ilk yardim', 'potential of first aid', 'primeiros socorros', 'primeros auxilios'] },
+        { value: 1, keywords: ['no injury', 'without injury', 'aucune blessure', 'keine verletzung', 'yaralanma yok', 'potential of no injury', 'no potential of injury', 'no potential injury', 'sem lesao', 'sin lesion'] }
     ],
     likelihood: [
-        { value: 10, keywords: ['very likely', 'almost certain', 'certain', 'highly likely', 'very likely to happen', 'almost certain to happen', 'tres probable', 'sehr wahrscheinlich', 'cok olasi'] },
-        { value: 8, keywords: ['likely', 'probable', 'likely to happen', 'vraisemblable', 'wahrscheinlich', 'muhtemel'] },
-        { value: 5, keywords: ['possible', 'possible to happen', 'might happen', 'can happen', 'could happen', 'peut arriver', 'moglich', 'olasi'] },
-        { value: 3, keywords: ['very unlikely', 'very unlikely to happen', 'unlikely', 'improbable', 'sehr unwahrscheinlich', 'pek olasi degil'] },
-        { value: 1, keywords: ['almost impossible', 'almost impossible to happen', 'impossible', 'very remote', 'extremely unlikely', 'quasi impossible', 'fast unmoglich', 'imkansiz'] }
+        { value: 10, keywords: ['very likely', 'almost certain', 'certain', 'highly likely', 'very likely to happen', 'almost certain to happen', 'tres probable', 'sehr wahrscheinlich', 'cok olasi', 'muito provavel', 'quase certo'] },
+        { value: 8, keywords: ['likely', 'probable', 'likely to happen', 'vraisemblable', 'wahrscheinlich', 'muhtemel', 'provavel'] },
+        { value: 5, keywords: ['possible', 'possible to happen', 'might happen', 'can happen', 'could happen', 'peut arriver', 'moglich', 'olasi', 'possivel'] },
+        { value: 3, keywords: ['very unlikely', 'very unlikely to happen', 'unlikely', 'improbable', 'sehr unwahrscheinlich', 'pek olasi degil', 'muito improvavel', 'improvavel'] },
+        { value: 1, keywords: ['almost impossible', 'almost impossible to happen', 'impossible', 'very remote', 'extremely unlikely', 'quasi impossible', 'fast unmoglich', 'imkansiz', 'quase impossivel', 'impossivel'] }
     ]
 };
 
@@ -1000,6 +1037,9 @@ function matchScaleByKeywords(rawValue, table) {
     return null;
 }
 
+// Returns null (not a guessed default) when the cell can't be read at all - callers
+// decide the per-row fallback themselves, so one unparseable/merged-blank cell can't
+// get cached as a fabricated "real" value and carried forward onto later rows.
 function parseFrequencySmart(rawValue) {
     const keywordMatch = matchScaleByKeywords(rawValue, RA2025_FSL_KEYWORDS.frequency);
     if (Number.isFinite(keywordMatch)) return keywordMatch;
@@ -1009,7 +1049,7 @@ function parseFrequencySmart(rawValue) {
         return nearestScaleValue(numeric, RA2025_FREQUENCY_VALUES, 1);
     }
 
-    return 1;
+    return null;
 }
 
 function parseSeveritySmart(rawValue) {
@@ -1021,7 +1061,7 @@ function parseSeveritySmart(rawValue) {
         return nearestScaleValue(numeric, RA2025_SEVERITY_VALUES, 5);
     }
 
-    return 5;
+    return null;
 }
 
 function parseLikelihoodSmart(rawValue) {
@@ -1033,7 +1073,7 @@ function parseLikelihoodSmart(rawValue) {
         return nearestScaleValue(numeric, RA2025_LIKELIHOOD_VALUES, 3);
     }
 
-    return 3;
+    return null;
 }
 
 function parseRiskScoreSmart(rawValue) {
@@ -1167,6 +1207,17 @@ function parseZoneB(doc, strings, columnOverrides) {
             lastScaleValues.likelihood = likelihood;
         }
 
+        // Per-row fallback only (not cached above) - a row with no real/carried value
+        // still needs a valid scale number, but it must not contaminate lastScaleValues
+        // for the merged-cell rows that follow it. Track which fields actually hit this
+        // fallback so the UI can flag them instead of showing a silent, indistinguishable "1".
+        const frequencyUnverified = !Number.isFinite(frequency);
+        const severityUnverified = !Number.isFinite(severity);
+        const likelihoodUnverified = !Number.isFinite(likelihood);
+        if (frequencyUnverified) frequency = 1;
+        if (severityUnverified) severity = 5;
+        if (likelihoodUnverified) likelihood = 3;
+
         const parsedRiskScore = parseRiskScoreSmart(rowData[cols.riskScore]);
         const riskScore = Number.isFinite(parsedRiskScore) ? parsedRiskScore : (frequency * severity * likelihood);
         const newControl = rowData[cols.newControl] || '';
@@ -1194,7 +1245,10 @@ function parseZoneB(doc, strings, columnOverrides) {
                 severity: severity,
                 likelihood: likelihood,
                 calculated_score: riskScore,
-                risk_level: riskLevel
+                risk_level: riskLevel,
+                frequency_unverified: frequencyUnverified,
+                severity_unverified: severityUnverified,
+                likelihood_unverified: likelihoodUnverified
             },
             mitigation_plan: {
                 current_controls: currentControls,
@@ -1203,7 +1257,7 @@ function parseZoneB(doc, strings, columnOverrides) {
             }
         });
     }
-    
+
     return riskItems;
 }
 
@@ -2232,6 +2286,12 @@ function extractRiskTableData() {
         const currentControl = cells[12]?.querySelector('input')?.value || cells[12]?.textContent?.trim() || '';
         const routineType = cells[13]?.querySelector('input')?.value || cells[13]?.textContent?.trim() || '';
         const sourceRowIndex = parseInt(row.dataset.rowIndex, 10);
+
+        // Carry over the main table's "couldn't auto-detect this value" flags (see
+        // .scale-value-unverified in index.html) so the GOEHS modal can flag them too.
+        const frequencyUnverified = row.dataset.freqUnverified === 'true';
+        const severityUnverified = row.dataset.sevUnverified === 'true';
+        const likelihoodUnverified = row.dataset.likeUnverified === 'true';
         
         // Try to get Countermeasure_Ladder from stored data (if AI generated it)
         const rowData = row.dataset?.countermeasureLadder || '';
@@ -2263,7 +2323,10 @@ function extractRiskTableData() {
             hazardSource: hazardSource,
             currentControl: currentControl,
             routineType: routineType,
-            countermeasureLadder: rowData // Pass AI-tagged countermeasure ladder to GOEHS
+            countermeasureLadder: rowData, // Pass AI-tagged countermeasure ladder to GOEHS
+            frequencyUnverified: frequencyUnverified,
+            severityUnverified: severityUnverified,
+            likelihoodUnverified: likelihoodUnverified
         });
     });
     
@@ -2826,17 +2889,17 @@ function populateGoehsHazardsFromTable(tableData) {
                 <input type="text" class="hazard-desc w-full p-1 border border-slate-300 rounded text-xs" value="${escapeHtml(goehsUiLabel(hazard.hazardSource || hazard.hazardList))}" placeholder="Description">
             </td>
             <td class="p-1 border-r border-slate-200 bg-amber-50">
-                <select class="hazard-init-freq w-full p-1 border border-slate-300 rounded text-xs bg-white text-center" onchange="calcTableInitRisk('${hazardId}')">
+                <select class="hazard-init-freq w-full p-1 border border-slate-300 rounded text-xs bg-white text-center${hazard.frequencyUnverified ? ' modal-scale-value-unverified' : ''}"${hazard.frequencyUnverified ? ' title="Frequency could not be auto-detected from the Excel file — this is a default, please verify."' : ''} onchange="calcTableInitRisk('${hazardId}')">
                     ${freqOpts(freqValues, goehsFreq)}
                 </select>
             </td>
             <td class="p-1 border-r border-slate-200 bg-amber-50">
-                <select class="hazard-init-sev w-full p-1 border border-slate-300 rounded text-xs bg-white text-center" onchange="calcTableInitRisk('${hazardId}')">
+                <select class="hazard-init-sev w-full p-1 border border-slate-300 rounded text-xs bg-white text-center${hazard.severityUnverified ? ' modal-scale-value-unverified' : ''}"${hazard.severityUnverified ? ' title="Severity could not be auto-detected from the Excel file — this is a default, please verify."' : ''} onchange="calcTableInitRisk('${hazardId}')">
                     ${freqOpts(sevValues, goehsSev)}
                 </select>
             </td>
             <td class="p-1 border-r border-slate-200 bg-amber-50">
-                <select class="hazard-init-like w-full p-1 border border-slate-300 rounded text-xs bg-white text-center" onchange="calcTableInitRisk('${hazardId}')">
+                <select class="hazard-init-like w-full p-1 border border-slate-300 rounded text-xs bg-white text-center${hazard.likelihoodUnverified ? ' modal-scale-value-unverified' : ''}"${hazard.likelihoodUnverified ? ' title="Likelihood could not be auto-detected from the Excel file — this is a default, please verify."' : ''} onchange="calcTableInitRisk('${hazardId}')">
                     ${freqOpts(likeValues, goehsLike)}
                 </select>
             </td>

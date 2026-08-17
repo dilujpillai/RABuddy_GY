@@ -382,7 +382,20 @@
             outline: 2px solid #a5b4fc;
             outline-offset: 1px;
         }
-        
+        /* Frequency/Severity/Likelihood: the RA2025 importer couldn't actually detect or read
+           this column's value from the Excel file (column not found, or an unrecognized
+           language/format), so it fell back to a scale default. Flagged with a dashed amber
+           outline - distinct from the red "wrong value" style - so it's never confused with a
+           genuinely-parsed value that happens to be the same number. */
+        .scale-value-unverified {
+            outline: 2px dashed #f59e0b;
+            outline-offset: 1px;
+        }
+        .modal-scale-value-unverified {
+            outline: 2px dashed #f59e0b;
+            outline-offset: 1px;
+        }
+
         /* GOEHS Visual Highlighting Styles */
         .goehs-empty-required {
             outline: 2px solid #ef4444 !important;
@@ -4754,8 +4767,14 @@ data.forEach((row, index) => {
     
     // Store AI-tagged Countermeasure Ladder (if available)
     const countermeasureLadderAttr = row['Countermeasure_Ladder'] ? `data-countermeasure-ladder="${DOMPurify.sanitize(row['Countermeasure_Ladder'])}"` : '';
-                   
-                tableHTML += `<tr data-row-index="${index}" data-image-id="${imageId}" ${deletedAttr} ${countermeasureLadderAttr} class="hover:bg-slate-100 transition ${rowBgClass} ${deletedClass}">
+
+    // Flag F/S/L values the RA2025 importer couldn't actually detect/read from the source
+    // Excel file - see .scale-value-unverified above. Not set for AI/manual-entry rows.
+    const freqUnverifiedAttr = row['_frequencyUnverified'] ? 'data-freq-unverified="true"' : '';
+    const sevUnverifiedAttr = row['_severityUnverified'] ? 'data-sev-unverified="true"' : '';
+    const likeUnverifiedAttr = row['_likelihoodUnverified'] ? 'data-like-unverified="true"' : '';
+
+                tableHTML += `<tr data-row-index="${index}" data-image-id="${imageId}" ${deletedAttr} ${countermeasureLadderAttr} ${freqUnverifiedAttr} ${sevUnverifiedAttr} ${likeUnverifiedAttr} class="hover:bg-slate-100 transition ${rowBgClass} ${deletedClass}">
                     <td class="${tdClasses} picture-cell cursor-pointer modern-hover-cell" data-step="${row.Steps || ''}" data-hazard="${hazardListValue}" data-filename="${originalFileName || ''}"></td>
                     <td class="${tdClasses} text-center">${aiBadge}</td>
                     <td class="${tdClasses} cursor-pointer modern-hover-cell" onclick="openTableImageModal('', ${index})">${row.Steps || ''}</td>
@@ -4789,6 +4808,21 @@ data.forEach((row, index) => {
                     } else {
                         sel.classList.remove('hazard-invalid');
                     }
+                });
+
+                // Mark Frequency/Severity/Likelihood dropdowns the RA2025 importer couldn't
+                // actually detect/read (see .scale-value-unverified above) - dashed amber
+                // outline plus a tooltip, so a defaulted "1" is never mistaken for a real value.
+                const scaleFlags = [
+                    { attr: 'freq-unverified', nth: 7, label: 'Frequency' },
+                    { attr: 'sev-unverified', nth: 8, label: 'Severity' },
+                    { attr: 'like-unverified', nth: 9, label: 'Likelihood' }
+                ];
+                scaleFlags.forEach(({ attr, nth, label }) => {
+                    tableContainer.querySelectorAll(`tr[data-${attr}="true"] td:nth-child(${nth}) select`).forEach(sel => {
+                        sel.classList.add('scale-value-unverified');
+                        sel.title = `${label} could not be auto-detected from the Excel file — this is a default, please verify.`;
+                    });
                 });
 
                 // Mark consequence dropdowns that are not in the standard registry - soft
@@ -13976,8 +14010,12 @@ if (projectData.tableData && projectData.tableData.counterMeasures) {
 }
 
 // Attach listeners
-document.getElementById('saveProjectBtn').addEventListener('click', saveProject);
-document.getElementById('saveProjectBtn2').addEventListener('click', saveProject);
+// NOTE: wrapped in arrow functions, not passed directly - addEventListener calls the
+// handler with the click Event as its first argument, which would otherwise land in
+// saveProject's `filenameOverride` param (a truthy object beats the `|| getProjectFileName(...)`
+// fallback) and get stringified into the downloaded filename as "[object PointerEvent]".
+document.getElementById('saveProjectBtn').addEventListener('click', () => saveProject());
+document.getElementById('saveProjectBtn2').addEventListener('click', () => saveProject());
 document.getElementById('loadProjectBtn').addEventListener('click', () => document.getElementById('projectFileInput').click());
 document.getElementById('projectFileInput').addEventListener('change', (e) => {
     const file = e.target.files[0];
@@ -15835,6 +15873,17 @@ downloadBtn.addEventListener('click', async () => {
                 lastScaleValues.likelihood = likelihood;
             }
 
+            // Per-row fallback only (not cached above) - a row with no real/carried value
+            // still needs a valid scale number, but it must not contaminate lastScaleValues
+            // for the merged-cell rows that follow it. Track which fields actually hit this
+            // fallback so the UI can flag them instead of showing a silent, indistinguishable "1".
+            const frequencyUnverified = !Number.isFinite(frequency);
+            const severityUnverified = !Number.isFinite(severity);
+            const likelihoodUnverified = !Number.isFinite(likelihood);
+            if (frequencyUnverified) frequency = 1;
+            if (severityUnverified) severity = 5;
+            if (likelihoodUnverified) likelihood = 3;
+
             const parsedRiskScore = cols.riskScore ? parseRiskScoreValue(row[cols.riskScore]) : null;
             const riskScore = Number.isFinite(parsedRiskScore)
                 ? parsedRiskScore
@@ -15861,7 +15910,10 @@ downloadBtn.addEventListener('click', async () => {
                     severity: severity,
                     likelihood: likelihood,
                     calculated_score: riskScore,
-                    risk_level: riskLevel
+                    risk_level: riskLevel,
+                    frequency_unverified: frequencyUnverified,
+                    severity_unverified: severityUnverified,
+                    likelihood_unverified: likelihoodUnverified
                 },
                 mitigation_plan: {
                     current_controls: row[cols.currentControl] || '',
@@ -15960,6 +16012,10 @@ downloadBtn.addEventListener('click', async () => {
         }
 
         window.buildTableFromData(Array.isArray(tableData) ? [...tableData] : tableData);
+
+        if (typeof window.warnIfRA2025ScaleColumnsUnverified === 'function') {
+            window.warnIfRA2025ScaleColumnsUnverified(riskItems);
+        }
 
         if (window.initializeDashboard) {
             window.initializeDashboard();
@@ -22546,7 +22602,12 @@ ${JSON.stringify(payload, null, 2)}`;
                 '_rawHazardType': hazardType,
                 '_rawConsequence': consequence,
                 '_matchedHazardType': normalizedHazardType,
-                '_matchedConsequence': normalizedConsequence
+                '_matchedConsequence': normalizedConsequence,
+                // Flags a Frequency/Severity/Likelihood the parser couldn't actually detect/read
+                // (column not found, or unrecognized cell format) rather than a genuinely-parsed value.
+                '_frequencyUnverified': !!item.assessment_pre_control?.frequency_unverified,
+                '_severityUnverified': !!item.assessment_pre_control?.severity_unverified,
+                '_likelihoodUnverified': !!item.assessment_pre_control?.likelihood_unverified
             };
         });
     }
