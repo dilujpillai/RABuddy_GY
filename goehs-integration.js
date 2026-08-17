@@ -416,6 +416,67 @@ async function processSelectedSheetsRA2025(file, sheetIndices) {
     showDirectGoehsAlert(msg, 'success');
 }
 
+// Process selected sheets for RA 2025 batch workflow.
+// Returns per-file metadata compatible with batch dashboards and can also hand off
+// to a host callback when running inside an external batch processor.
+async function processSelectedSheetsBatchRA2025(file, sheetIndices, batchFileIndex) {
+    let allRiskItems = [];
+    let lastContext = null;
+    let lastDetectedLang = 'en';
+    let lastDetectedColumns = {};
+    const errors = [];
+
+    showDirectGoehsAlert(`📂 Processing ${sheetIndices.length} selected sheet(s) from "${file.name}"...`, 'info');
+
+    for (const sheetIdx of sheetIndices) {
+        try {
+            const data = await parseRA2025Template(file, null, sheetIdx);
+            if (data.risk_items && data.risk_items.length > 0) {
+                allRiskItems = allRiskItems.concat(data.risk_items);
+                lastContext = data.process_context;
+                lastDetectedLang = data.detectedLang || lastDetectedLang;
+                lastDetectedColumns = data.detectedColumns || lastDetectedColumns;
+            } else {
+                errors.push(`Sheet ${sheetIdx}: No data rows found`);
+            }
+        } catch (err) {
+            errors.push(`Sheet ${sheetIdx}: ${err.message}`);
+        }
+    }
+
+    const parsed = {
+        fileName: file && file.name ? file.name : `BatchFile_${batchFileIndex ?? ''}`,
+        status: allRiskItems.length > 0 ? 'ready' : 'failed',
+        riskItems: allRiskItems,
+        tableData: allRiskItems.length > 0 ? convertRA2025ToTableFormat(allRiskItems) : [],
+        parsedContext: lastContext,
+        detectedLang: lastDetectedLang || 'en',
+        detectedColumns: lastDetectedColumns || {},
+        selectedSheetIndices: Array.isArray(sheetIndices) ? [...sheetIndices] : [],
+        partialErrors: errors,
+        errorMsg: allRiskItems.length > 0 ? '' : (errors.join(' | ') || 'No data found in selected sheets')
+    };
+
+    if (typeof window.onBatchSheetSelectionResult === 'function') {
+        try {
+            window.onBatchSheetSelectionResult(batchFileIndex, parsed);
+        } catch (callbackErr) {
+            console.warn('onBatchSheetSelectionResult callback failed:', callbackErr);
+        }
+    }
+
+    if (allRiskItems.length === 0) {
+        showDirectGoehsAlert('⚠ No usable rows found in selected sheets.', 'warning');
+        return parsed;
+    }
+
+    const issueCount = errors.length;
+    const summary = `✅ Parsed ${allRiskItems.length} row(s) from ${sheetIndices.length} selected sheet(s)` +
+        (issueCount > 0 ? ` · ${issueCount} sheet(s) had issues.` : '.');
+    showDirectGoehsAlert(summary, issueCount > 0 ? 'info' : 'success');
+    return parsed;
+}
+
 // Convert RA 2025 parsed data to buildTableFromData format
 // Note: This function passes raw values - buildTableFromData will handle registry lookups
 function convertRA2025ToTableFormat(riskItems) {
@@ -1637,6 +1698,40 @@ function goehsUiLabel(val) {
     return val;
 }
 
+// ============================================================
+// GOEHS hazard-category/sub-hazard dropdown language - deliberately independent from
+// the appLanguage used by goehsUiLabel() above for everything else in this modal (ladder
+// levels, outcomes, general chrome), since only Hazard Category/Sub-Hazard translations
+// exist for the newer languages (es/pl/pt/sl/tr/zh/th). Defaults to whatever the main
+// table's own hazard-dropdown language is already set to, since GOEHS hazards are
+// populated FROM the main table and are usually already in that same language.
+// ============================================================
+let goehsHazardDropdownLang = localStorage.getItem('goehsHazardDropdownLang')
+    || localStorage.getItem('hazardDropdownLang') || 'en';
+// Once the user picks a language directly in this modal, stop auto-inheriting from the
+// main table for the rest of the session - their explicit choice here should stick.
+let goehsHazardDropdownLangManual = false;
+function goehsHazardLabel(englishKey, lang) {
+    if (!englishKey) return englishKey;
+    const l = lang || goehsHazardDropdownLang;
+    if (l === 'en') return englishKey;
+    const langMap = window.TRANSLATIONS?.[l];
+    if (!langMap) return englishKey;
+    return langMap[englishKey] || englishKey;
+}
+function relabelGoehsHazardSelect(sel, lang) {
+    if (!sel) return;
+    Array.from(sel.options).forEach(opt => {
+        if (opt.value) opt.textContent = goehsHazardLabel(opt.value, lang);
+    });
+}
+function relabelGoehsHazardDropdownsInLanguage(lang) {
+    document.querySelectorAll('#hazardTableBody .hazard-category').forEach(sel => relabelGoehsHazardSelect(sel, lang));
+    document.querySelectorAll('#hazardTableBody .hazard-sub').forEach(sel => relabelGoehsHazardSelect(sel, lang));
+}
+window.relabelGoehsHazardDropdownsInLanguage = relabelGoehsHazardDropdownsInLanguage;
+window.goehsHazardLabel = goehsHazardLabel;
+
 const GOEHS_CONDITION_MODES = ['Routine', 'Non-Routine', 'Emergency Situation'];
 
 function parseGoehsConditionMode(rawValue) {
@@ -1873,6 +1968,21 @@ function updateGoehsIssueCounter() {
     } else {
         counterEl.title = 'No unresolved issues in Final Review. Deleted rows are excluded.';
         counterEl.setAttribute('aria-label', 'No unresolved issues in Final Review.');
+    }
+
+    const downloadBtn = document.getElementById('goehsDownloadXlsxBtn');
+    if (downloadBtn) {
+        const hasIssues = issueStats.total > 0;
+        downloadBtn.disabled = hasIssues;
+        if (hasIssues) {
+            downloadBtn.title = `Fix ${issueStats.total} unresolved issue(s) before downloading GOEHS file.`;
+            downloadBtn.classList.add('opacity-60', 'cursor-not-allowed');
+            downloadBtn.setAttribute('aria-disabled', 'true');
+        } else {
+            downloadBtn.title = 'Download GOEHS Batch Upload XLSX';
+            downloadBtn.classList.remove('opacity-60', 'cursor-not-allowed');
+            downloadBtn.removeAttribute('aria-disabled');
+        }
     }
 }
 
@@ -2492,6 +2602,7 @@ function suggestJobTitle(taskName) {
 
 // Auto-populate GOEHS tasks from risk table
 function populateGoehsTasksFromTable(tableData) {
+    window.__goehsTasksSyncedSig = computeGoehsTasksSignature(tableData);
     // Clear existing tasks
     goehsTasks = [];
     taskIdCounter = 0;
@@ -2579,6 +2690,7 @@ function populateGoehsTasksFromTable(tableData) {
 
 // Auto-populate GOEHS hazards from risk table - TABLE FORMAT
 function populateGoehsHazardsFromTable(tableData) {
+    window.__goehsHazardsSyncedSig = computeGoehsHazardsSignature(tableData);
     // Clear existing hazards
     goehsHazards = [];
     hazardIdCounter = 0;
@@ -2779,8 +2891,24 @@ function populateGoehsHazardsFromTable(tableData) {
     // Auto-apply countermeasure ladder suggestions based on control descriptions
     setTimeout(() => autoApplyCountermeasureSuggestions(), 100);
 
+    // Inherit the main table's hazard-dropdown language rather than re-detecting: the
+    // hazard/category values pulled in above (h.hazardGroup / h.hazardList) are always the
+    // canonical English registry key (that's what the main table's <select> value holds,
+    // by design, regardless of what language it's currently displayed in), so there is
+    // nothing non-English left to detect from by the time data reaches this modal. The
+    // main table already did the real detection when the Excel sheet was imported: reuse
+    // that result here, unless the user has explicitly picked a different language in this
+    // modal's own dropdown, which then sticks for the rest of the session.
+    if (!goehsHazardDropdownLangManual && window.hazardDropdownLang && window.hazardDropdownLang !== goehsHazardDropdownLang) {
+        goehsHazardDropdownLang = window.hazardDropdownLang;
+        localStorage.setItem('goehsHazardDropdownLang', goehsHazardDropdownLang);
+        const sel = document.getElementById('goehsHazardLangSelect');
+        if (sel) sel.value = goehsHazardDropdownLang;
+    }
+    relabelGoehsHazardDropdownsInLanguage(goehsHazardDropdownLang);
+
     scheduleGoehsIssueCounterRefresh();
-    
+
     console.log(`✅ Populated ${tableData.hazards.length} hazards in table format from risk table`);
 }
 
@@ -2848,7 +2976,7 @@ function addHazardTableRow() {
     ).join('');
 
     const categoryOptions = Object.keys(HAZARD_CATEGORIES).map(cat =>
-        `<option value="${cat}">${goehsUiLabel(cat)}</option>`
+        `<option value="${cat}">${goehsHazardLabel(cat)}</option>`
     ).join('');
 
     const freqOpts = (vals) => vals.map(v => `<option value="${v}">${v}</option>`).join('');
@@ -3010,7 +3138,7 @@ function updateTableSubHazards(selectElement, hazardId) {
         HAZARD_CATEGORIES[hazardCategory].forEach(sub => {
             const opt = document.createElement('option');
             opt.value = sub;
-            opt.textContent = goehsUiLabel(sub);
+            opt.textContent = goehsHazardLabel(sub);
             subSelect.appendChild(opt);
         });
     }
@@ -3207,10 +3335,23 @@ function openGoehsModal() {
 }
 
 // Auto-populate GOEHS tools from existing risk table
+// Cheap equality signature for "has the main risk table changed since GOEHS last
+// pulled from it" - deliberately only the fields that actually feed the GOEHS
+// tasks/hazards panes, not the full row objects.
+function computeGoehsTasksSignature(tableData) {
+    return JSON.stringify((tableData.tasks || []).map(t => [t.name, t.description]));
+}
+function computeGoehsHazardsSignature(tableData) {
+    return JSON.stringify((tableData.hazards || []).map(h => [
+        h.stepName, h.hazardGroup, h.hazardList, h.consequence, h.frequency, h.severity,
+        h.likelihood, h.hazardSource, h.currentControl, h.routineType, h.countermeasureLadder
+    ]));
+}
+
 function autoPopulateFromRiskTable() {
     const tableData = extractRiskTableData();
     const banner = document.getElementById('goehsAutoPopulateBanner');
-    
+
     if (tableData.hazards.length === 0) {
         // Update banner to show no data
         if (banner) {
@@ -3231,25 +3372,55 @@ function autoPopulateFromRiskTable() {
     // Show success info
     const count = tableData.hazards.length;
     const taskCount = tableData.tasks.length;
-    
+
+    // Detect drift: the main risk table is re-extracted fresh every time this modal
+    // opens, but Tasks/Hazards only auto-populate from it ONCE (ensureGoehsSectionDataLoaded
+    // guards on the panes still being empty) - so editing rows in the main table after the
+    // first GOEHS visit silently had no effect until the user found the buried "Re-sync"
+    // button. Surface that drift right here, in the banner shown the moment the modal opens.
+    const hazardsChanged = goehsHazards.length > 0
+        && window.__goehsHazardsSyncedSig !== undefined
+        && window.__goehsHazardsSyncedSig !== computeGoehsHazardsSignature(tableData);
+    const tasksChanged = goehsTasks.length > 0
+        && window.__goehsTasksSyncedSig !== undefined
+        && window.__goehsTasksSyncedSig !== computeGoehsTasksSignature(tableData);
+
     // Update banner to show data found
     if (banner) {
-        banner.className = 'mb-6 p-4 bg-green-50 border border-green-200 rounded-lg';
-        banner.innerHTML = `
-            <div class="flex items-start gap-3">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-green-600 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                <div>
-                    <h4 class="font-semibold text-green-800">✓ Risk Table Data Detected: ${taskCount} Task(s), ${count} Hazard(s)</h4>
-                    <p class="text-green-700 text-sm mt-1">Your risk assessment data will automatically populate the final review pane.</p>
-                    <p class="text-green-700 text-sm mt-2"><strong>Next:</strong> Complete the assessment header below, then review final rows and download GOEHS batch upload file.</p>
+        if (hazardsChanged || tasksChanged) {
+            const what = [tasksChanged ? 'tasks' : null, hazardsChanged ? 'hazards' : null].filter(Boolean).join(' and ');
+            banner.className = 'mb-6 p-4 bg-amber-50 border border-amber-300 rounded-lg';
+            banner.innerHTML = `
+                <div class="flex items-start gap-3">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-amber-600 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.93 4.93l14.14 14.14M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                    <div class="flex-1">
+                        <h4 class="font-semibold text-amber-800">⚠ Risk table has changed since this was loaded</h4>
+                        <p class="text-amber-700 text-sm mt-1">Your main risk table's ${what} no longer match what's shown below/in the review pane. Refresh to pull in the latest changes (this replaces what's currently in the ${what} pane here - any edits made only inside GOEHS Integration for those rows will be lost).</p>
+                        <div class="mt-3 flex gap-2 flex-wrap">
+                            ${tasksChanged ? `<button type="button" onclick="resyncTasksFromTable()" class="goehs-btn goehs-btn-indigo">🔄 Refresh Tasks</button>` : ''}
+                            ${hazardsChanged ? `<button type="button" onclick="resyncHazardsFromTable()" class="goehs-btn goehs-btn-indigo">🔄 Refresh Hazards</button>` : ''}
+                        </div>
+                    </div>
                 </div>
-            </div>
-        `;
+            `;
+        } else {
+            banner.className = 'mb-6 p-4 bg-green-50 border border-green-200 rounded-lg';
+            banner.innerHTML = `
+                <div class="flex items-start gap-3">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-green-600 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                    <div>
+                        <h4 class="font-semibold text-green-800">✓ Risk Table Data Detected: ${taskCount} Task(s), ${count} Hazard(s)</h4>
+                        <p class="text-green-700 text-sm mt-1">Your risk assessment data will automatically populate the final review pane.</p>
+                        <p class="text-green-700 text-sm mt-2"><strong>Next:</strong> Complete the assessment header below, then review final rows and download GOEHS batch upload file.</p>
+                    </div>
+                </div>
+            `;
+        }
     }
-    
+
     // Store for later use
     window.goehsTableData = tableData;
-    
+
     // Populate tasks (Tool 2) - will be called when user navigates to Tool 2
     // Populate hazards (Tool 3) - will be called when user navigates to Tool 3
 }
@@ -3270,6 +3441,48 @@ function resyncTasksFromTable() {
     populateGoehsTasksFromTable(tableData);
     showGoehsAlert(`Re-synced ${tableData.tasks.length} task(s) from risk table.`, 'success');
 }
+
+// Push a single GOEHS hazard-row field edit (manual or AI Assist) back to the linked
+// main-table row. GOEHS's own category/sub-hazard vocabulary (HAZARD_CATEGORIES in
+// ra-registry.js) and the main table's (HAZARD_REGISTRY) both match the same vendor
+// whitelist, so this is a direct value copy rather than a lossy re-mapping - if a value
+// somehow doesn't line up with the main table's registry it just shows red there, same as
+// any other mismatch, and can be cleaned up with AI Fix / Suggest Closest Match.
+function syncGoehsHazardFieldToMainTable(sourceRowIndex, field, value) {
+    const mainRow = document.querySelector(`#table-container tr[data-row-index="${sourceRowIndex}"]`);
+    if (!mainRow) return;
+    const v = String(value || '').trim();
+
+    const syncSelect = (selector) => {
+        const sel = mainRow.querySelector(selector);
+        if (!sel || !v || sel.value === v) return;
+        if (!Array.from(sel.options).some(o => o.value === v)) {
+            const opt = document.createElement('option');
+            opt.value = v; opt.textContent = v;
+            sel.insertBefore(opt, sel.firstChild);
+        }
+        sel.value = v;
+        // Bubbles so the main table's own change handling (score/category recalculation,
+        // the live issue pill, hazard-group cascade) runs exactly as if the user had
+        // picked this value directly in the main table.
+        sel.dispatchEvent(new Event('change', { bubbles: true }));
+    };
+
+    if (field === 'category') {
+        syncSelect('.group select');
+    } else if (field === 'subHazard') {
+        syncSelect('.hazard-list-cell select');
+    } else if (field === 'outcome') {
+        syncSelect('.consequence-cell select');
+    } else if (field === 'hazardSource') {
+        const input = mainRow.children[11]?.querySelector('input');
+        if (input && input.value !== value) input.value = value;
+    } else if (field === 'currentControl') {
+        const input = mainRow.children[12]?.querySelector('input');
+        if (input && input.value !== value) input.value = value;
+    }
+}
+window.syncGoehsHazardFieldToMainTable = syncGoehsHazardFieldToMainTable;
 
 // Re-sync hazards from risk table (user-triggered)
 function resyncHazardsFromTable() {
@@ -3521,6 +3734,48 @@ document.addEventListener('DOMContentLoaded', function() {
     // GOEHS Integration button
     document.getElementById('goehsIntegrationBtn')?.addEventListener('click', openGoehsModal);
 
+    // ============ REVERSE SYNC: GOEHS hazard-row edits -> main risk table ============
+    // The main table -> GOEHS direction already existed (extractRiskTableData / re-sync);
+    // this covers the other direction so a correction made inside GOEHS Integration
+    // (AI Assist or a manual dropdown/text change) doesn't get silently lost the next time
+    // the main table happens to re-render. Each GOEHS hazard row carries the linked main
+    // row's index in data-source-row-index (set in populateGoehsHazardsFromTable).
+    document.getElementById('hazardTableBody')?.addEventListener('change', (e) => {
+        const row = e.target.closest('tr[data-source-row-index]');
+        if (!row) return;
+        const sourceRowIndex = Number(row.dataset.sourceRowIndex);
+        if (Number.isNaN(sourceRowIndex)) return;
+        if (e.target.classList.contains('hazard-category')) {
+            syncGoehsHazardFieldToMainTable(sourceRowIndex, 'category', e.target.value);
+        } else if (e.target.classList.contains('hazard-sub')) {
+            syncGoehsHazardFieldToMainTable(sourceRowIndex, 'subHazard', e.target.value);
+        } else if (e.target.classList.contains('hazard-outcome')) {
+            syncGoehsHazardFieldToMainTable(sourceRowIndex, 'outcome', e.target.value);
+        }
+    });
+    document.getElementById('hazardTableBody')?.addEventListener('input', (e) => {
+        const row = e.target.closest('tr[data-source-row-index]');
+        if (!row) return;
+        const sourceRowIndex = Number(row.dataset.sourceRowIndex);
+        if (Number.isNaN(sourceRowIndex)) return;
+        if (e.target.classList.contains('hazard-desc')) {
+            syncGoehsHazardFieldToMainTable(sourceRowIndex, 'hazardSource', e.target.value);
+        } else if (e.target.classList.contains('hazard-counter-desc')) {
+            syncGoehsHazardFieldToMainTable(sourceRowIndex, 'currentControl', e.target.value);
+        }
+    });
+
+    const goehsHazardLangSelect = document.getElementById('goehsHazardLangSelect');
+    if (goehsHazardLangSelect) {
+        goehsHazardLangSelect.value = goehsHazardDropdownLang;
+        goehsHazardLangSelect.addEventListener('change', (e) => {
+            goehsHazardDropdownLang = e.target.value;
+            goehsHazardDropdownLangManual = true;
+            localStorage.setItem('goehsHazardDropdownLang', goehsHazardDropdownLang);
+            relabelGoehsHazardDropdownsInLanguage(goehsHazardDropdownLang);
+        });
+    }
+
     // AI Assist button in Final Review header
     const goehsAiAssistBtn = document.getElementById('goehsAiAssistBtn');
     if (goehsAiAssistBtn && goehsAiAssistBtn.dataset.goehsBound !== '1') {
@@ -3770,13 +4025,18 @@ async function aiPopulateHazardFields() {
     let updated = 0;
     hazardRows.forEach(row => {
         const counterDesc = row.querySelector('.hazard-counter-desc')?.value || '';
+        const hazardDesc = row.querySelector('.hazard-desc')?.value || '';
+        const outcomeText = row.querySelector('.hazard-outcome')?.value || '';
         const counterLadderSelect = row.querySelector('.hazard-counter-ladder');
         const predDesc = row.querySelector('.hazard-pred-desc')?.value || '';
         const predLadderSelect = row.querySelector('.hazard-pred-ladder');
+
+        const hasSelectedLadder = (selectEl) => !!selectEl && Array.from(selectEl.selectedOptions || []).length > 0;
+        const ladderSourceText = [counterDesc, hazardDesc, outcomeText].map(v => String(v || '').trim()).filter(Boolean).join(' | ');
         
         // Suggest countermeasure ladder based on description
-        if (counterDesc && counterLadderSelect) {
-            const suggestions = suggestCountermeasureLadder(counterDesc);
+        if (ladderSourceText && counterLadderSelect && !hasSelectedLadder(counterLadderSelect)) {
+            const suggestions = suggestCountermeasureLadder(ladderSourceText);
             if (suggestions.length > 0) {
                 // Clear existing selections
                 Array.from(counterLadderSelect.options).forEach(opt => opt.selected = false);
@@ -3789,6 +4049,8 @@ async function aiPopulateHazardFields() {
                 counterLadderSelect.classList.add('goehs-ai-prefilled');
                 updated++;
             }
+        } else if (counterLadderSelect && hasSelectedLadder(counterLadderSelect)) {
+            counterLadderSelect.classList.add('goehs-ai-prefilled');
         }
         
         if (predDesc && predLadderSelect) {
@@ -4280,10 +4542,15 @@ async function aiAssistHazardFields() {
             const hazardSource = row.querySelector('.hazard-desc')?.value?.trim() || '';
             const currentControl = row.querySelector('.hazard-counter-desc')?.value?.trim() || '';
             const counterLadderSelect = row.querySelector('.hazard-counter-ladder');
+            const hasExistingLadderSelection = !!counterLadderSelect && Array.from(counterLadderSelect.selectedOptions || []).length > 0;
 
             // Preserve Current Control text; use it only for ladder classification.
-            if (currentControl && counterLadderSelect) {
-                const ladderLevels = suggestCountermeasureLadder(currentControl);
+            if (!hasExistingLadderSelection && counterLadderSelect) {
+                const ladderInput = [currentControl, hazardSource, outcomeSelect?.value || '']
+                    .map(v => String(v || '').trim())
+                    .filter(Boolean)
+                    .join(' | ');
+                const ladderLevels = suggestCountermeasureLadder(ladderInput);
                 if (ladderLevels.length > 0) {
                     Array.from(counterLadderSelect.options).forEach(opt => {
                         opt.selected = false;
@@ -4307,6 +4574,8 @@ async function aiAssistHazardFields() {
                         ladderUpdatedRows++;
                     }
                 }
+            } else if (hasExistingLadderSelection && counterLadderSelect) {
+                counterLadderSelect.classList.add('goehs-ai-prefilled');
             }
 
             const hazardNeedsFix = !!hazardSelect && (!hazardSelect.value || hazardSelect.classList.contains('goehs-mismatch'));
@@ -4331,9 +4600,13 @@ async function aiAssistHazardFields() {
                 currentHazard: hazardSelect?.value?.trim() || '',
                 currentSubHazard: subHazardSelect?.value?.trim() || '',
                 currentOutcome: outcomeSelect?.value?.trim() || '',
-                hazardOptions: toOptionValues(hazardSelect),
-                subHazardOptions: toOptionValues(subHazardSelect),
-                outcomeOptions: toOptionValues(outcomeSelect)
+                // Sub-hazard options cascade off the selected Hazard Group so they can
+                // legitimately differ row to row - kept per-row. Hazard Group and Outcome
+                // are the SAME static list on every row; sending them per-row multiplied
+                // the payload size by the row count and was the cause of 413 "Payload Too
+                // Large" errors on tables with more than a handful of mismatched rows -
+                // now sent once at the top level of the prompt instead.
+                subHazardOptions: toOptionValues(subHazardSelect)
             });
         });
 
@@ -4349,33 +4622,52 @@ async function aiAssistHazardFields() {
         }
 
         // 2) AI pass only for rows with missing/mismatched dropdown fields.
-        const promptRows = rowsNeedingDropdownAssist.map((item, assistIndex) => ({
-            assistIndex,
-            taskName: item.taskName,
-            hazardSource: item.hazardSource,
-            currentControl: item.currentControl,
-            needsHazard: item.hazardNeedsFix,
-            needsSubHazard: item.subHazardNeedsFix,
-            needsOutcome: item.outcomeNeedsFix,
-            currentHazard: item.currentHazard,
-            currentSubHazard: item.currentSubHazard,
-            currentOutcome: item.currentOutcome,
-            allowedHazards: item.hazardOptions,
-            allowedSubHazards: item.subHazardOptions,
-            allowedOutcomes: item.outcomeOptions
-        }));
+        // Hazard Group and Outcome are the same static dropdown on every row, so grab
+        // them once instead of repeating a full copy inside each row's JSON below.
+        const sharedHazardOptions = toOptionValues(rowsNeedingDropdownAssist[0].hazardSelect);
+        const sharedOutcomeOptions = toOptionValues(rowsNeedingDropdownAssist[0].outcomeSelect);
 
-        const prompt = `You are a workplace safety risk expert.
+        // Batch in chunks of 20 rows per call - even with the shared-lists fix above, a
+        // single call covering hundreds of rows (each still carrying its own cascaded
+        // allowedSubHazards list) could still hit the API's payload limit. Batching keeps
+        // each request small regardless of how large the hazard table grows, and one
+        // batch failing (e.g. malformed AI response) doesn't lose the others' fixes.
+        const BATCH_SIZE = 20;
+        let dropdownUpdatedRows = 0;
+        let batchErrors = 0;
+
+        for (let batchStart = 0; batchStart < rowsNeedingDropdownAssist.length; batchStart += BATCH_SIZE) {
+            const batchItems = rowsNeedingDropdownAssist.slice(batchStart, batchStart + BATCH_SIZE);
+            const promptRows = batchItems.map((item, i) => ({
+                assistIndex: i,
+                taskName: item.taskName,
+                hazardSource: item.hazardSource,
+                currentControl: item.currentControl,
+                needsHazard: item.hazardNeedsFix,
+                needsSubHazard: item.subHazardNeedsFix,
+                needsOutcome: item.outcomeNeedsFix,
+                currentHazard: item.currentHazard,
+                currentSubHazard: item.currentSubHazard,
+                currentOutcome: item.currentOutcome,
+                allowedSubHazards: item.subHazardOptions
+            }));
+
+            const prompt = `You are a workplace safety risk expert.
 
 Task:
 Fix ONLY missing or mismatched dropdown fields for the listed rows.
 Do NOT propose or rewrite control text.
 
 Rules:
-- Use each row's allowed options.
-- Return values exactly from allowed option lists.
+- "hazard" must come from the allowedHazards list below (used for every row that needs it).
+- "outcome" must come from the allowedOutcomes list below (used for every row that needs it).
+- "subHazard" must come from that row's own allowedSubHazards list.
+- Return values exactly from the relevant allowed option list - do not invent new text.
 - Only fill fields flagged as needed.
 - If unsure, choose the best closest allowed option.
+
+allowedHazards (for every row's "hazard"): ${JSON.stringify(sharedHazardOptions)}
+allowedOutcomes (for every row's "outcome"): ${JSON.stringify(sharedOutcomeOptions)}
 
 ROWS:
 ${JSON.stringify(promptRows, null, 2)}
@@ -4390,100 +4682,104 @@ Return ONLY valid JSON array:
   }
 ]`;
 
-        // Call the API - use global endpoint constant
-        let response;
-        try {
-            response = await fetch(GOEHS_GLOBAL_API_ENDPOINT, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    model: 'openai/gpt-4o-mini',  // Use same paid model as main app
-                    prompt: prompt
-                })
-            });
-        } catch (networkError) {
-            throw new Error('Network error - API server may be unavailable. Use Intelligent Fill instead.');
-        }
-        
-        if (!response.ok) {
-            const errorText = await response.text().catch(() => '');
-            if (response.status === 404) {
-                throw new Error('API endpoint not found (404). The AI service may be temporarily unavailable. Use Intelligent Fill instead.');
-            }
-            throw new Error(`API request failed: ${response.status} - ${errorText}. Use Intelligent Fill instead.`);
-        }
-        
-        const data = await response.json();
-        const content = data.choices?.[0]?.message?.content || '';
-        
-        // Parse the AI response
-        const jsonMatch = content.match(/\[[\s\S]*\]/);
-        if (!jsonMatch) {
-            throw new Error('AI did not return valid JSON array');
-        }
-        
-        const suggestions = JSON.parse(jsonMatch[0]);
+            try {
+                const response = await fetch(GOEHS_GLOBAL_API_ENDPOINT, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        model: 'openai/gpt-4o-mini',  // Use same paid model as main app
+                        prompt: prompt
+                    })
+                });
 
-        // Apply dropdown correction suggestions.
-        let dropdownUpdatedRows = 0;
-        suggestions.forEach(suggestion => {
-            const assistIndex = Number(suggestion.assistIndex);
-            if (Number.isNaN(assistIndex)) return;
+                if (!response.ok) {
+                    const errorText = await response.text().catch(() => '');
+                    throw new Error(`API request failed: ${response.status} - ${errorText}`);
+                }
 
-            const controlItem = rowsNeedingDropdownAssist[assistIndex];
-            if (!controlItem || !controlItem.row) return;
+                const data = await response.json();
+                const content = data.choices?.[0]?.message?.content || '';
 
-            let rowUpdated = false;
+                const jsonMatch = content.match(/\[[\s\S]*\]/);
+                if (!jsonMatch) {
+                    throw new Error('AI did not return valid JSON array');
+                }
 
-            const suggestedHazard = (suggestion.hazard || '').toString().trim();
-            const suggestedSubHazard = (suggestion.subHazard || '').toString().trim();
-            const suggestedOutcome = (suggestion.outcome || '').toString().trim();
+                const suggestions = JSON.parse(jsonMatch[0]);
 
-            if (controlItem.hazardNeedsFix && suggestedHazard && controlItem.hazardSelect) {
-                const matchedHazard = matchSelectOption(controlItem.hazardSelect, suggestedHazard);
-                if (matchedHazard) {
-                    controlItem.hazardSelect.value = matchedHazard.value;
-                    controlItem.hazardSelect.classList.remove('goehs-mismatch');
-                    controlItem.hazardSelect.classList.add('goehs-ai-prefilled');
+                // Apply dropdown correction suggestions for this batch.
+                suggestions.forEach(suggestion => {
+                    const localIndex = Number(suggestion.assistIndex);
+                    if (Number.isNaN(localIndex)) return;
 
-                    if (controlItem.row.id) {
-                        updateTableSubHazards(controlItem.hazardSelect, controlItem.row.id);
-                        controlItem.subHazardSelect = controlItem.row.querySelector('.hazard-sub');
+                    const controlItem = batchItems[localIndex];
+                    if (!controlItem || !controlItem.row) return;
+
+                    let rowUpdated = false;
+                    const sourceRowIndex = Number(controlItem.row.dataset.sourceRowIndex);
+
+                    const suggestedHazard = (suggestion.hazard || '').toString().trim();
+                    const suggestedSubHazard = (suggestion.subHazard || '').toString().trim();
+                    const suggestedOutcome = (suggestion.outcome || '').toString().trim();
+
+                    if (controlItem.hazardNeedsFix && suggestedHazard && controlItem.hazardSelect) {
+                        const matchedHazard = matchSelectOption(controlItem.hazardSelect, suggestedHazard);
+                        if (matchedHazard) {
+                            controlItem.hazardSelect.value = matchedHazard.value;
+                            controlItem.hazardSelect.classList.remove('goehs-mismatch');
+                            controlItem.hazardSelect.classList.add('goehs-ai-prefilled');
+
+                            if (controlItem.row.id) {
+                                updateTableSubHazards(controlItem.hazardSelect, controlItem.row.id);
+                                controlItem.subHazardSelect = controlItem.row.querySelector('.hazard-sub');
+                            }
+                            if (!Number.isNaN(sourceRowIndex)) syncGoehsHazardFieldToMainTable(sourceRowIndex, 'category', matchedHazard.value);
+                            rowUpdated = true;
+                        }
                     }
-                    rowUpdated = true;
-                }
-            }
 
-            if (controlItem.subHazardNeedsFix && suggestedSubHazard && controlItem.subHazardSelect) {
-                const matchedSubHazard = matchSelectOption(controlItem.subHazardSelect, suggestedSubHazard);
-                if (matchedSubHazard) {
-                    controlItem.subHazardSelect.value = matchedSubHazard.value;
-                    controlItem.subHazardSelect.classList.remove('goehs-mismatch');
-                    controlItem.subHazardSelect.classList.add('goehs-ai-prefilled');
-                    rowUpdated = true;
-                }
-            }
+                    if (controlItem.subHazardNeedsFix && suggestedSubHazard && controlItem.subHazardSelect) {
+                        const matchedSubHazard = matchSelectOption(controlItem.subHazardSelect, suggestedSubHazard);
+                        if (matchedSubHazard) {
+                            controlItem.subHazardSelect.value = matchedSubHazard.value;
+                            controlItem.subHazardSelect.classList.remove('goehs-mismatch');
+                            controlItem.subHazardSelect.classList.add('goehs-ai-prefilled');
+                            if (!Number.isNaN(sourceRowIndex)) syncGoehsHazardFieldToMainTable(sourceRowIndex, 'subHazard', matchedSubHazard.value);
+                            rowUpdated = true;
+                        }
+                    }
 
-            if (controlItem.outcomeNeedsFix && suggestedOutcome && controlItem.outcomeSelect) {
-                const matchedOutcome = matchSelectOption(controlItem.outcomeSelect, suggestedOutcome);
-                if (matchedOutcome) {
-                    controlItem.outcomeSelect.value = matchedOutcome.value;
-                    controlItem.outcomeSelect.classList.remove('goehs-mismatch');
-                    controlItem.outcomeSelect.classList.add('goehs-ai-prefilled');
-                    rowUpdated = true;
-                }
-            }
+                    if (controlItem.outcomeNeedsFix && suggestedOutcome && controlItem.outcomeSelect) {
+                        const matchedOutcome = matchSelectOption(controlItem.outcomeSelect, suggestedOutcome);
+                        if (matchedOutcome) {
+                            controlItem.outcomeSelect.value = matchedOutcome.value;
+                            controlItem.outcomeSelect.classList.remove('goehs-mismatch');
+                            controlItem.outcomeSelect.classList.add('goehs-ai-prefilled');
+                            if (!Number.isNaN(sourceRowIndex)) syncGoehsHazardFieldToMainTable(sourceRowIndex, 'outcome', matchedOutcome.value);
+                            rowUpdated = true;
+                        }
+                    }
 
-            if (rowUpdated) {
-                dropdownUpdatedRows++;
+                    if (rowUpdated) {
+                        dropdownUpdatedRows++;
+                    }
+                });
+            } catch (batchError) {
+                console.error('AI Assist batch failed:', batchError);
+                batchErrors++;
             }
-        });
+        }
+
+        if (batchErrors > 0 && dropdownUpdatedRows === 0 && ladderUpdatedRows === 0) {
+            throw new Error(`All ${batchErrors} AI batch(es) failed. Use Intelligent Fill instead.`);
+        }
 
         if (dropdownUpdatedRows > 0 || ladderUpdatedRows > 0) {
             const parts = [];
             if (dropdownUpdatedRows > 0) parts.push(`corrected dropdowns on ${dropdownUpdatedRows} row(s)`);
             if (ladderUpdatedRows > 0) parts.push(`updated ladder selections on ${ladderUpdatedRows} row(s)`);
-            showGoehsAlert(`🤖 AI Assist: ${parts.join(' and ')}.`, 'success');
+            const batchNote = batchErrors > 0 ? ` (${batchErrors} batch(es) failed - re-run AI Assist to retry those rows)` : '';
+            showGoehsAlert(`🤖 AI Assist: ${parts.join(' and ')}${batchNote}.`, batchErrors > 0 ? 'warning' : 'success');
         } else {
             showGoehsAlert('⚠ AI did not return usable dropdown corrections and no ladder updates were made.', 'warning');
         }
@@ -4867,87 +5163,42 @@ function copyHazardCSV() {
 }
 
 // Generate Excel file with 3 sheets (Assessment, Task, Hazard)
-function generateExcelWithSheets() {
-    if (!validateGoehsRequiredHeaderFields()) {
-        return;
-    }
+// Builds a GOEHS-vendor-template-matching workbook (flat 40-column "Batch Upload Template"
+// sheet, matching Risk_Registry_Batch_Upload_Template.xlsx) from a plain hazards array + header
+// metadata. Pure - does not read the DOM and does not write a file, so it can be reused by both
+// the GOEHS assessment modal (generateExcelWithSheets, below) and the Excel Import wizard's
+// per-sheet/batch GOEHS export, which previously had no shared "what does a GOEHS export look
+// like" implementation at all.
+function buildGoehsBatchWorkbook(hazards, meta, exportLang) {
+    if (typeof XLSX === 'undefined') return null;
 
-    const assessmentTitleField = document.getElementById('goehsAssessmentTitle');
-    const titleInput = (assessmentTitleField?.value || '').trim();
+    const m = meta || {};
+    const lang = exportLang || 'en';
+    const T = (lang !== 'en' && window.TRANSLATIONS?.[lang]) ? window.TRANSLATIONS[lang] : null;
 
-    if (!titleInput) {
-        if (assessmentTitleField) {
-            assessmentTitleField.classList.add('goehs-empty-required');
-            assessmentTitleField.focus();
-            assessmentTitleField.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }
-        showGoehsAlert('Assessment Title is mandatory before download. Please enter it to continue.', 'error');
-        return;
-    }
-
-    if (assessmentTitleField) {
-        assessmentTitleField.classList.remove('goehs-empty-required');
-    }
-
-    const assessmentTitle = titleInput;
-
-    if (typeof XLSX === 'undefined') {
-        showGoehsAlert('Excel library not loaded. Please try the CSV download instead.', 'error');
-        return;
-    }
-
-    // Assessment header fields
-    const orgName     = document.getElementById('goehsOrgName').value;
-    const location    = document.getElementById('goehsLocation').value;
-    const department  = document.getElementById('goehsDepartment').value;
-    const workstation = document.getElementById('goehsWorkstation').value;
-    const date        = formatDateForGoehsExport(document.getElementById('goehsAssessmentDate')?.value || '');
-    const equipment   = document.getElementById('goehsEquipment')?.value || '';
-    const type        = getGoehsTypeValue();
-    const approver    = document.getElementById('goehsApprover').value || '(Site Admin)';
-    const teamMembers = document.getElementById('goehsTeamMembers')?.value || '';
-    const completedBy = document.getElementById('goehsCompletedBy')?.value || '';
-
-    // Collect hazard rows — values already validated against GOEHS whitelists in the UI
-    const hazards = collectHazardData();
-
-    // Build task lookup map from available task rows (if any) and risk-table-derived metadata fallback.
-    const taskMap = getGoehsTaskMetadataMap(hazards);
-
-    if (hazards.length === 0) {
-        showGoehsAlert('No hazards found. Please add hazards in Tool 3 first.', 'error');
-        return;
-    }
-
-    // ── Language detection ──
-    // Reads from localStorage (same key used by the main app language switcher)
-    const exportLang = localStorage.getItem('appLanguage') || 'en';
-    const T = (exportLang !== 'en' && window.TRANSLATIONS?.[exportLang]) ? window.TRANSLATIONS[exportLang] : null;
-
-    // Translate a single English value to the export language using window.TRANSLATIONS
     function xlate(val) {
         if (!val || !T) return val;
         return T[val] || val;
     }
 
-    // Translate a Condition Mode value
     function xlateCondition(val) {
-        if (!val || exportLang === 'en') return val;
-        return GOEHS_CONDITION_TRANSLATIONS[exportLang]?.[val] || xlate(val) || val;
+        if (!val || lang === 'en') return val;
+        return GOEHS_CONDITION_TRANSLATIONS[lang]?.[val] || xlate(val) || val;
     }
 
-    // Translate a Countermeasure Ladder string (one or more comma-separated levels)
-    // Validates against English whitelist first, then maps to the target language.
     function normalizeLadder(ladderStr) {
         if (!ladderStr) return '';
         const parts = ladderStr.split(',').map(s => s.trim()).filter(Boolean);
         const valid = parts.filter(p => COUNTERMEASURE_LADDER.includes(p));
-        if (exportLang === 'en' || !GOEHS_LADDER_TRANSLATIONS[exportLang]) {
+        if (lang === 'en' || !GOEHS_LADDER_TRANSLATIONS[lang]) {
             return valid.join(', ');
         }
-        const lmap = GOEHS_LADDER_TRANSLATIONS[exportLang];
+        const lmap = GOEHS_LADDER_TRANSLATIONS[lang];
         return valid.map(p => lmap[p] || p).join(', ');
     }
+
+    // Build task lookup map from available task rows (if any) and risk-table-derived metadata fallback.
+    const taskMap = getGoehsTaskMetadataMap(hazards);
 
     // -- Flat 40-column header matching Risk_Registry_Batch_Upload_Template.xlsx --
     const headers = [
@@ -4981,17 +5232,17 @@ function generateExcelWithSheets() {
 
         return [
             idx + 1,                                      // Row
-            orgName,                                      // OrgName*
-            location,                                     // Location*
-            department,                                   // Department
-            workstation,                                  // Workstation
-            assessmentTitle,                              // Assessment Title*
-            date,                                         // Assessment Date
-            equipment,                                    // Equipment
-            type,                                         // Type
-            approver,                                     // Assessment Approver*
-            teamMembers,                                  // Name of Risk Assessment Team Members
-            completedBy,                                  // Completed By
+            m.orgName || '',                              // OrgName*
+            m.location || '',                             // Location*
+            m.department || '',                           // Department
+            m.workstation || '',                           // Workstation
+            m.assessmentTitle || '',                       // Assessment Title*
+            m.date || '',                                  // Assessment Date
+            m.equipment || '',                              // Equipment
+            m.type || '',                                   // Type
+            m.approver || '(Site Admin)',                   // Assessment Approver*
+            m.teamMembers || '',                            // Name of Risk Assessment Team Members
+            m.completedBy || '',                            // Completed By
             taskName,                                      // Task Name *
             task.taskDescription || taskName,              // Task Description *
             xlateCondition(conditionMode),                 // Condition Mode *
@@ -5023,9 +5274,11 @@ function generateExcelWithSheets() {
         ];
     });
 
-    // -- Create workbook � single sheet named "Batch Upload Template" --
+    // -- Create workbook — single sheet named "Batch Upload Template" --
+    // The vendor template (Risk_Registry_Batch_Upload_Template.xlsx) repeats the header row
+    // verbatim on row 2 before data starts on row 3 - confirmed by inspecting the actual file.
     const wb = XLSX.utils.book_new();
-    const wsData = [headers, ...dataRows];
+    const wsData = [headers, headers, ...dataRows];
     const ws = XLSX.utils.aoa_to_sheet(wsData);
 
     // Auto-size column widths
@@ -5036,13 +5289,95 @@ function generateExcelWithSheets() {
     ws['!cols'] = colWidths;
 
     XLSX.utils.book_append_sheet(wb, ws, 'Batch Upload Template');
+    return wb;
+}
+window.buildGoehsBatchWorkbook = buildGoehsBatchWorkbook;
+
+async function generateExcelWithSheets() {
+    if (!validateGoehsRequiredHeaderFields()) {
+        return;
+    }
+
+    const assessmentTitleField = document.getElementById('goehsAssessmentTitle');
+    const titleInput = (assessmentTitleField?.value || '').trim();
+
+    if (!titleInput) {
+        if (assessmentTitleField) {
+            assessmentTitleField.classList.add('goehs-empty-required');
+            assessmentTitleField.focus();
+            assessmentTitleField.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+        showGoehsAlert('Assessment Title is mandatory before download. Please enter it to continue.', 'error');
+        return;
+    }
+
+    if (assessmentTitleField) {
+        assessmentTitleField.classList.remove('goehs-empty-required');
+    }
+
+    const assessmentTitle = titleInput;
+
+    if (typeof XLSX === 'undefined') {
+        showGoehsAlert('Excel library not loaded. Please try the CSV download instead.', 'error');
+        return;
+    }
+
+    // Collect hazard rows — values already validated against GOEHS whitelists in the UI
+    const hazards = collectHazardData();
+
+    if (hazards.length === 0) {
+        showGoehsAlert('No hazards found. Please add hazards in Tool 3 first.', 'error');
+        return;
+    }
+
+    // ── Language ──
+    // Uses the modal's own Hazard dropdown language (goehsHazardDropdownLang), not the
+    // global appLanguage UI toggle - that only covers en/fr/de and is a different control
+    // from the one the user actually sees next to the Hazard/Sub-Hazard dropdowns here.
+    const exportLang = goehsHazardDropdownLang || 'en';
+
+    const meta = {
+        orgName: document.getElementById('goehsOrgName').value,
+        location: document.getElementById('goehsLocation').value,
+        department: document.getElementById('goehsDepartment').value,
+        workstation: document.getElementById('goehsWorkstation').value,
+        assessmentTitle,
+        date: formatDateForGoehsExport(document.getElementById('goehsAssessmentDate')?.value || ''),
+        equipment: document.getElementById('goehsEquipment')?.value || '',
+        type: getGoehsTypeValue(),
+        approver: document.getElementById('goehsApprover').value || '(Site Admin)',
+        teamMembers: document.getElementById('goehsTeamMembers')?.value || '',
+        completedBy: document.getElementById('goehsCompletedBy')?.value || ''
+    };
+
+    const wb = buildGoehsBatchWorkbook(hazards, meta, exportLang);
+    if (!wb) {
+        showGoehsAlert('Excel library not loaded. Please try the CSV download instead.', 'error');
+        return;
+    }
 
     const langLabel = exportLang !== 'en' ? `_${exportLang.toUpperCase()}` : '';
-    const filename = `GOEHS_Batch_Upload_${assessmentTitle.replace(/[^a-zA-Z0-9]/g, '_')}${langLabel}.xlsx`;
+    const safeTitle = assessmentTitle.replace(/[^a-zA-Z0-9]/g, '_');
+    const filename = `GOEHS_Batch_Upload_${safeTitle}${langLabel}.xlsx`;
     XLSX.writeFile(wb, filename);
 
+    // Also save the full project JSON alongside the GOEHS Excel, named from the same
+    // Assessment Title (falling back to the main app's Plant/Process-based naming if for
+    // some reason the project save itself has nothing to save) - so a downloaded GOEHS
+    // batch file always has a matching project save to reopen and keep editing from.
+    let jsonSaved = false;
+    if (typeof window.saveProject === 'function') {
+        try {
+            await window.saveProject(`${safeTitle}.json`, true);
+            jsonSaved = true;
+        } catch (jsonSaveError) {
+            console.warn('Could not save project JSON alongside GOEHS export:', jsonSaveError);
+        }
+    }
+
     const langNote = exportLang !== 'en' ? ` (language: ${exportLang.toUpperCase()})` : '';
-    showGoehsAlert(`✅ GOEHS Batch Upload Excel downloaded${langNote} — ${hazards.length} hazard row(s) in "Batch Upload Template" sheet.`, 'success');
+    const jsonNote = jsonSaved ? ` Project JSON ("${safeTitle}.json") also downloaded.` : '';
+    showGoehsAlert(`✅ GOEHS Batch Upload Excel downloaded${langNote} — ${hazards.length} hazard row(s) in "Batch Upload Template" sheet.${jsonNote}`, 'success');
 }
 
 function downloadCSV(csvContent, filename) {

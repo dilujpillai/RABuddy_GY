@@ -81,3 +81,33 @@
     gap: 8px !important;
     align-items: center !important;
 }
+
+/* ---- Toolbar dropdown / flyout menu ---- */
+.rab-dropdown {
+    position: relative !important;
+    display: inline-block !important;
+}
+/* position: fixed, not absolute - these panels are reparented to <body> at init time
+   (see initRabDropdown) so they escape ancestor overflow:hidden cards elsewhere in this
+   layout (e.g. #dashboard-container), which would otherwise clip them. Top/left are set
+   dynamically in JS from the toggle button's position each time a panel opens. */
+.rab-dropdown-panel {
+    display: none;
+    position: fixed !important;
+    background: #fff !important;
+    border: 1px solid #e2e8f0 !important;
+    border-radius: 8px !important;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.15) !important;
+    padding: 8px !important;
+    z-index: 1000 !important;
+    min-width: 230px !important;
+}
+.rab-dropdown-panel.rab-dropdown-open {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 6px !important;
+}
+.rab-dropdown-panel .rab-btn {
+    width: 100% !important;
+    justify-content: flex-start !important;
+}
