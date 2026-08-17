@@ -3430,17 +3430,24 @@ function autoPopulateFromRiskTable() {
     const count = tableData.hazards.length;
     const taskCount = tableData.tasks.length;
 
-    // Detect drift: the main risk table is re-extracted fresh every time this modal
-    // opens, but Tasks/Hazards only auto-populate from it ONCE (ensureGoehsSectionDataLoaded
-    // guards on the panes still being empty) - so editing rows in the main table after the
-    // first GOEHS visit silently had no effect until the user found the buried "Re-sync"
-    // button. Surface that drift right here, in the banner shown the moment the modal opens.
+    // Detect drift: the main risk table is re-extracted fresh every time this modal opens,
+    // but Tasks/Hazards only auto-populate from it ONCE (ensureGoehsSectionDataLoaded guards
+    // on the panes still being empty) - so editing rows in the main table after the first
+    // GOEHS visit silently had no effect. Category/Sub-Hazard/Outcome/Hazard Source/Current
+    // Control/Countermeasure Ladder all write back to the main table as they're edited (see
+    // syncGoehsHazardFieldToMainTable/syncGoehsLadderToMainTable), so a rebuild from the main
+    // table can't lose those - it's now safe to auto-refresh here instead of requiring a
+    // manual click. Fields with no main-table counterpart (Job Title, Condition Mode, manual
+    // F/S/L overrides, Predictive/Residual values) are GOEHS-only and still reset on refresh.
     const hazardsChanged = goehsHazards.length > 0
         && window.__goehsHazardsSyncedSig !== undefined
         && window.__goehsHazardsSyncedSig !== computeGoehsHazardsSignature(tableData);
     const tasksChanged = goehsTasks.length > 0
         && window.__goehsTasksSyncedSig !== undefined
         && window.__goehsTasksSyncedSig !== computeGoehsTasksSignature(tableData);
+
+    if (tasksChanged) populateGoehsTasksFromTable(tableData);
+    if (hazardsChanged) populateGoehsHazardsFromTable(tableData);
 
     // Update banner to show data found
     if (banner) {
@@ -3449,14 +3456,10 @@ function autoPopulateFromRiskTable() {
             banner.className = 'mb-6 p-4 bg-amber-50 border border-amber-300 rounded-lg';
             banner.innerHTML = `
                 <div class="flex items-start gap-3">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-amber-600 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.93 4.93l14.14 14.14M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-amber-600 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                     <div class="flex-1">
-                        <h4 class="font-semibold text-amber-800">⚠ Risk table has changed since this was loaded</h4>
-                        <p class="text-amber-700 text-sm mt-1">Your main risk table's ${what} no longer match what's shown below/in the review pane. Refresh to pull in the latest changes (this replaces what's currently in the ${what} pane here - any edits made only inside GOEHS Integration for those rows will be lost).</p>
-                        <div class="mt-3 flex gap-2 flex-wrap">
-                            ${tasksChanged ? `<button type="button" onclick="resyncTasksFromTable()" class="goehs-btn goehs-btn-indigo">🔄 Refresh Tasks</button>` : ''}
-                            ${hazardsChanged ? `<button type="button" onclick="resyncHazardsFromTable()" class="goehs-btn goehs-btn-indigo">🔄 Refresh Hazards</button>` : ''}
-                        </div>
+                        <h4 class="font-semibold text-amber-800">🔄 Refreshed ${what} from the main risk table</h4>
+                        <p class="text-amber-700 text-sm mt-1">Your main table had changed since this was last loaded here, so the ${what} pane was automatically updated to match. Hazard/Sub-Hazard/Outcome/Source/Current Control/Countermeasure Ladder carried over - Job Title, Condition Mode, and any manual F/S/L or Predictive/Residual edits for the affected rows were reset since those only exist here.</p>
                     </div>
                 </div>
             `;
@@ -3808,6 +3811,8 @@ document.addEventListener('DOMContentLoaded', function() {
             syncGoehsHazardFieldToMainTable(sourceRowIndex, 'subHazard', e.target.value);
         } else if (e.target.classList.contains('hazard-outcome')) {
             syncGoehsHazardFieldToMainTable(sourceRowIndex, 'outcome', e.target.value);
+        } else if (e.target.classList.contains('hazard-counter-ladder')) {
+            syncGoehsLadderToMainTable(e.target);
         }
     });
     document.getElementById('hazardTableBody')?.addEventListener('input', (e) => {
@@ -4169,9 +4174,35 @@ function applyLadderSelection(selectEl, levels) {
         const opt = Array.from(selectEl.options).find(o => o.value === level);
         if (opt) { opt.selected = true; matched++; }
     });
-    if (matched > 0) selectEl.classList.add('goehs-ai-prefilled');
+    if (matched > 0) {
+        selectEl.classList.add('goehs-ai-prefilled');
+        // Write the AI-assigned ladder straight back to the main table row this hazard
+        // came from - otherwise it only ever exists in this <select>'s in-memory state,
+        // and a later "Refresh Hazards" resync (which rebuilds this table from the main
+        // table) silently wipes it out since the main table never learned about it.
+        syncGoehsLadderToMainTable(selectEl);
+    }
     return matched > 0;
 }
+
+// Push the current selection of a hazard row's Countermeasure Ladder <select> (Current or
+// Predictive) back onto the linked main-table row's data-countermeasure-ladder attribute -
+// the single source of truth that populateGoehsHazardsFromTable/resyncHazardsFromTable reads
+// from. Called on manual selection (onchange) and after any AI/Intelligent ladder fill.
+function syncGoehsLadderToMainTable(selectEl) {
+    const hazardRow = selectEl && selectEl.closest('tr[data-source-row-index]');
+    if (!hazardRow) return;
+    const mainRow = document.querySelector(`#table-container tr[data-row-index="${hazardRow.dataset.sourceRowIndex}"]`);
+    if (!mainRow) return;
+
+    const selected = Array.from(selectEl.selectedOptions).map(o => o.value).filter(Boolean);
+    if (selected.length > 0) {
+        mainRow.setAttribute('data-countermeasure-ladder', selected.join(', '));
+    } else {
+        mainRow.removeAttribute('data-countermeasure-ladder');
+    }
+}
+window.syncGoehsLadderToMainTable = syncGoehsLadderToMainTable;
 
 // AI Fix Countermeasure Ladder - the "AI" option in the Fix Countermeasure Ladder flyout.
 // Covers BOTH Current and Predictive ladder fields, same scope as Intelligent Fill
