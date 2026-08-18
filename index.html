@@ -233,29 +233,35 @@
 }
 .gy-dashboard { display: grid; grid-template-columns: 300px 1fr; gap: 25px; margin-bottom: 30px; }
 .gy-dropzone {
-    border: 3px dashed #27ae60; border-radius: 10px; padding: 20px; text-align: center; background: #f0fff4; 
+    border: 2px dashed #cbd5e1; border-radius: 10px; padding: 20px; text-align: center; background: #f8fafc;
     cursor: pointer; display: flex; flex-direction: column; justify-content: center; align-items: center;
-    transition: all 0.2s; height: 100%; box-sizing: border-box;
+    transition: background 0.15s, border-color 0.15s; height: 100%; box-sizing: border-box;
 }
-.gy-dropzone:hover { background: #e8f8f0; border-color: #219150; transform: translateY(-2px); }
+.gy-dropzone:hover { background: #f1f5f9; border-color: #94a3b8; }
 .gy-mapper-box { background: #f8f9fa; border: 1px solid #e9ecef; padding: 20px; border-radius: 10px; }
 .gy-mapper-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 2px solid #e9ecef; padding-bottom: 10px; }
 .gy-mapper-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(80px, 1fr)); gap: 10px; }
 .gy-map-field input { width: 100%; padding: 6px; border: 1px solid #ccc; border-radius: 4px; text-align: center; font-weight: bold; }
-#gyRefreshBtn { background: #3498db; color: white; border: none; padding: 6px 12px; border-radius: 15px; cursor: pointer; }
+/* Neutral count pill used by the Source Images / Steps Preview panel headers */
+.gy-count-badge {
+    font-size: 0.7rem; font-weight: 600; color: #475569; background: #f1f5f9;
+    border: 1px solid #e2e8f0; padding: 2px 9px; border-radius: 999px;
+}
 .gy-grid-container { display: grid; grid-template-columns: repeat(auto-fill, minmax(400px, 1fr)); gap: 25px; margin-top: 20px; }
 /* .gy-card base rule lives further down (fully overridden here, was dead/shadowed code) */
 .gy-card-img { height: 200px; background: #f8f9fa; display: flex; align-items: center; justify-content: center; position: relative; border-bottom: 1px solid #eee; overflow: hidden; }
 .gy-card-img img { max-width: 100%; max-height: 100%; object-fit: contain; }
 .gy-row-badge { position: absolute; bottom: 10px; left: 10px; background: rgba(0,0,0,0.6); color: white; padding: 4px 10px; border-radius: 4px; font-size: 11px; pointer-events: none; z-index: 5; }
 .gy-action-btn { width: 30px; height: 30px; border-radius: 50%; cursor: pointer; z-index: 10; display: flex; align-items: center; justify-content: center; border: none; position: absolute; top: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
-.gy-down-btn { right: 80px; background: #10b981; color: white; }
-.gy-down-btn:hover { background: #059669; transform: scale(1.1); }
-.gy-del-btn { right: 10px; background: #e74c3c; color: white; }
-.gy-rep-btn { right: 45px; background: #3498db; color: white; }
+.gy-down-btn { right: 80px; background: #059669; color: white; }
+.gy-down-btn:hover { background: #047857; transform: scale(1.1); }
+.gy-del-btn { right: 10px; background: #dc2626; color: white; }
+.gy-del-btn:hover { background: #b91c1c; transform: scale(1.1); }
+.gy-rep-btn { right: 45px; background: #2563eb; color: white; }
+.gy-rep-btn:hover { background: #1d4ed8; transform: scale(1.1); }
 .gy-card-body { padding: 15px; display: flex; flex-direction: column; gap: 10px; }
 .gy-textarea { width: 100%; box-sizing: border-box; border: 1px solid #e0e0e0; border-radius: 6px; padding: 8px; font-size: 0.9rem; min-height: 50px; background: #fafafa; }
-.gy-main-btn { background: #27ae60; color: white; border: none; padding: 15px 40px; font-size: 1.2rem; border-radius: 50px; cursor: pointer; }
+.gy-main-btn { background: #059669; color: white; border: none; padding: 15px 40px; font-size: 1.2rem; border-radius: 8px; cursor: pointer; }
         .btn-indigo { background: linear-gradient(135deg, #002c5f 0%, #001a3d 100%); color: white; border: none; padding: 12px 24px; font-weight: 600; border-radius: 8px; cursor: pointer; transition: all 0.3s ease; box-shadow: 0 4px 15px rgba(0, 44, 95, 0.3); }
         .btn-indigo:hover { background: linear-gradient(135deg, #001a3d 0%, #001530 100%); transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0, 44, 95, 0.4); }
         .btn-indigo:disabled { opacity: 0.5; cursor: not-allowed; }
@@ -2231,7 +2237,7 @@
                         </svg>
                         <span class="text-sm font-semibold text-blue-800">Click to Upload Legacy Excel</span>
                     </div>
-                    <input type="file" id="excelUpload" accept=".xlsx,.xls,.csv" class="hidden" />
+                    <input type="file" id="excelUpload" accept=".xlsx,.xlsm,.xls,.csv" class="hidden" />
                 </div>
                 
                 <!-- Option 2: Direct GOEHS Upload (Pre-formatted RA 2025 Template) -->
@@ -2254,7 +2260,7 @@
                         </svg>
                         <span class="text-sm font-semibold text-orange-800">Click to Upload RA 2025 Template</span>
                     </div>
-                    <input type="file" id="directGoehsUpload" accept=".xlsx,.xls" class="hidden" />
+                    <input type="file" id="directGoehsUpload" accept=".xlsx,.xlsm,.xls" class="hidden" />
                 </div>
                 
                 <!-- Option 3: Batch RA 2025 → GOEHS Export (up to 20 files) -->
@@ -2277,7 +2283,7 @@
                         </svg>
                         <span class="text-sm font-semibold text-emerald-800">Click to Select RA 2025 Files (up to 20)</span>
                     </div>
-                    <input type="file" id="batchRA2025Upload" accept=".xlsx,.xls" multiple class="hidden" />
+                    <input type="file" id="batchRA2025Upload" accept=".xlsx,.xlsm,.xls" multiple class="hidden" />
                 </div>
                 
             </div>
@@ -14422,8 +14428,8 @@ downloadBtn.addEventListener('click', async () => {
 
         <div id="gySingleTabContent" style="display:contents;">
         <!-- Sheet Tabs Bar -->
-        <div id="gySheetTabsBar" style="display:none; flex-shrink:0; margin-bottom:12px; background:linear-gradient(135deg,#002c5f 0%,#001a3d 100%); border-radius:10px; padding:6px 10px; overflow-x:auto; white-space:nowrap;">
-            <span style="color:#93c5fd; font-size:0.7rem; font-weight:600; margin-right:10px; vertical-align:middle;">📑 Sheets:</span>
+        <div id="gySheetTabsBar" style="display:none; flex-shrink:0; margin-bottom:12px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:6px 10px; overflow-x:auto; white-space:nowrap;">
+            <span style="color:#64748b; font-size:0.7rem; font-weight:700; margin-right:10px; vertical-align:middle;">📑 Sheets:</span>
             <span id="gySheetTabsList" style="display:inline-flex; gap:4px;"></span>
         </div>
         
@@ -14435,7 +14441,7 @@ downloadBtn.addEventListener('click', async () => {
                 <div style="font-size: 32px;">📂</div>
                 <h4 style="margin: 8px 0 4px 0; font-size: 0.9rem; font-weight: 600;">Drop Excel File</h4>
                 <p style="font-size: 0.75rem; color: #64748b; margin: 0;">or click to browse</p>
-                <p class="text-emerald-600 text-xs mt-2">.xlsx, .xls, .json</p>
+                <p class="text-emerald-600 text-xs mt-2">.xlsx, .xlsm, .xls, .json</p>
             </div>
 
             <!-- Column Mapping + Preview: collapsed by default, expand for full-width review/edit -->
@@ -14450,11 +14456,11 @@ downloadBtn.addEventListener('click', async () => {
                     <div>
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; padding-bottom: 8px; border-bottom: 2px solid #e2e8f0;">
                             <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
-                                <button id="gyCopyMappingBtn" type="button" title="Copy current column mapping — then switch to the next tab and click Paste" style="background:linear-gradient(135deg,#0ea5e9,#0284c7);color:white;border:none;padding:4px 10px;border-radius:6px;cursor:pointer;font-size:0.68rem;font-weight:600;transition:all 0.2s;" onmouseover="this.style.transform='translateY(-1px)';this.style.boxShadow='0 2px 8px rgba(14,165,233,0.35)'" onmouseout="this.style.transform='';this.style.boxShadow=''">📋 Copy Mapping</button>
-                                <button id="gyPasteMappingBtn" type="button" title="Paste the copied mapping into this tab" disabled style="background:#e2e8f0;color:#94a3b8;border:none;padding:4px 10px;border-radius:6px;cursor:not-allowed;font-size:0.68rem;font-weight:600;transition:all 0.2s;">📌 Paste</button>
-                                <button id="gyApplyMappingAll" type="button" title="Apply this mapping to ALL other tabs at once" style="display:none;background:linear-gradient(135deg,#f59e0b,#d97706);color:white;border:none;padding:4px 10px;border-radius:6px;cursor:pointer;font-size:0.68rem;font-weight:600;transition:all 0.2s;" onmouseover="this.style.transform='translateY(-1px)';this.style.boxShadow='0 2px 8px rgba(245,158,11,0.35)'" onmouseout="this.style.transform='';this.style.boxShadow=''">📋 Apply to All Tabs</button>
-                                <button id="gyClearMappingBtn" type="button" title="Clear all mapped columns" style="background:#fff;color:#475569;border:1px solid #cbd5e1;padding:4px 10px;border-radius:6px;cursor:pointer;font-size:0.68rem;font-weight:600;transition:all 0.2s;">🧹 Clear</button>
-                                <button id="gyRefreshBtn" type="button" style="background: linear-gradient(135deg, #002c5f 0%, #001a3d 100%); color: white; border: none; padding: 4px 10px; border-radius: 6px; cursor: pointer; font-size: 0.7rem; font-weight: 600;">↻ Refresh</button>
+                                <button id="gyCopyMappingBtn" type="button" class="rab-btn rab-btn-sm rab-c-ghost" title="Copy current column mapping — then switch to the next tab and click Paste">📋 Copy Mapping</button>
+                                <button id="gyPasteMappingBtn" type="button" class="rab-btn rab-btn-sm rab-c-ghost" title="Paste the copied mapping into this tab" disabled>📌 Paste</button>
+                                <button id="gyApplyMappingAll" type="button" class="rab-btn rab-btn-sm rab-c-amber rab-hidden" title="Apply this mapping to ALL other tabs at once">📋 Apply to All Tabs</button>
+                                <button id="gyClearMappingBtn" type="button" class="rab-btn rab-btn-sm rab-c-ghost" title="Clear all mapped columns">🧹 Clear</button>
+                                <button id="gyRefreshBtn" type="button" class="rab-btn rab-btn-sm rab-c-blue">↻ Refresh</button>
                             </div>
                         </div>
                         <div id="gyMapHelp" class="gy-map-help">Use the <strong>Map to</strong> row in the preview table to assign columns quickly. Open <strong>Advanced Manual Mapping</strong> only if you need direct A/B/C edits.</div>
@@ -14482,13 +14488,13 @@ downloadBtn.addEventListener('click', async () => {
 
                     <!-- Excel Preview Panel -->
                     <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; display: flex; flex-direction: column;">
-                        <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: linear-gradient(135deg, #002c5f 0%, #001a3d 100%); color: white;">
-                            <h4 style="font-size: 0.75rem; font-weight: 600; margin: 0;">📋 Excel Data Preview</h4>
+                        <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: #f1f5f9; border-bottom: 1px solid #e2e8f0; color: #334155;">
+                            <h4 style="font-size: 0.75rem; font-weight: 700; margin: 0;">📋 Excel Data Preview</h4>
                             <div style="display: flex; gap: 8px; align-items: center;">
-                                <label style="font-size: 0.65rem;">Header Row:</label>
-                                <input type="number" id="gyHeaderRow" value="1" min="1" max="50" style="width: 40px; padding: 2px 4px; border: none; border-radius: 4px; font-size: 0.7rem; text-align: center; color: #1e293b; background: #fff;">
-                                <label style="font-size: 0.65rem;">Data Start:</label>
-                                <input type="number" id="gyDataStartRow" value="2" min="1" max="100" style="width: 40px; padding: 2px 4px; border: none; border-radius: 4px; font-size: 0.7rem; text-align: center; color: #1e293b; background: #fff;">
+                                <label style="font-size: 0.65rem; color: #64748b; font-weight: 600;">Header Row:</label>
+                                <input type="number" id="gyHeaderRow" value="1" min="1" max="50" style="width: 44px; padding: 2px 4px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 0.7rem; text-align: center; color: #1e293b; background: #fff;">
+                                <label style="font-size: 0.65rem; color: #64748b; font-weight: 600;">Data Start:</label>
+                                <input type="number" id="gyDataStartRow" value="2" min="1" max="100" style="width: 44px; padding: 2px 4px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 0.7rem; text-align: center; color: #1e293b; background: #fff;">
                             </div>
                         </div>
                         <div id="gyExcelPreviewContainer" style="flex: 1; overflow: auto; max-height: 50vh;">
@@ -14506,36 +14512,36 @@ downloadBtn.addEventListener('click', async () => {
             </details>
         </div>
 
-        <input type="file" id="gyFileInput" accept=".xlsx, .xls, .json" style="display:none">
+        <input type="file" id="gyFileInput" accept=".xlsx, .xlsm, .xls, .json" style="display:none">
         <div id="gyStatus" style="text-align: center; font-size: 0.8rem; font-weight: 600; color: #64748b; padding: 4px 0; flex-shrink: 0;"></div>
 
         <!-- Main Content: Source Images + Steps Preview -->
         <div style="display: flex; gap: 16px; flex: 1; min-height: 0; overflow: hidden;">
             
             <!-- Left Panel: Source Images -->
-            <div class="gy-source-panel" id="gySourcePanel" style="display:none; width: 280px; flex-shrink: 0; background: linear-gradient(180deg, #fefce8 0%, #fef9c3 100%); border: 1px solid #fde047; border-radius: 12px; padding: 12px; display: flex; flex-direction: column;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; padding-bottom: 8px; border-bottom: 2px solid #fde047;">
-                    <h4 style="font-weight: 700; color: #854d0e; font-size: 0.85rem; margin: 0;">🖼️ Source Images</h4>
-                    <span id="gyImgCount" style="font-size: 0.7rem; color: #a16207; background: white; padding: 2px 8px; border-radius: 10px;"></span>
+            <div class="gy-source-panel" id="gySourcePanel" style="display:none; width: 280px; flex-shrink: 0; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 12px; display: flex; flex-direction: column;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid #e2e8f0;">
+                    <h4 style="font-weight: 700; color: #334155; font-size: 0.85rem; margin: 0;">🖼️ Source Images</h4>
+                    <span id="gyImgCount" class="gy-count-badge"></span>
                 </div>
-                <p style="font-size: 0.7rem; color: #a16207; margin: 0 0 8px 0;">Drag images to step cards →</p>
-                <button onclick="gyDownloadAllImages()" style="background: #f59e0b; color: white; border: none; padding: 8px 12px; border-radius: 6px; font-size: 0.75rem; font-weight: 600; cursor: pointer; margin-bottom: 10px;">⬇️ Download All Images</button>
+                <p style="font-size: 0.7rem; color: #64748b; margin: 0 0 8px 0;">Drag images to step cards →</p>
+                <button onclick="gyDownloadAllImages()" class="rab-btn rab-btn-sm rab-c-ghost" style="width: 100%; margin-bottom: 10px;">⬇️ Download All Images</button>
                 <div id="gySourceGrid" class="gy-source-scroll" style="flex: 1; overflow-y: auto; display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; padding-right: 4px;"></div>
             </div>
 
             <!-- Right Panel: Steps Cards -->
-            <div class="gy-cards-panel" id="gyCardsPanel" style="flex: 1; background: linear-gradient(180deg, #f0fdf4 0%, #dcfce7 100%); border: 1px solid #86efac; border-radius: 12px; padding: 12px; display: flex; flex-direction: column; min-width: 0;">
-                <div style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 8px; margin-bottom: 8px; border-bottom: 2px solid #86efac; flex-shrink: 0;">
-                    <h4 style="font-weight: 700; color: #166534; font-size: 0.9rem; margin: 0; display: flex; align-items: center; gap: 8px;">
+            <div class="gy-cards-panel" id="gyCardsPanel" style="flex: 1; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 12px; display: flex; flex-direction: column; min-width: 0;">
+                <div style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 8px; margin-bottom: 8px; border-bottom: 1px solid #e2e8f0; flex-shrink: 0;">
+                    <h4 style="font-weight: 700; color: #334155; font-size: 0.9rem; margin: 0; display: flex; align-items: center; gap: 8px;">
                         📝 Steps Preview
-                        <span id="gyStepCount" style="font-size: 0.7rem; color: #15803d; background: white; padding: 2px 10px; border-radius: 10px;"></span>
+                        <span id="gyStepCount" class="gy-count-badge"></span>
                     </h4>
                     <div style="display: flex; gap: 8px;">
-                        <button id="gyRestoreDeletedBtn" onclick="gyShowRestoreModal()" style="display:none; background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: white; border: none; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 0.75rem; font-weight: 600; display: flex; align-items: center; gap: 4px;">
+                        <button id="gyRestoreDeletedBtn" onclick="gyShowRestoreModal()" class="rab-btn rab-btn-sm rab-c-amber rab-hidden">
                             ↩️ Restore (<span id="gyDeletedCount">0</span>)
                         </button>
-                        <button onclick="gyAddEmptyStep()" style="background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%); color: white; border: none; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 0.75rem; font-weight: 600; display: flex; align-items: center; gap: 4px;">
-                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="width: 12px; height: 12px;"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M12 4v16m8-8H4"></path></svg>
+                        <button onclick="gyAddEmptyStep()" class="rab-btn rab-btn-sm rab-c-emerald">
+                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M12 4v16m8-8H4"></path></svg>
                             Add Step
                         </button>
                     </div>
@@ -14568,6 +14574,17 @@ downloadBtn.addEventListener('click', async () => {
             <!-- Language indicator -->
             <div id="ra2025DetectedLang" style="text-align:center; margin-bottom:12px;">
                 <span class="text-xs bg-blue-100 text-blue-800 px-3 py-1 rounded-full">🌐 Multi-language support: EN, FR, DE, TR</span>
+            </div>
+
+            <!-- Sheet selection, folded in from what used to be a separate picker modal.
+                 Hidden automatically for single-sheet workbooks. Checkbox = import this sheet,
+                 clicking the name = preview/map it. -->
+            <div id="ra2025SheetStrip" class="ra2025-sheet-strip" style="display:none;">
+                <div class="ra2025-sheet-strip-head">
+                    <span>📑 Sheets to import</span>
+                    <span id="ra2025SheetStripSummary" class="ra2025-sheet-strip-summary"></span>
+                </div>
+                <div id="ra2025SheetStripList" class="ra2025-sheet-strip-list"></div>
             </div>
 
             <!-- Row/mode controls: always visible, since they're needed to verify a mapping
@@ -14710,6 +14727,70 @@ downloadBtn.addEventListener('click', async () => {
 .ra2025-mapper-card.ra2025-advanced-open .ra2025-advanced-panel {
     display: flex;
 }
+
+/* Sheet selection strip */
+.ra2025-sheet-strip {
+    padding: 8px 12px;
+    margin-bottom: 10px;
+    border: 1px solid #c7d2fe;
+    border-radius: 10px;
+    background: #eef2ff;
+}
+.ra2025-sheet-strip-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 7px;
+    font-size: 11px;
+    font-weight: 700;
+    color: #3730a3;
+}
+.ra2025-sheet-strip-summary {
+    font-weight: 600;
+    color: #4f46e5;
+}
+.ra2025-sheet-strip-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+.ra2025-sheet-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 9px 3px 7px;
+    border: 1px solid #c7d2fe;
+    border-radius: 999px;
+    background: #fff;
+    font-size: 12px;
+}
+.ra2025-sheet-chip input[type="checkbox"] {
+    width: 14px;
+    height: 14px;
+    accent-color: #4f46e5;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+.ra2025-sheet-chip button {
+    border: none;
+    background: none;
+    padding: 0;
+    cursor: pointer;
+    font: inherit;
+    color: #64748b;
+    max-width: 180px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.ra2025-sheet-chip.is-included button { color: #1e293b; font-weight: 600; }
+.ra2025-sheet-chip.is-previewing {
+    border-color: #4f46e5;
+    box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.18);
+}
+.ra2025-sheet-chip.is-previewing button { color: #3730a3; }
+.ra2025-sheet-chip button:hover { text-decoration: underline; }
 
 /* Row/mode control strip */
 .ra2025-control-strip {
@@ -15925,6 +16006,119 @@ downloadBtn.addEventListener('click', async () => {
         return null;
     }
 
+    // ── Workbook sheet selection (folded into this modal) ─────────────────────
+    // Every worksheet in the uploaded workbook, which ones the user wants imported, and
+    // which one is currently being previewed/mapped.
+    let ra2025WorkbookSheets = [];          // [{ index, name }]
+    let ra2025IncludedSheets = new Set();   // sheet indices to import on confirm
+    let ra2025PreviewSheetIndex = null;     // sheet currently shown in the preview/verify grid
+
+    async function loadRA2025WorkbookSheets(currentSheetIndex) {
+        ra2025WorkbookSheets = [];
+        ra2025PreviewSheetIndex = currentSheetIndex || null;
+
+        if (!ra2025ZipData) return;
+
+        // Sheet display names live in workbook.xml, in the same order as sheetN.xml files.
+        let sheetNames = [];
+        try {
+            const wbXml = await ra2025ZipData.file('xl/workbook.xml')?.async('text') || '';
+            const wbDoc = new DOMParser().parseFromString(wbXml, 'text/xml');
+            sheetNames = Array.from(wbDoc.getElementsByTagName('sheet')).map(s => s.getAttribute('name') || '');
+        } catch (error) {
+            console.warn('Could not read workbook sheet names:', error);
+        }
+
+        for (let i = 1; i <= 50; i++) {
+            if (!ra2025ZipData.file(`xl/worksheets/sheet${i}.xml`)) continue;
+            ra2025WorkbookSheets.push({ index: i, name: sheetNames[i - 1] || `Sheet ${i}` });
+        }
+
+        // Default to just the sheet we opened on - same default the old picker used (first
+        // sheet checked), so multi-sheet imports don't silently pull in everything.
+        ra2025IncludedSheets = new Set();
+        if (ra2025PreviewSheetIndex) {
+            ra2025IncludedSheets.add(ra2025PreviewSheetIndex);
+        } else if (ra2025WorkbookSheets.length > 0) {
+            ra2025PreviewSheetIndex = ra2025WorkbookSheets[0].index;
+            ra2025IncludedSheets.add(ra2025PreviewSheetIndex);
+        }
+
+        renderRA2025SheetStrip();
+    }
+
+    function renderRA2025SheetStrip() {
+        const wrap = document.getElementById('ra2025SheetStrip');
+        const list = document.getElementById('ra2025SheetStripList');
+        const summary = document.getElementById('ra2025SheetStripSummary');
+        if (!wrap || !list) return;
+
+        // Single-sheet workbook: nothing to choose, so don't spend dialog space on it.
+        if (ra2025WorkbookSheets.length <= 1) {
+            wrap.style.display = 'none';
+            return;
+        }
+        wrap.style.display = '';
+
+        list.innerHTML = ra2025WorkbookSheets.map(sheet => {
+            const isPreview = sheet.index === ra2025PreviewSheetIndex;
+            const isIncluded = ra2025IncludedSheets.has(sheet.index);
+            return `
+                <span class="ra2025-sheet-chip${isPreview ? ' is-previewing' : ''}${isIncluded ? ' is-included' : ''}">
+                    <input type="checkbox" ${isIncluded ? 'checked' : ''}
+                           title="Include this sheet in the import"
+                           onchange="toggleRA2025SheetInclude(${sheet.index}, this.checked)">
+                    <button type="button" title="Preview and map this sheet"
+                            onclick="previewRA2025Sheet(${sheet.index})">${escapeHtml(sheet.name)}</button>
+                </span>
+            `;
+        }).join('');
+
+        if (summary) {
+            const n = ra2025IncludedSheets.size;
+            summary.textContent = n === 0
+                ? 'No sheets selected'
+                : `${n} of ${ra2025WorkbookSheets.length} sheets will be imported`;
+        }
+    }
+
+    window.toggleRA2025SheetInclude = function(sheetIndex, isChecked) {
+        if (isChecked) {
+            ra2025IncludedSheets.add(sheetIndex);
+        } else {
+            ra2025IncludedSheets.delete(sheetIndex);
+        }
+        renderRA2025SheetStrip();
+        updateMappingStatus(getHeaderRowData());
+    };
+
+    // Switch which sheet the preview/verification grid is showing. The current column mapping
+    // is deliberately kept - sheets in one workbook are almost always the same layout, which is
+    // the entire reason "confirm once, apply to the rest" works.
+    window.previewRA2025Sheet = async function(sheetIndex) {
+        if (!ra2025ZipData || sheetIndex === ra2025PreviewSheetIndex) return;
+
+        try {
+            const sheetFile = ra2025ZipData.file(`xl/worksheets/sheet${sheetIndex}.xml`);
+            if (!sheetFile) return;
+
+            const xml = await sheetFile.async('text');
+            ra2025SheetDoc = new DOMParser().parseFromString(xml, 'text/xml');
+            ra2025PreviewSheetIndex = sheetIndex;
+            window.ra2025SelectedSheetIndex = sheetIndex;
+
+            extractAllRows();
+            renderRA2025SheetStrip();
+            updateRA2025Preview();
+
+            const sheet = ra2025WorkbookSheets.find(s => s.index === sheetIndex);
+            setStatusMessage(`Previewing "${sheet ? sheet.name : 'Sheet ' + sheetIndex}". The mapping below applies to every selected sheet.`, false);
+        } catch (error) {
+            console.error('Could not switch preview sheet:', error);
+            setStatusMessage('Could not load that sheet: ' + error.message, true);
+        }
+    };
+
     // ── Saved mapping profiles ────────────────────────────────────────────────
     // Keyed by a fingerprint of the sheet's header row rather than by filename, so a mapping
     // confirmed once is reapplied automatically to the next sheet of the same workbook AND to
@@ -16424,8 +16618,14 @@ downloadBtn.addEventListener('click', async () => {
             const taskDesc = String(row[cols.taskDesc] || '').trim();
             const hazardGroup = String(row[cols.hazardGroup] || '').trim();
             const hazardDetail = String(row[cols.hazardDetail] || '').trim();
+            // Preserve the mapped column's actual text - the main table's own field is free
+            // text, so it shouldn't be forced through normalizeRoutineType's fixed 3-value
+            // vocabulary here. GOEHS's own dropdown re-derives its best guess from this text
+            // when the hazard is populated into the GOEHS modal, which is where that fixed
+            // vocabulary is actually required.
             const rawRoutineMode = cols.routine ? row[cols.routine] : '';
-            const routineType = normalizeRoutineType(rawRoutineMode, defaultRoutine);
+            const trimmedRoutineMode = String(rawRoutineMode || '').trim();
+            const routineType = trimmedRoutineMode || defaultRoutine;
 
             if (!taskDesc && !hazardGroup && !hazardDetail) continue;
 
@@ -16711,6 +16911,12 @@ downloadBtn.addEventListener('click', async () => {
             ra2025SheetDoc = selectedSheetDoc;
             window.ra2025SelectedSheetIndex = selectedSheetIndex || null;
 
+            // Enumerate every worksheet so the sheet strip can offer them. Sheet selection used
+            // to live in a separate picker modal shown before this one; folding it in here means
+            // one dialog instead of two, and - more importantly - the chosen sheets stay visible
+            // and changeable while you're confirming the mapping.
+            await loadRA2025WorkbookSheets(selectedSheetIndex);
+
             const langHintEl = document.getElementById('ra2025DetectedLang');
             if (langHintEl) {
                 const sheetLabel = selectedSheetIndex ? `Sheet ${selectedSheetIndex}` : 'Detected sheet';
@@ -16874,15 +17080,27 @@ downloadBtn.addEventListener('click', async () => {
         const dataStartRow = parseInt(document.getElementById('ra2025DataStartRow').value) || 15;
         const routineDefaultMode = document.getElementById('ra2025DefaultRoutineType')?.value || 'Routine';
 
+        // Multi-sheet workbook: honour the sheet strip's tick boxes. The previewed sheet is
+        // only imported if it's actually ticked - otherwise the user unticking it would have
+        // no effect, since it's the one parsed from the live preview rows below.
+        const isMultiSheet = ra2025WorkbookSheets.length > 1;
+        if (isMultiSheet && ra2025IncludedSheets.size === 0) {
+            setStatusMessage('Select at least one sheet to import.', true);
+            return;
+        }
+        const includePreviewedSheet = !isMultiSheet || ra2025IncludedSheets.has(ra2025PreviewSheetIndex);
+
         setParseButtonBusy(true, 'Parsing...');
         setStatusMessage('Parsing mapped preview rows...', false);
 
         try {
-            let parsedItems = parseRiskItemsFromPreviewRows(cols, dataStartRow, routineDefaultMode);
+            let parsedItems = includePreviewedSheet
+                ? parseRiskItemsFromPreviewRows(cols, dataStartRow, routineDefaultMode)
+                : [];
             let parsedContext = window.directGoehsContext || deriveProcessContextFromPreviewRows();
             let parseEngine = 'preview_rows_mapper';
 
-            if (parsedItems.length === 0 && typeof parseRA2025Template === 'function') {
+            if (includePreviewedSheet && parsedItems.length === 0 && typeof parseRA2025Template === 'function') {
                 const parseResult = await parseRA2025Template(
                     sourceFile,
                     {
@@ -16899,14 +17117,16 @@ downloadBtn.addEventListener('click', async () => {
                 parseEngine = 'template_fallback';
             }
 
-            if (parsedItems.length === 0) {
-                setStatusMessage('No rows parsed. Check mapping and row start values.', true);
-                return;
-            }
+            // Multi-sheet import: apply the confirmed mapping to every OTHER sheet the user
+            // ticked in the sheet strip (the previewed sheet is already parsed above). Falls
+            // back to __ra2025MultiSheetQueue for callers that pre-seeded a sheet list.
+            const stripSelection = ra2025WorkbookSheets.length > 1
+                ? Array.from(ra2025IncludedSheets).filter(idx => idx !== ra2025PreviewSheetIndex)
+                : [];
+            const sheetQueue = stripSelection.length > 0
+                ? { file: sourceFile, remaining: stripSelection }
+                : window.__ra2025MultiSheetQueue;
 
-            // Multi-sheet import: the user confirmed the mapping on the first sheet, so apply
-            // that same mapping to the remaining selected sheets instead of asking again.
-            const sheetQueue = window.__ra2025MultiSheetQueue;
             let extraSheetCount = 0;
             if (sheetQueue && sheetQueue.file === sourceFile && Array.isArray(sheetQueue.remaining) && sheetQueue.remaining.length > 0
                 && typeof parseRA2025Template === 'function') {
@@ -16935,6 +17155,13 @@ downloadBtn.addEventListener('click', async () => {
                 }
             }
             window.__ra2025MultiSheetQueue = null;
+
+            // Checked after the multi-sheet pass, since with the previewed sheet unticked all
+            // of the rows come from the other selected sheets.
+            if (parsedItems.length === 0) {
+                setStatusMessage('No rows parsed. Check mapping and row start values.', true);
+                return;
+            }
 
             window.ra2025RawRiskItems = parsedItems;
             window.ra2025LoadedFile = sourceFile;
@@ -17304,7 +17531,9 @@ downloadBtn.addEventListener('click', async () => {
         const countEl = document.getElementById('gyDeletedCount');
         if (btn && countEl) {
             countEl.textContent = gyDeletedItems.length;
-            btn.style.display = gyDeletedItems.length > 0 ? 'flex' : 'none';
+            // Toggle the class, not style.display - .rab-btn sets `display: inline-flex
+            // !important`, which an inline display would lose to.
+            btn.classList.toggle('rab-hidden', gyDeletedItems.length === 0);
         }
     }
 
@@ -17346,7 +17575,7 @@ downloadBtn.addEventListener('click', async () => {
                         <div style="font-weight:600; color:#1e293b;">Step ${item.step || '?'} (Row ${item.row})</div>
                         <div style="font-size:0.8rem; color:#64748b; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:280px;">${item.desc || 'No description'}</div>
                     </div>
-                    <button onclick="gyRestoreItem(${idx}); this.closest('div[style*=display\\:flex]').remove();" style="background:#22c55e; color:white; border:none; padding:8px 16px; border-radius:6px; cursor:pointer; font-weight:600; font-size:0.8rem;">Restore</button>
+                    <button onclick="gyRestoreItem(${idx}); this.closest('div[style*=display\\:flex]').remove();" style="background:#059669; color:white; border:none; padding:8px 16px; border-radius:6px; cursor:pointer; font-weight:600; font-size:0.8rem;">Restore</button>
                 </div>
             `;
         });
@@ -17354,7 +17583,7 @@ downloadBtn.addEventListener('click', async () => {
         html += `
                     </div>
                     <div style="margin-top:16px; padding-top:12px; border-top:1px solid #e2e8f0; display:flex; gap:8px;">
-                        <button onclick="gyRestoreAll(); this.closest('div[style*=fixed]').remove();" style="flex:1; background:linear-gradient(135deg, #22c55e 0%, #16a34a 100%); color:white; border:none; padding:10px; border-radius:8px; cursor:pointer; font-weight:600;">✅ Restore All (${gyDeletedItems.length})</button>
+                        <button onclick="gyRestoreAll(); this.closest('div[style*=fixed]').remove();" style="flex:1; background:#059669; color:white; border:none; padding:10px; border-radius:8px; cursor:pointer; font-weight:600;">✅ Restore All (${gyDeletedItems.length})</button>
                         <button onclick="gyClearDeleted(); this.closest('div[style*=fixed]').remove();" style="flex:1; background:#fee2e2; color:#dc2626; border:none; padding:10px; border-radius:8px; cursor:pointer; font-weight:600;">🗑️ Clear All</button>
                     </div>
                 </div>
@@ -17548,7 +17777,7 @@ async function loadFile(file) {
             gyActiveSheetIdx = bestSheetIdx;
             buildGySheetTabs(); // Render sheet tab bar
             const applyMapInit = document.getElementById('gyApplyMappingAll');
-            if (applyMapInit) applyMapInit.style.display = gyAllSheets.length > 1 ? 'inline-block' : 'none';
+            if (applyMapInit) applyMapInit.classList.toggle('rab-hidden', gyAllSheets.length <= 1);
             
             // Extract all rows for preview
             extractGyAllRows();
@@ -17731,7 +17960,7 @@ async function loadFile(file) {
         }
         
         const applyMapBtn = document.getElementById('gyApplyMappingAll');
-        if (applyMapBtn) applyMapBtn.style.display = gyAllSheets.length > 1 ? 'inline-block' : 'none';
+        if (applyMapBtn) applyMapBtn.classList.toggle('rab-hidden', gyAllSheets.length <= 1);
     }
     
     // ===== APPLY MAPPING TO ALL TABS =====
@@ -17849,15 +18078,17 @@ async function loadFile(file) {
         statusEl.textContent = `✓ Mapping applied to ${applied} other tab${applied !== 1 ? 's' : ''}! Switch tabs to review.`;
         statusEl.style.color = '#d97706';
 
-        // Brief flash on the button
+        // Brief success flash. Swaps the shared colour class rather than setting an inline
+        // background - .rab-c-* declare their background with !important, so an inline style
+        // would simply be ignored here.
         const btn = document.getElementById('gyApplyMappingAll');
         if (btn) {
             const orig = btn.textContent;
             btn.textContent = `✓ Applied to ${applied} tabs`;
-            btn.style.background = 'linear-gradient(135deg,#22c55e,#16a34a)';
+            btn.classList.replace('rab-c-amber', 'rab-c-emerald');
             setTimeout(() => {
                 btn.textContent = orig;
-                btn.style.background = 'linear-gradient(135deg,#f59e0b,#d97706)';
+                btn.classList.replace('rab-c-emerald', 'rab-c-amber');
             }, 2000);
         }
     }
@@ -17886,20 +18117,18 @@ async function loadFile(file) {
                 headerRow:  document.getElementById('gyHeaderRow')?.value   || '1',
                 dataStart:  document.getElementById('gyDataStartRow')?.value || '2'
             };
-            // Enable Paste button
+            // Enable Paste button - the disabled styling comes from .rab-btn:disabled, so
+            // clearing the attribute is all that's needed.
             const pasteBtn = document.getElementById('gyPasteMappingBtn');
             if (pasteBtn) {
                 pasteBtn.disabled = false;
-                pasteBtn.style.background = 'linear-gradient(135deg,#475569,#334155)';
-                pasteBtn.style.color = 'white';
-                pasteBtn.style.cursor = 'pointer';
+                pasteBtn.classList.replace('rab-c-ghost', 'rab-c-slate');
             }
-            // Flash Copy button green briefly
-            const origBg = this.style.background;
-            this.style.background = 'linear-gradient(135deg,#22c55e,#16a34a)';
+            // Brief success flash via the shared colour classes (see applyMappingToAllTabs).
+            this.classList.replace('rab-c-ghost', 'rab-c-emerald');
             this.textContent = '✓ Copied!';
             setTimeout(() => {
-                this.style.background = origBg || 'linear-gradient(135deg,#0ea5e9,#0284c7)';
+                this.classList.replace('rab-c-emerald', 'rab-c-ghost');
                 this.textContent = '📋 Copy Mapping';
             }, 1500);
         };
@@ -18380,7 +18609,7 @@ async function loadFile(file) {
                     <!-- Header with Step Number & Actions -->
                     <div style="display:flex; justify-content:space-between; align-items:center; padding-bottom:8px; border-bottom:2px solid #e2e8f0;">
                         <div style="display:flex; align-items:center; gap:10px;">
-                            <span style="background:linear-gradient(135deg, #002c5f 0%, #001a3d 100%); color:white; padding:6px 14px; border-radius:8px; font-weight:700; font-size:0.9rem;">Step ${item.step || '?'}</span>
+                            <span style="background:#002c5f; color:white; padding:6px 14px; border-radius:6px; font-weight:700; font-size:0.9rem;">Step ${item.step || '?'}</span>
                             <span style="color:#64748b; font-size:0.75rem;">Row ${item.row}</span>
                         </div>
                         <button onclick="gyRemoveRow('${item.id}')" style="background:#fee2e2; color:#dc2626; border:none; padding:6px 12px; border-radius:6px; cursor:pointer; font-size:0.75rem; font-weight:600; transition:all 0.2s;" onmouseover="this.style.background='#fecaca'" onmouseout="this.style.background='#fee2e2'">🗑️ Delete</button>
@@ -23095,9 +23324,9 @@ ${JSON.stringify(payload, null, 2)}`;
             progressCount.textContent = `${i + 1} / ${files.length}`;
             progressFill.style.width = `${((i + 1) / files.length) * 50}%`;
 
-            const validExts = ['.xlsx', '.xls'];
+            const validExts = ['.xlsx', '.xlsm', '.xls'];
             if (!validExts.some(ext => file.name.toLowerCase().endsWith(ext))) {
-                expandedEntries.push({ file, sheetIndex: null, sheetName: null, displayName: file.name, skipReason: 'Invalid file type (must be .xlsx or .xls)' });
+                expandedEntries.push({ file, sheetIndex: null, sheetName: null, displayName: file.name, skipReason: 'Invalid file type (must be .xlsx, .xlsm, or .xls)' });
                 continue;
             }
             if (file.size > 10 * 1024 * 1024) {
@@ -23257,7 +23486,9 @@ ${JSON.stringify(payload, null, 2)}`;
                 'Hazard Source': item.risk_scenario?.source || '',
                 'Current Control': item.mitigation_plan?.current_controls || '',
                 'Countermeasure_Ladder': cmLadder,
-                'Routine/Non-Routine/Emergency Situation': 'Routine',
+                // Was hardcoded to 'Routine' regardless of what the file actually mapped for
+                // this column - now uses the value parseZoneB read from the mapped column.
+                'Routine/Non-Routine/Emergency Situation': item.routine_type || 'Routine',
                 'Frequency': freq,
                 'Severity': sev,
                 'Likelihood': like,

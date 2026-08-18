@@ -40,9 +40,10 @@ function createSafeTextElement(tag, text, className = '') {
  */
 function validateFileUpload(file, options = {}) {
     const {
-        allowedExtensions = ['.xlsx', '.xls'],
+        allowedExtensions = ['.xlsx', '.xlsm', '.xls'],
         allowedMimeTypes = [
             'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'application/vnd.ms-excel.sheet.macroEnabled.12',
             'application/vnd.ms-excel',
             'application/octet-stream'
         ],
@@ -167,19 +168,23 @@ async function handleDirectGoehsUpload(event) {
     console.log('Processing file:', file.name);
     
     // SECURITY: Validate file type, extension, and size
+    // .xlsm (macro-enabled) is the same OOXML zip/XML structure as .xlsx - it just carries an
+    // extra inert xl/vbaProject.bin entry that the JSZip-based parsing below never reads or
+    // executes - so it needs no parser changes, only to pass this gate.
     const validMimeTypes = [
         'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // .xlsx
+        'application/vnd.ms-excel.sheet.macroEnabled.12', // .xlsm
         'application/vnd.ms-excel', // .xls
         'application/octet-stream' // Some browsers report this for Excel files
     ];
-    const validExtensions = ['.xlsx', '.xls'];
+    const validExtensions = ['.xlsx', '.xlsm', '.xls'];
     const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB limit
-    
+
     const fileName = file.name.toLowerCase();
     const hasValidExtension = validExtensions.some(ext => fileName.endsWith(ext));
-    
+
     if (!hasValidExtension) {
-        showDirectGoehsAlert('❌ Invalid file type. Please upload an Excel file (.xlsx or .xls)', 'error');
+        showDirectGoehsAlert('❌ Invalid file type. Please upload an Excel file (.xlsx, .xlsm, or .xls)', 'error');
         event.target.value = ''; // Reset input
         return;
     }
@@ -199,14 +204,28 @@ async function handleDirectGoehsUpload(event) {
     try {
         showDirectGoehsAlert('📂 Processing RA 2025 Template (auto-detecting language)...', 'info');
         
-        // Check for multiple sheets first
+        // Multi-sheet workbooks used to open a separate sheet-picker modal here before the
+        // mapper. Sheet selection now lives inside the mapper itself (the sheet strip), so
+        // the picker would be a redundant extra step - go straight to the mapper, which opens
+        // on the best-matching sheet with all sheets listed and switchable. The picker is
+        // still used by the batch workflow, which has no mapper to fold it into.
         const sheetList = await getExcelSheetList(file);
+        const preferredSheetIdx = sheetList.length > 0 ? sheetList[0].index : 1;
+        if (sheetList.length > 1 && typeof openRA2025ColumnMapper === 'function') {
+            window.ra2025LoadedFile = file;
+            window.ra2025PendingFile = file;
+            window.ra2025SelectedSheetIndex = preferredSheetIdx;
+            showDirectGoehsAlert(`📂 "${file.name}" has ${sheetList.length} sheets — pick the ones to import and confirm the mapping.`, 'info');
+            await openRA2025ColumnMapper(file, preferredSheetIdx, 'confirm');
+            event.target.value = '';
+            return;
+        }
         if (sheetList.length > 1) {
-            // Show sheet picker modal and let user choose
+            // Mapper unavailable - fall back to the standalone picker.
             showSheetPickerForRA2025(file, sheetList, 'single');
             return;
         }
-        
+
         // Single sheet — pass the sheet index directly to skip hasRA2025Structure check.
         // The user explicitly chose this upload path, so we trust it's an RA2025 template.
         const singleSheetIdx = sheetList.length === 1 ? sheetList[0].index : 1;
@@ -597,9 +616,10 @@ function convertRA2025ToTableFormat(riskItems) {
             'Hazard Source': item.risk_scenario.source || '',
             'Current Control': item.mitigation_plan.current_controls || '',
             'Countermeasure_Ladder': countermeasureLadder,
-            'Routine/Non-Routine/Emergency Situation': parseGoehsConditionMode(
-                item.routine_type || item.routineType || item.condition_mode || item.mode || 'Routine'
-            ),
+            // Free text in the main table (see the <input> in buildTableFromData) - keep the
+            // value as actually read from the mapped column instead of forcing it through
+            // parseGoehsConditionMode's fixed 3-value vocabulary here.
+            'Routine/Non-Routine/Emergency Situation': item.routine_type || item.routineType || item.condition_mode || item.mode || 'Routine',
             'Frequency': item.assessment_pre_control.frequency || 1, // Use extracted frequency, default to 1
             'Severity': item.assessment_pre_control.severity || 5,
             'Likelihood': item.assessment_pre_control.likelihood || 3,
@@ -1207,8 +1227,15 @@ function parseZoneB(doc, strings, columnOverrides) {
         const consequence = rowData[cols.consequence] || '';
         const source = rowData[cols.source] || '';
         const currentControls = rowData[cols.currentControl] || '';
+        // Preserve the mapped column's actual text rather than coercing it into one of the
+        // 3 fixed GOEHS values here - the main table's own field is free text (see
+        // convertRA2025ToTableFormat below), so a value like "Planned Shutdown" or a non-
+        // English word that parseGoehsConditionMode doesn't recognize should still show up
+        // as itself instead of silently collapsing to "Routine". GOEHS's own fixed-vocabulary
+        // dropdown (populateGoehsHazardsFromTable) re-derives its best guess from this text
+        // at population time, which is the appropriate place to force it into the 3 values.
         const rawRoutineMode = cols.routine ? rowData[cols.routine] : '';
-        const routineType = rawRoutineMode ? parseGoehsConditionMode(rawRoutineMode) : routineDefault;
+        const routineType = rawRoutineMode ? String(rawRoutineMode).trim() : routineDefault;
 
         const rawFrequency = rowData[cols.frequency];
         const rawSeverity = rowData[cols.severity];
@@ -1558,10 +1585,10 @@ document.addEventListener('DOMContentLoaded', function() {
             const files = e.dataTransfer.files;
             if (files.length > 0) {
                 const file = files[0];
-                if (file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) {
+                if (file.name.endsWith('.xlsx') || file.name.endsWith('.xlsm') || file.name.endsWith('.xls')) {
                     handleDirectGoehsUpload({ target: { files: [file] } });
                 } else {
-                    showDirectGoehsAlert('❌ Please drop an Excel file (.xlsx or .xls)', 'error');
+                    showDirectGoehsAlert('❌ Please drop an Excel file (.xlsx, .xlsm, or .xls)', 'error');
                 }
             }
         }, false);
@@ -1825,13 +1852,22 @@ window.goehsHazardLabel = goehsHazardLabel;
 
 const GOEHS_CONDITION_MODES = ['Routine', 'Non-Routine', 'Emergency Situation'];
 
+// Best-effort classifier into GOEHS's fixed 3-value vocabulary (Routine / Non-Routine /
+// Emergency Situation), used only where GOEHS itself requires one of those exact values
+// (its own dropdowns/exports) - NOT for deciding what the main table's free-text field shows.
 function parseGoehsConditionMode(rawValue) {
     const value = (rawValue || '').toString().trim();
     if (!value) return 'Routine';
     const lower = value.toLowerCase();
-    if (lower.includes('emergency')) return 'Emergency Situation';
-    if (lower.includes('non-routine') || lower.includes('non routine')) return 'Non-Routine';
-    if (lower.includes('routine')) return 'Routine';
+    if (lower.includes('emergency') || lower.includes('urgence') || lower.includes('notfall') ||
+        lower.includes('acil') || lower.includes('emergencia') || lower.includes('urgência') ||
+        lower.includes('urgencia') || lower.includes('emergência')) return 'Emergency Situation';
+    if (lower.includes('non-routine') || lower.includes('non routine') || lower.includes('nonroutine') ||
+        lower.includes('non-routinier') || lower.includes('nicht-routine') || lower.includes('rutin disi') ||
+        lower.includes('não rotineira') || lower.includes('nao rotineira') || lower.includes('não-rotineira') ||
+        lower.includes('no rutinario') || lower.includes('no rutinaria')) return 'Non-Routine';
+    if (lower.includes('routine') || lower.includes('routinier') || lower.includes('rutin') ||
+        lower.includes('rotina') || lower.includes('rutina')) return 'Routine';
     return 'Routine';
 }
 
