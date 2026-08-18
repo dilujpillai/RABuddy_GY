@@ -14558,42 +14558,63 @@ downloadBtn.addEventListener('click', async () => {
 
 <!-- RA 2025 Manual Column Mapper Modal (Fallback when auto-detection fails) -->
 <div id="ra2025ColumnMapperModal" class="gy-modal-overlay" style="display:none;">
-    <div class="gy-modal-content" style="width: 96vw; max-width: 1700px; max-height: 92vh; overflow: hidden; display: flex; flex-direction: column; padding: 24px;">
+    <div id="ra2025MapperCard" class="gy-modal-content ra2025-mapper-card">
         <button class="gy-close-modal" onclick="closeRA2025ColumnMapper()">×</button>
         
         <div style="flex-shrink: 0;">
-            <h2 style="text-align:center; color:#1e293b; margin-top:0; margin-bottom: 4px;">🗺️ RA 2025 Column Mapper</h2>
-            <p style="text-align:center; color:#64748b; margin-bottom:10px;">Auto-detection couldn't identify your file format. Please map columns manually below.</p>
-            
+            <h2 id="ra2025MapperTitle" style="text-align:center; color:#1e293b; margin-top:0; margin-bottom: 4px;">🗺️ RA 2025 Column Mapper</h2>
+            <p id="ra2025MapperSubtitle" style="text-align:center; color:#64748b; margin-bottom:10px;">Auto-detection couldn't identify your file format. Please map columns manually below.</p>
+
             <!-- Language indicator -->
-            <div id="ra2025DetectedLang" style="text-align:center; margin-bottom:15px;">
+            <div id="ra2025DetectedLang" style="text-align:center; margin-bottom:12px;">
                 <span class="text-xs bg-blue-100 text-blue-800 px-3 py-1 rounded-full">🌐 Multi-language support: EN, FR, DE, TR</span>
             </div>
+
+            <!-- Row/mode controls: always visible, since they're needed to verify a mapping
+                 even when the full sheet preview below is collapsed. -->
+            <div class="ra2025-control-strip">
+                <label>Header Row:</label>
+                <input type="number" id="ra2025HeaderRow" value="14" min="1" max="50" onchange="updateRA2025Preview()">
+                <label>Data Start:</label>
+                <input type="number" id="ra2025DataStartRow" value="15" min="1" max="100" onchange="updateRA2025Preview()">
+                <label>Default Mode:</label>
+                <select id="ra2025DefaultRoutineType">
+                    <option value="Routine" selected>Routine</option>
+                    <option value="Non-Routine">Non-Routine</option>
+                    <option value="Emergency Situation">Emergency Situation</option>
+                </select>
+                <span class="ra2025-control-spacer"></span>
+                <span id="ra2025SavedMappingNote" class="ra2025-saved-note" style="display:none;"></span>
+            </div>
+
+            <!-- Detection confidence summary -->
+            <div id="ra2025ConfidenceBar" class="ra2025-confidence" style="display:none;"></div>
         </div>
-        
+
+        <!-- Verification grid: the primary surface in Confirm mode. Shows field -> column
+             -> the actual Excel header text -> real sample values, so a wrong mapping is
+             obvious at a glance without having to read the whole sheet. -->
+        <div id="ra2025VerifyPanel" class="ra2025-verify-panel">
+            <div class="ra2025-verify-grid-head">
+                <span>Field</span><span>Column</span><span>Excel header</span><span>Sample values from your file</span>
+            </div>
+            <div id="ra2025VerifyGrid" class="ra2025-verify-grid"></div>
+        </div>
+
+        <!-- Advanced: full sheet preview + per-column mapping board (collapsed in Confirm mode) -->
+        <button type="button" id="ra2025TogglePreviewBtn" class="ra2025-toggle-preview" onclick="toggleRA2025AdvancedPanel()">
+            <span id="ra2025TogglePreviewLabel">📊 Show full sheet preview &amp; advanced mapping</span>
+        </button>
+
+        <div id="ra2025AdvancedPanel" class="ra2025-advanced-panel">
         <!-- Two-panel layout: Preview + Mapping -->
         <div class="ra2025-map-layout" style="flex: 1; min-height: 0;">
             
             <!-- Left Panel: Excel Preview -->
-            <div style="display: flex; flex-direction: column; min-width: 0;">
+            <div style="display: flex; flex-direction: column; min-width: 0; min-height: 0;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-shrink: 0; padding: 8px 12px; border: 1px solid #e2e8f0; border-radius: 10px; background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);">
                     <h4 style="font-weight: 700; color: #334155; font-size: 13px; margin: 0;">📊 Exact Sheet Preview</h4>
-                    <div style="display: flex; gap: 8px; align-items: center;">
-                        <label style="font-size: 11px; color: #64748b; font-weight: 600;">Header Row:</label>
-                        <input type="number" id="ra2025HeaderRow" value="14" min="1" max="50" 
-                               style="width: 56px; padding: 4px 8px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 12px;"
-                               onchange="updateRA2025Preview()">
-                        <label style="font-size: 11px; color: #64748b; font-weight: 600;">Data Start:</label>
-                        <input type="number" id="ra2025DataStartRow" value="15" min="1" max="100" 
-                               style="width: 56px; padding: 4px 8px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 12px;"
-                               onchange="updateRA2025Preview()">
-                        <label style="font-size: 11px; color: #64748b; font-weight: 600;">Default Mode:</label>
-                        <select id="ra2025DefaultRoutineType" style="padding: 4px 8px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 12px; color: #0f172a; background: #ffffff;">
-                            <option value="Routine" selected>Routine</option>
-                            <option value="Non-Routine">Non-Routine</option>
-                            <option value="Emergency Situation">Emergency Situation</option>
-                        </select>
-                    </div>
+                    <span style="font-size: 11px; color: #64748b;">Row &amp; mode controls are at the top of this dialog</span>
                 </div>
                 <div id="ra2025PreviewViewport" class="ra2025-preview-viewport">
                     <div id="ra2025PreviewContainer" class="preview-pan-container ra2025-preview-container" style="touch-action: pan-x pan-y; -webkit-overflow-scrolling: touch;">
@@ -14620,25 +14641,26 @@ downloadBtn.addEventListener('click', async () => {
                 </div>
                 <div style="font-size:11px; color:#166534; margin-bottom:8px;">Map columns from the preview header. This board updates live with green feedback.</div>
                 <div id="ra2025MapFeedbackList" class="ra2025-map-feedback"></div>
-
-                <!-- Parsing Status -->
-                <div id="ra2025MappingStatus" style="margin-top: 10px; padding: 10px; background: #f0fdf4; border: 1px solid #86efac; border-radius: 8px; font-size: 11px; color: #166534; font-weight: 600;">
-                    Ready to parse. Map at least the Task/Step Description column.
-                </div>
             </aside>
         </div>
+        </div><!-- /ra2025AdvancedPanel -->
 
         <!-- Action Buttons -->
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 15px; padding-top: 15px; border-top: 2px solid #e2e8f0; flex-shrink: 0;">
-            <button onclick="closeRA2025ColumnMapper()" style="padding: 10px 20px; background: #f1f5f9; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; color: #64748b;">
-                Cancel
-            </button>
-            <div style="display: flex; gap: 10px;">
+        <div class="ra2025-mapper-footer">
+            <!-- Parsing status lives in the footer so it stays visible when the advanced
+                 panel above is collapsed (setStatusMessage targets this element). -->
+            <div id="ra2025MappingStatus" class="ra2025-footer-status">
+                Ready to parse. Map at least the Task/Step Description column.
+            </div>
+            <div class="ra2025-footer-actions">
+                <button onclick="closeRA2025ColumnMapper()" style="padding: 10px 20px; background: #f1f5f9; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; color: #64748b;">
+                    Cancel
+                </button>
                 <button type="button" class="rab-btn rab-c-amber" onclick="tryAutoDetectRA2025()">
                     🔄 Re-try Auto-Detect
                 </button>
                 <button type="button" id="ra2025ParseLoadBtn" class="rab-btn rab-c-blue" onclick="parseWithManualMapping()">
-                    ✓ Parse & Load to Table
+                    ✓ Parse &amp; Load to Table
                 </button>
             </div>
         </div>
@@ -14647,18 +14669,287 @@ downloadBtn.addEventListener('click', async () => {
 
 <style>
 /* RA 2025 Column Mapper Styles */
+
+/* The card is compact by default - in Confirm mode the user only needs the verification
+   grid, not the whole sheet. It widens/heightens only once the advanced preview panel is
+   expanded (.ra2025-advanced-open), so the dialog matches the amount of content shown. */
+.ra2025-mapper-card {
+    width: min(1100px, 94vw);
+    max-width: 1100px;
+    max-height: 86vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    padding: 24px;
+    transition: width 0.22s ease, max-width 0.22s ease, max-height 0.22s ease;
+}
+/* Confirm mode keeps the card content-sized (a short mapping gets a short dialog), so on a
+   short viewport the field list + chrome can still exceed max-height. Let the card itself
+   scroll there rather than clipping - the grid's own cap keeps the footer CTA visible in the
+   normal case, and this is purely the safety net for small screens. */
+.ra2025-mapper-card:not(.ra2025-advanced-open) {
+    overflow-y: auto;
+}
+.ra2025-mapper-card.ra2025-advanced-open {
+    width: 96vw;
+    max-width: 1700px;
+    /* Definite height, not just max-height: the sheet preview below is sized with flex:1 and
+       scrolls internally, and a flex child can only resolve flex:1 to a bounded pixel height
+       if its ancestors have a definite height. With max-height alone the preview grows to the
+       full table height, overflows, and gets clipped by overflow:hidden - so the vertical
+       scrollbar never appears (horizontal still worked because width was always definite). */
+    height: 92vh;
+    max-height: 92vh;
+}
+.ra2025-advanced-panel {
+    display: none;
+    flex: 1;
+    min-height: 0;
+    flex-direction: column;
+}
+.ra2025-mapper-card.ra2025-advanced-open .ra2025-advanced-panel {
+    display: flex;
+}
+
+/* Row/mode control strip */
+.ra2025-control-strip {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    padding: 8px 12px;
+    margin-bottom: 10px;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+}
+.ra2025-control-strip label {
+    font-size: 11px;
+    color: #64748b;
+    font-weight: 600;
+}
+.ra2025-control-strip input[type="number"] {
+    width: 56px;
+    padding: 4px 8px;
+    border: 1px solid #cbd5e1;
+    border-radius: 4px;
+    font-size: 12px;
+}
+.ra2025-control-strip select {
+    padding: 4px 8px;
+    border: 1px solid #cbd5e1;
+    border-radius: 4px;
+    font-size: 12px;
+    color: #0f172a;
+    background: #ffffff;
+}
+.ra2025-control-spacer { flex: 1; }
+.ra2025-saved-note {
+    font-size: 11px;
+    font-weight: 600;
+    color: #3730a3;
+    background: #eef2ff;
+    border: 1px solid #c7d2fe;
+    border-radius: 999px;
+    padding: 3px 10px;
+}
+
+/* Detection confidence summary */
+.ra2025-confidence {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 10px 14px;
+    margin-bottom: 12px;
+    border-radius: 10px;
+    font-size: 12px;
+    line-height: 1.5;
+}
+.ra2025-confidence-ok {
+    background: #f0fdf4;
+    border: 1px solid #86efac;
+    color: #166534;
+}
+.ra2025-confidence-warn {
+    background: #fffbeb;
+    border: 1px solid #fcd34d;
+    color: #92400e;
+}
+.ra2025-confidence strong { font-weight: 700; }
+
+/* Verification grid */
+.ra2025-verify-panel {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    overflow: hidden;
+    background: #fff;
+}
+.ra2025-mapper-card.ra2025-advanced-open .ra2025-verify-panel {
+    display: none;
+}
+.ra2025-verify-grid-head,
+.ra2025-verify-row {
+    display: grid;
+    grid-template-columns: 190px 96px minmax(120px, 1fr) minmax(160px, 1.4fr);
+    gap: 10px;
+    align-items: center;
+    padding: 8px 14px;
+}
+.ra2025-verify-grid-head {
+    background: #f8fafc;
+    border-bottom: 1px solid #e2e8f0;
+    font-size: 10px;
+    font-weight: 700;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    flex-shrink: 0;
+}
+.ra2025-verify-grid {
+    overflow-y: auto;
+    min-height: 0;
+    /* The card is intentionally content-sized in Confirm mode (max-height only, so a short
+       mapping gets a short dialog), which means flex:1 alone can't give this a scrollable
+       box - see the .ra2025-advanced-open note above. An explicit cap makes the field list
+       scroll on its own regardless of the ancestor chain. */
+    max-height: 40vh;
+}
+.ra2025-verify-row {
+    border-bottom: 1px solid #f1f5f9;
+    font-size: 12px;
+}
+.ra2025-verify-row:last-child { border-bottom: none; }
+.ra2025-verify-row.is-unmapped { background: #fffbeb; }
+.ra2025-verify-row.is-unmapped-required { background: #fef2f2; }
+.ra2025-verify-field {
+    font-weight: 600;
+    color: #1e293b;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.ra2025-verify-req {
+    color: #dc2626;
+    font-weight: 700;
+}
+.ra2025-verify-row select {
+    width: 100%;
+    padding: 4px 6px;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    font-size: 12px;
+    background: #fff;
+    color: #0f172a;
+}
+.ra2025-verify-row.is-unmapped select { border-color: #f59e0b; }
+.ra2025-verify-row.is-unmapped-required select { border-color: #ef4444; }
+.ra2025-verify-header-text {
+    color: #475569;
+    font-style: italic;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.ra2025-verify-header-text.is-empty { color: #cbd5e1; font-style: normal; }
+.ra2025-verify-samples {
+    display: flex;
+    gap: 5px;
+    flex-wrap: wrap;
+    overflow: hidden;
+}
+.ra2025-verify-sample {
+    background: #f1f5f9;
+    border: 1px solid #e2e8f0;
+    border-radius: 5px;
+    padding: 2px 7px;
+    color: #334155;
+    font-size: 11px;
+    max-width: 190px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.ra2025-verify-sample.is-none {
+    background: transparent;
+    border: 1px dashed #cbd5e1;
+    color: #94a3b8;
+    font-style: italic;
+}
+
+/* Advanced panel toggle */
+.ra2025-toggle-preview {
+    flex-shrink: 0;
+    margin-top: 10px;
+    padding: 8px 14px;
+    width: 100%;
+    background: #f8fafc;
+    border: 1px dashed #cbd5e1;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 600;
+    color: #475569;
+    transition: background 0.15s, border-color 0.15s;
+}
+.ra2025-toggle-preview:hover {
+    background: #f1f5f9;
+    border-color: #94a3b8;
+    color: #1e293b;
+}
+
+/* Footer */
+.ra2025-mapper-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 14px;
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 2px solid #e2e8f0;
+    flex-shrink: 0;
+    flex-wrap: wrap;
+}
+.ra2025-footer-status {
+    flex: 1;
+    min-width: 220px;
+    padding: 8px 12px;
+    background: #f0fdf4;
+    border: 1px solid #86efac;
+    border-radius: 8px;
+    font-size: 11px;
+    color: #166534;
+    font-weight: 600;
+}
+.ra2025-footer-actions {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-shrink: 0;
+}
+
 .ra2025-map-layout {
     display: grid;
     grid-template-columns: minmax(0, 1fr) 360px;
+    /* Explicit bounded row + stretch (not align-items:start). With `start` the grid items keep
+       their content height, so the preview pane below never gets a bounded box to scroll in. */
+    grid-template-rows: minmax(0, 1fr);
+    align-items: stretch;
     gap: 14px;
-    align-items: start;
+    min-height: 0;
+}
+.ra2025-map-layout > * {
+    min-height: 0;
 }
 .ra2025-map-side {
     border: 1px solid #86efac;
     border-radius: 10px;
     background: linear-gradient(180deg, #f0fdf4 0%, #dcfce7 100%);
     padding: 10px;
-    max-height: 100%;
+    min-height: 0;
     overflow: auto;
 }
 .ra2025-map-feedback {
@@ -15052,7 +15343,12 @@ downloadBtn.addEventListener('click', async () => {
         const parseBtn = document.getElementById('ra2025ParseLoadBtn');
         if (!parseBtn) return;
         parseBtn.disabled = !!isBusy;
-        parseBtn.textContent = label || '✓ Parse & Load to Table';
+        // Restore the label matching the current mode, not a hardcoded one - otherwise
+        // finishing a parse in Confirm mode relabels the button to the manual-mode wording.
+        const idleLabel = ra2025MapperMode === 'confirm'
+            ? '✓ Confirm & Load to Table'
+            : '✓ Parse & Load to Table';
+        parseBtn.textContent = label || idleLabel;
     }
 
     let ra2025PreviewScrollSyncLock = false;
@@ -15629,6 +15925,115 @@ downloadBtn.addEventListener('click', async () => {
         return null;
     }
 
+    // ── Saved mapping profiles ────────────────────────────────────────────────
+    // Keyed by a fingerprint of the sheet's header row rather than by filename, so a mapping
+    // confirmed once is reapplied automatically to the next sheet of the same workbook AND to
+    // a different file built from the same template - which filename matching (the old
+    // isSameMappingSource behaviour) could never do.
+    const RA2025_PROFILE_STORAGE_KEY = 'rab.ra2025.mappingProfiles.v1';
+    const RA2025_PROFILE_LIMIT = 25;
+
+    function normalizeHeaderTextForFingerprint(value) {
+        return String(value || '')
+            .toLowerCase()
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .replace(/[^a-z0-9]+/g, ' ')
+            .trim();
+    }
+
+    function computeRA2025HeaderFingerprint(headerData) {
+        if (!headerData) return '';
+
+        const parts = Object.keys(headerData)
+            .filter(key => key !== '_rowNum' && /^[A-Z]{1,3}$/.test(key))
+            .sort((a, b) => colLetterToIndex(a) - colLetterToIndex(b))
+            .map(col => `${col}:${normalizeHeaderTextForFingerprint(headerData[col])}`)
+            .filter(part => !part.endsWith(':'));
+
+        // Too few real headers to identify a template reliably - better to skip the profile
+        // than to reuse a mapping from an unrelated sheet.
+        return parts.length >= 3 ? parts.join('|') : '';
+    }
+
+    function readRA2025Profiles() {
+        try {
+            const raw = localStorage.getItem(RA2025_PROFILE_STORAGE_KEY);
+            const parsed = raw ? JSON.parse(raw) : null;
+            return parsed && typeof parsed === 'object' ? parsed : {};
+        } catch (error) {
+            console.warn('Could not read saved RA2025 mapping profiles:', error);
+            return {};
+        }
+    }
+
+    function loadRA2025MappingProfile(fingerprint) {
+        if (!fingerprint) return null;
+        const profiles = readRA2025Profiles();
+        return profiles[fingerprint] || null;
+    }
+
+    function saveRA2025MappingProfile(fingerprint, mapping, headerRow, dataStartRow, routineDefault, sourceFileName) {
+        if (!fingerprint) return;
+
+        try {
+            const profiles = readRA2025Profiles();
+            profiles[fingerprint] = {
+                mapping: mapping,
+                headerRow: headerRow,
+                dataStartRow: dataStartRow,
+                routineDefault: routineDefault,
+                lastFile: sourceFileName || '',
+                savedAt: new Date().toISOString()
+            };
+
+            // Trim oldest entries so a heavy user can't grow this unbounded in localStorage.
+            const keys = Object.keys(profiles);
+            if (keys.length > RA2025_PROFILE_LIMIT) {
+                keys.sort((a, b) => String(profiles[a].savedAt || '').localeCompare(String(profiles[b].savedAt || '')));
+                keys.slice(0, keys.length - RA2025_PROFILE_LIMIT).forEach(key => { delete profiles[key]; });
+            }
+
+            localStorage.setItem(RA2025_PROFILE_STORAGE_KEY, JSON.stringify(profiles));
+        } catch (error) {
+            console.warn('Could not save RA2025 mapping profile:', error);
+        }
+    }
+
+    function showRA2025SavedMappingNote(text) {
+        const note = document.getElementById('ra2025SavedMappingNote');
+        if (!note) return;
+        if (!text) {
+            note.style.display = 'none';
+            note.textContent = '';
+            return;
+        }
+        note.style.display = '';
+        note.textContent = text;
+    }
+
+    // Persist whatever mapping the user actually confirmed, against the header row they
+    // confirmed it with. Called from the parse/confirm path, not on every keystroke.
+    function rememberCurrentRA2025Mapping() {
+        const headerRow = parseInt(document.getElementById('ra2025HeaderRow')?.value, 10) || 14;
+        const headerData = ra2025AllRows.find(row => row._rowNum === headerRow) || null;
+        const fingerprint = computeRA2025HeaderFingerprint(headerData);
+        if (!fingerprint) return;
+
+        const dataStartRow = parseInt(document.getElementById('ra2025DataStartRow')?.value, 10) || (headerRow + 1);
+        const routineDefault = document.getElementById('ra2025DefaultRoutineType')?.value || 'Routine';
+        const sourceFile = window.ra2025PendingFile || window.ra2025LoadedFile;
+
+        saveRA2025MappingProfile(
+            fingerprint,
+            getCurrentMapping(),
+            headerRow,
+            dataStartRow,
+            routineDefault,
+            sourceFile ? sourceFile.name : ''
+        );
+    }
+
     function detectMappingDefaultsFromSheet() {
         if (!ra2025SheetDoc) return null;
 
@@ -15683,6 +16088,187 @@ downloadBtn.addEventListener('click', async () => {
         updateRA2025Preview();
     };
 
+    // ── Confirm-vs-manual mode ────────────────────────────────────────────────
+    // 'confirm': auto-detection produced a mapping and we're asking the user to verify it
+    //            before anything reaches the main table (the default for every RA2025 import).
+    // 'manual' : auto-detection failed outright, so the user is building the mapping by hand.
+    // Only copy and the default expanded/collapsed state differ - the controls are identical.
+    let ra2025MapperMode = 'manual';
+
+    function setRA2025MapperMode(mode) {
+        ra2025MapperMode = mode === 'confirm' ? 'confirm' : 'manual';
+
+        const titleEl = document.getElementById('ra2025MapperTitle');
+        const subtitleEl = document.getElementById('ra2025MapperSubtitle');
+        const parseBtn = document.getElementById('ra2025ParseLoadBtn');
+
+        if (ra2025MapperMode === 'confirm') {
+            if (titleEl) titleEl.textContent = '🗺️ Confirm Your Column Mapping';
+            if (subtitleEl) {
+                subtitleEl.textContent = 'Check that each field below is reading the right column from your file, then load it into the table.';
+            }
+            if (parseBtn) parseBtn.textContent = '✓ Confirm & Load to Table';
+            setRA2025AdvancedPanel(false);
+        } else {
+            if (titleEl) titleEl.textContent = '🗺️ RA 2025 Column Mapper';
+            if (subtitleEl) {
+                subtitleEl.textContent = "Auto-detection couldn't identify your file format. Please map columns manually below.";
+            }
+            if (parseBtn) parseBtn.textContent = '✓ Parse & Load to Table';
+            setRA2025AdvancedPanel(true);
+        }
+    }
+
+    function setRA2025AdvancedPanel(isOpen) {
+        const card = document.getElementById('ra2025MapperCard');
+        const label = document.getElementById('ra2025TogglePreviewLabel');
+        if (card) card.classList.toggle('ra2025-advanced-open', !!isOpen);
+        if (label) {
+            label.innerHTML = isOpen
+                ? '▲ Hide full sheet preview — back to the mapping summary'
+                : '📊 Show full sheet preview &amp; advanced mapping';
+        }
+        // The preview's custom pan/scroll overlays measure the container, so they need a
+        // re-sync once it actually has a size (it has none while display:none). The card also
+        // animates its width over 0.22s, and the existing sync's last retry lands at exactly
+        // 220ms - so add one more pass after the transition has definitely finished, otherwise
+        // the rails can be sized from a mid-animation measurement.
+        if (isOpen) {
+            updateRA2025Preview();
+            scheduleRA2025PreviewScrollSync(true);
+            setTimeout(() => scheduleRA2025PreviewScrollSync(true), 320);
+        }
+    }
+
+    window.toggleRA2025AdvancedPanel = function() {
+        const card = document.getElementById('ra2025MapperCard');
+        setRA2025AdvancedPanel(!(card && card.classList.contains('ra2025-advanced-open')));
+    };
+
+    // Field -> column change, from the verification grid (the inverse direction of the
+    // preview's column -> field "Map to" row, which stays wired to handleRA2025HeaderMapping).
+    window.handleRA2025FieldMapping = function(selectEl) {
+        if (!selectEl) return;
+        const fieldKey = String(selectEl.getAttribute('data-field') || '');
+        if (!fieldKey) return;
+        setFieldMapping(fieldKey, selectEl.value);
+        updateRA2025Preview();
+    };
+
+    // First few real values under a column, so the user can tell at a glance whether a
+    // mapping is pointing at the data they expect (the whole point of the confirm step).
+    function getRA2025SampleValues(col, dataStart, maxSamples) {
+        const normalizedCol = normalizeColLetter(col);
+        if (!normalizedCol) return [];
+
+        const samples = [];
+        for (const row of ra2025AllRows) {
+            if (row._rowNum < dataStart) continue;
+            const value = String(row[normalizedCol] ?? '').trim();
+            if (!value) continue;
+            samples.push(value);
+            if (samples.length >= (maxSamples || 3)) break;
+        }
+        return samples;
+    }
+
+    function buildRA2025ColumnOptions(selectedCol, cols, headerData) {
+        const normalizedSelected = normalizeColLetter(selectedCol);
+        const options = [`<option value="">— not mapped —</option>`];
+        cols.forEach(col => {
+            const headerText = String((headerData && headerData[col]) || '').trim();
+            const suffix = headerText ? ` · ${truncateForOption(headerText, 22)}` : '';
+            const selected = col === normalizedSelected ? ' selected' : '';
+            options.push(`<option value="${col}"${selected}>${escapeHtml(col + suffix)}</option>`);
+        });
+        return options.join('');
+    }
+
+    function truncateForOption(value, maxLen) {
+        const text = String(value || '');
+        return text.length > maxLen ? text.slice(0, maxLen) + '…' : text;
+    }
+
+    function renderRA2025VerifyGrid(headerData) {
+        const grid = document.getElementById('ra2025VerifyGrid');
+        if (!grid) return { mapped: 0, missingRequired: [], missing: [] };
+
+        const cols = getPreviewColumns();
+        const dataStart = parseInt(document.getElementById('ra2025DataStartRow')?.value, 10) || 15;
+
+        let mapped = 0;
+        const missingRequired = [];
+        const missing = [];
+
+        const rowsHtml = RA2025_MAP_FIELDS.map(field => {
+            const col = normalizeColLetter(ra2025ColumnMap[field.key]);
+            const headerText = col ? String((headerData && headerData[col]) || '').trim() : '';
+            const samples = col ? getRA2025SampleValues(col, dataStart, 3) : [];
+
+            if (col) {
+                mapped++;
+            } else if (field.required) {
+                missingRequired.push(field.label);
+            } else {
+                missing.push(field.label);
+            }
+
+            const rowClass = col
+                ? ''
+                : (field.required ? ' is-unmapped-required' : ' is-unmapped');
+
+            const headerCell = col
+                ? `<span class="ra2025-verify-header-text" title="${escapeHtml(headerText)}">${escapeHtml(headerText || '(blank header)')}</span>`
+                : `<span class="ra2025-verify-header-text is-empty">—</span>`;
+
+            const samplesCell = samples.length > 0
+                ? samples.map(s => `<span class="ra2025-verify-sample" title="${escapeHtml(s)}">${escapeHtml(truncateForOption(s, 26))}</span>`).join('')
+                : `<span class="ra2025-verify-sample is-none">${col ? 'no data in this column' : 'not mapped'}</span>`;
+
+            return `
+                <div class="ra2025-verify-row${rowClass}">
+                    <span class="ra2025-verify-field">${escapeHtml(field.label)}${field.required ? '<span class="ra2025-verify-req">*</span>' : ''}</span>
+                    <select data-field="${escapeHtml(field.key)}" onchange="handleRA2025FieldMapping(this)">
+                        ${buildRA2025ColumnOptions(col, cols, headerData)}
+                    </select>
+                    ${headerCell}
+                    <span class="ra2025-verify-samples">${samplesCell}</span>
+                </div>
+            `;
+        }).join('');
+
+        grid.innerHTML = rowsHtml;
+        return { mapped: mapped, missingRequired: missingRequired, missing: missing };
+    }
+
+    function renderRA2025Confidence(summary) {
+        const bar = document.getElementById('ra2025ConfidenceBar');
+        if (!bar) return;
+
+        const total = RA2025_MAP_FIELDS.length;
+        const hasProblem = summary.missingRequired.length > 0 || summary.missing.length > 0;
+
+        bar.style.display = 'flex';
+        bar.className = 'ra2025-confidence ' + (hasProblem ? 'ra2025-confidence-warn' : 'ra2025-confidence-ok');
+
+        if (!hasProblem) {
+            bar.innerHTML = `<span>✅</span><div>All <strong>${total}</strong> fields matched to a column. Check the sample values below look right, then load.</div>`;
+            return;
+        }
+
+        const parts = [];
+        if (summary.missingRequired.length > 0) {
+            parts.push(`<strong>Required field${summary.missingRequired.length > 1 ? 's' : ''} not found:</strong> ${escapeHtml(summary.missingRequired.join(', '))}`);
+        }
+        if (summary.missing.length > 0) {
+            parts.push(`<strong>Not detected:</strong> ${escapeHtml(summary.missing.join(', '))}`);
+        }
+
+        bar.innerHTML = `<span>⚠️</span><div><div><strong>${summary.mapped}</strong> of <strong>${total}</strong> fields matched to a column.</div>` +
+            parts.map(p => `<div style="margin-top:3px;">${p}</div>`).join('') +
+            `<div style="margin-top:4px;">Unmatched fields fall back to a default value — set them below if your file has them.</div></div>`;
+    }
+
     window.updateRA2025Preview = function() {
         const headerRow = parseInt(document.getElementById('ra2025HeaderRow')?.value, 10) || 14;
         const dataStart = parseInt(document.getElementById('ra2025DataStartRow')?.value, 10) || 15;
@@ -15699,6 +16285,11 @@ downloadBtn.addEventListener('click', async () => {
         const headerData = ra2025AllRows.find(row => row._rowNum === headerRow) || null;
         const cols = getPreviewColumns();
         const dataRows = ra2025AllRows.filter(row => row._rowNum >= dataStart && row._rowNum < dataStart + 30);
+
+        // Verification grid + confidence summary (the primary surface in Confirm mode).
+        // Rendered on every refresh so it stays in step with the preview's own "Map to" row.
+        const verifySummary = renderRA2025VerifyGrid(headerData);
+        renderRA2025Confidence(verifySummary);
 
         if (mapperUi && typeof mapperUi.renderColumnMappingPreview === 'function') {
             const rendered = mapperUi.renderColumnMappingPreview({
@@ -16043,7 +16634,10 @@ downloadBtn.addEventListener('click', async () => {
 
     // Open the column mapper modal and load preview
     // sheetIndex: optional 1-based sheet index to load a specific sheet
-    window.openRA2025ColumnMapper = async function(file, sheetIndex) {
+    // mode: 'confirm' (verify an auto-detected mapping before loading - the normal RA2025
+    //       import path) or 'manual' (auto-detection failed; build the mapping by hand).
+    //       Defaults to 'manual' so existing fallback callers keep their current behaviour.
+    window.openRA2025ColumnMapper = async function(file, sheetIndex, mode) {
         const modal = document.getElementById('ra2025ColumnMapperModal');
         if (!modal) return;
 
@@ -16053,6 +16647,8 @@ downloadBtn.addEventListener('click', async () => {
         bindRA2025PreviewScrollSync();
         scheduleRA2025PreviewScrollSync(true);
         resetRA2025ColumnMap();
+        // Set copy/layout up front so the dialog reads correctly even if loading below fails.
+        setRA2025MapperMode(mode);
 
         if (file) {
             window.ra2025PendingFile = file;
@@ -16158,6 +16754,30 @@ downloadBtn.addEventListener('click', async () => {
             }
 
             tryAutoFillMapping();
+
+            // A mapping the user previously CONFIRMED for this same header layout outranks
+            // anything auto-detection guessed, so it's applied last and overwrites. Matched on
+            // the header fingerprint, so it carries across sheets and across files built from
+            // the same template - the whole point of remembering it.
+            showRA2025SavedMappingNote('');
+            const currentHeaderRow = parseInt(headerRowInput?.value, 10) || 14;
+            const currentHeaderData = ra2025AllRows.find(row => row._rowNum === currentHeaderRow) || null;
+            const savedProfile = loadRA2025MappingProfile(computeRA2025HeaderFingerprint(currentHeaderData));
+
+            if (savedProfile && savedProfile.mapping) {
+                applyMappingDefaults(savedProfile.mapping, true);
+
+                const profileDataStart = parseInt(savedProfile.dataStartRow, 10);
+                if (dataStartRowInput && Number.isFinite(profileDataStart)) {
+                    dataStartRowInput.value = String(profileDataStart);
+                }
+                if (defaultRoutineInput && ['Routine', 'Non-Routine', 'Emergency Situation'].includes(savedProfile.routineDefault)) {
+                    defaultRoutineInput.value = savedProfile.routineDefault;
+                }
+                showRA2025SavedMappingNote('✓ Applied your saved mapping for this layout');
+            }
+
+            setRA2025MapperMode(mode);
             updateRA2025Preview();
 
         } catch (e) {
@@ -16176,6 +16796,9 @@ downloadBtn.addEventListener('click', async () => {
         document.getElementById('ra2025ColumnMapperModal').style.display = 'none';
         setRA2025ModalBodyLock(false);
         window.ra2025PendingFile = null;
+        // Drop any queued sibling sheets - cancelling the confirmation cancels the whole
+        // import, so they must not be silently picked up by a later, unrelated confirm.
+        window.__ra2025MultiSheetQueue = null;
     };
     
     window.tryAutoDetectRA2025 = async function() {
@@ -16281,6 +16904,38 @@ downloadBtn.addEventListener('click', async () => {
                 return;
             }
 
+            // Multi-sheet import: the user confirmed the mapping on the first sheet, so apply
+            // that same mapping to the remaining selected sheets instead of asking again.
+            const sheetQueue = window.__ra2025MultiSheetQueue;
+            let extraSheetCount = 0;
+            if (sheetQueue && sheetQueue.file === sourceFile && Array.isArray(sheetQueue.remaining) && sheetQueue.remaining.length > 0
+                && typeof parseRA2025Template === 'function') {
+                setParseButtonBusy(true, 'Applying to other sheets...');
+
+                for (const otherSheetIdx of sheetQueue.remaining) {
+                    try {
+                        const otherResult = await parseRA2025Template(
+                            sourceFile,
+                            {
+                                ...cols,
+                                headerRow: headerRow,
+                                dataStartRow: dataStartRow,
+                                routineDefault: routineDefaultMode
+                            },
+                            otherSheetIdx
+                        );
+                        const otherItems = Array.isArray(otherResult?.risk_items) ? otherResult.risk_items : [];
+                        if (otherItems.length > 0) {
+                            parsedItems = parsedItems.concat(otherItems);
+                            extraSheetCount++;
+                        }
+                    } catch (sheetErr) {
+                        console.warn(`RA2025: sheet ${otherSheetIdx} failed with the confirmed mapping:`, sheetErr);
+                    }
+                }
+            }
+            window.__ra2025MultiSheetQueue = null;
+
             window.ra2025RawRiskItems = parsedItems;
             window.ra2025LoadedFile = sourceFile;
             if (parsedContext) {
@@ -16337,9 +16992,20 @@ downloadBtn.addEventListener('click', async () => {
                 };
             }
 
+            // The user has now explicitly confirmed this mapping produces good data, so it's
+            // worth remembering for the next sheet/file with the same header layout.
+            rememberCurrentRA2025Mapping();
+
             loadRA2025RowsToMainTable(parsedItems);
             closeRA2025ColumnMapper();
-            showDirectGoehsAlert(`✅ Manually mapped and loaded ${parsedItems.length} risk items into the main table.`, 'success');
+
+            let loadedMsg = ra2025MapperMode === 'confirm'
+                ? `✅ Loaded ${parsedItems.length} risk items into the main table.`
+                : `✅ Manually mapped and loaded ${parsedItems.length} risk items into the main table.`;
+            if (extraSheetCount > 0) {
+                loadedMsg += ` Your confirmed mapping was applied to ${extraSheetCount} more sheet(s).`;
+            }
+            showDirectGoehsAlert(loadedMsg, 'success');
         } catch (e) {
             console.error('Manual RA2025 parsing failed:', e);
             setStatusMessage('Manual parsing failed: ' + e.message, true);

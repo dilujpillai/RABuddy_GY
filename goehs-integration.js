@@ -212,12 +212,12 @@ async function handleDirectGoehsUpload(event) {
         const singleSheetIdx = sheetList.length === 1 ? sheetList[0].index : 1;
         const data = await parseRA2025Template(file, null, singleSheetIdx);
         console.log('Parsed data:', data);
-        
+
         // Check if we got valid data
         if (!data.risk_items || data.risk_items.length === 0) {
             throw new Error('NO_DATA_FOUND');
         }
-        
+
         // Store context for GOEHS modal to use later
         window.directGoehsContext = data.process_context;
         setGoehsWorkflowContext(GOEHS_WORKFLOW_SOURCES.RA2025_SINGLE, {
@@ -230,44 +230,55 @@ async function handleDirectGoehsUpload(event) {
             riskItemCount: Array.isArray(data.risk_items) ? data.risk_items.length : 0,
             processContext: data.process_context || null
         });
-        
+
         // Store the file and raw data for potential remapping
         window.ra2025LoadedFile = file;
+        window.ra2025PendingFile = file;
         window.ra2025RawRiskItems = data.risk_items;
-        window.ra2025SelectedSheetIndex = null; // single-sheet, no specific index
-        
-        // Convert parsed data to the format buildTableFromData expects
+        window.ra2025SelectedSheetIndex = singleSheetIdx;
+
+        // Confirm-before-load: rather than dropping straight into the main table, show the
+        // auto-detected mapping for verification first. Auto-detection silently mismatching a
+        // column (e.g. a Portuguese "Frequência" header it can't match) used to land as
+        // plausible-looking default values that a new user would never think to question -
+        // this makes the mapping an explicit, visible step. Loading happens on confirm, via
+        // parseWithManualMapping().
+        if (typeof openRA2025ColumnMapper === 'function') {
+            showDirectGoehsAlert(`📂 Parsed "${file.name}" — please confirm the column mapping before loading.`, 'info');
+            await openRA2025ColumnMapper(file, singleSheetIdx, 'confirm');
+            event.target.value = '';
+            return;
+        }
+
+        // Fallback for the (unexpected) case where the mapper isn't available: preserve the
+        // original straight-to-table behaviour rather than dead-ending the upload.
         const tableData = convertRA2025ToTableFormat(data.risk_items);
-        console.log('Converted table data:', tableData);
-        
-        // Populate the main risk assessment table (same as AI does)
-        // Use window.buildTableFromData since it's in a different script scope
         if (window.buildTableFromData) {
             window.buildTableFromData(tableData);
         } else {
             throw new Error('buildTableFromData not available');
         }
-        
+
         if (window.initializeDashboard) {
             window.initializeDashboard();
         }
-        
+
         // Show dashboard
         document.getElementById('dashboard-container').style.display = 'block';
-        
+
         // Switch to the Rich Media tab (where the main table lives) and scroll into view
         if (window.switchTab) window.switchTab('rich-media');
-        
+
         // Show the Remap Columns button since we loaded RA2025 data
         const remapBtn = document.getElementById('remapColumnsBtn');
         if (remapBtn) remapBtn.classList.remove('rab-hidden');
-        
+
         // Scroll to table
         setTimeout(() => {
             const table = document.querySelector('#table-container table');
             if (table) table.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }, 300);
-        
+
         showDirectGoehsAlert(`✅ Loaded ${data.risk_items.length} risk items from "${file.name}". Review the table, then use "Open GOEHS Integration" to upload to GOEHS.`, 'success');
         warnIfRA2025ScaleColumnsUnverified(data.risk_items);
 
@@ -415,8 +426,30 @@ async function processSelectedSheetsRA2025(file, sheetIndices) {
         partialErrorCount: errors.length
     });
     window.ra2025LoadedFile = file;
+    window.ra2025PendingFile = file;
     window.ra2025RawRiskItems = allRiskItems;
     window.ra2025SelectedSheetIndex = sheetIndices[0] || null;
+
+    // Confirm-before-load (same rationale as the single-sheet path). The mapper works on one
+    // sheet at a time, so the user confirms the mapping on the FIRST selected sheet and that
+    // same confirmed mapping is then applied to the remaining sheets - which is exactly the
+    // "map once, reuse on the next sheet" behaviour, handled by parseWithManualMapping().
+    if (typeof openRA2025ColumnMapper === 'function') {
+        const firstSheetIdx = sheetIndices[0] || null;
+        window.__ra2025MultiSheetQueue = {
+            file: file,
+            remaining: sheetIndices.slice(1),
+            totalSheets: sheetIndices.length
+        };
+        showDirectGoehsAlert(
+            sheetIndices.length > 1
+                ? `📂 Parsed ${sheetIndices.length} sheets — confirm the mapping once and it will be applied to all of them.`
+                : `📂 Parsed "${file.name}" — please confirm the column mapping before loading.`,
+            'info'
+        );
+        await openRA2025ColumnMapper(file, firstSheetIdx, 'confirm');
+        return;
+    }
 
     // Convert and build table
     const tableData = convertRA2025ToTableFormat(allRiskItems);
@@ -3861,12 +3894,14 @@ document.addEventListener('DOMContentLoaded', function() {
         goehsFixLadderBtn.dataset.goehsBound = '1';
     }
 
-    // Remap Columns button - opens manual column mapper with existing file
+    // Remap Columns button - reopens the mapper for the already-loaded file.
+    // Uses 'confirm' mode: someone re-checking a mapping wants the compact field -> column ->
+    // sample-values view, not a blank manual-mapping screen. The full preview is one click away.
     document.getElementById('remapColumnsBtn')?.addEventListener('click', function() {
         if (window.ra2025LoadedFile) {
             // Re-open the column mapper with the stored file and sheet index
             window.ra2025PendingFile = window.ra2025LoadedFile;
-            window.openRA2025ColumnMapper(window.ra2025LoadedFile, window.ra2025SelectedSheetIndex || null);
+            window.openRA2025ColumnMapper(window.ra2025LoadedFile, window.ra2025SelectedSheetIndex || null, 'confirm');
         } else {
             alert('No RA 2025 file loaded. Please upload an Excel file first using the GOEHS Integration upload.');
         }
