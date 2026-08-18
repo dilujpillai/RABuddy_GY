@@ -1593,6 +1593,54 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }, false);
     }
+
+    // The Legacy Excel and Batch RA2025 cards, and the image/video upload zone, had no drag
+    // and drop wiring at all (click-only) despite looking like drop targets - or, for image
+    // upload, its own label text literally saying "drag and drop" while nothing handled it.
+    // Wire drops on each straight into the same <input> the click handler already uses, by
+    // assigning the dropped file(s) to input.files and firing 'change' - reuses every existing
+    // upload code path instead of duplicating it.
+    function wireDropZoneToInput(zoneId, inputId, hoverClass) {
+        const zone = document.getElementById(zoneId);
+        const input = document.getElementById(inputId);
+        if (!zone || !input) return;
+
+        const stop = (e) => { e.preventDefault(); e.stopPropagation(); };
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(evt => zone.addEventListener(evt, stop, false));
+        ['dragenter', 'dragover'].forEach(evt => zone.addEventListener(evt, () => zone.classList.add(hoverClass), false));
+        ['dragleave', 'drop'].forEach(evt => zone.addEventListener(evt, () => zone.classList.remove(hoverClass), false));
+
+        zone.addEventListener('drop', (e) => {
+            const files = e.dataTransfer && e.dataTransfer.files;
+            if (!files || files.length === 0) return;
+
+            const dt = new DataTransfer();
+            Array.from(files).forEach(f => dt.items.add(f));
+            input.files = dt.files;
+            input.dispatchEvent(new Event('change', { bubbles: true }));
+        }, false);
+    }
+
+    wireDropZoneToInput('excelUploadDropZone', 'excelUpload', 'rab-drop-hover');
+    wireDropZoneToInput('batchRA2025DropZone', 'batchRA2025Upload', 'rab-drop-hover');
+    wireDropZoneToInput('imageUploadDropZone', 'imageUpload', 'rab-drop-hover');
+
+    // Global safety net: a file dropped anywhere this page doesn't specifically handle (a
+    // near-miss on one of the zones above, or any other spot) falls through to the browser's
+    // default action - navigating to/opening the file - which looks exactly like "drag and
+    // drop doesn't work, it opens in a new tab" even though the specific zones above are fine.
+    // Gated on dataTransfer having a real 'Files' type so this never touches the app's own
+    // internal drag interactions (image reordering, gallery drag-to-card, etc.), which move
+    // custom data, not OS files.
+    ['dragover', 'drop'].forEach(evt => {
+        window.addEventListener(evt, (e) => {
+            if (e.defaultPrevented) return;
+            const types = e.dataTransfer && e.dataTransfer.types;
+            if (types && Array.from(types).includes('Files')) {
+                e.preventDefault();
+            }
+        }, false);
+    });
 });
 
 // ============ DATA STRUCTURES ============

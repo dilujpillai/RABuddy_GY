@@ -238,6 +238,13 @@
     transition: background 0.15s, border-color 0.15s; height: 100%; box-sizing: border-box;
 }
 .gy-dropzone:hover { background: #f1f5f9; border-color: #94a3b8; }
+
+/* Drag-over feedback for the click-to-upload cards that also accept drops (see
+   wireDropZoneToInput in goehs-integration.js) */
+.rab-drop-hover {
+    outline: 3px dashed #002c5f !important;
+    outline-offset: -3px;
+}
 .gy-mapper-box { background: #f8f9fa; border: 1px solid #e9ecef; padding: 20px; border-radius: 10px; }
 .gy-mapper-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 2px solid #e9ecef; padding-bottom: 10px; }
 .gy-mapper-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(80px, 1fr)); gap: 10px; }
@@ -2131,7 +2138,7 @@
                 <div class="bg-slate-50 border border-slate-200 rounded-2xl p-4">
                     <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:h-[340px]">
                         <!-- Upload dropzone -->
-                        <label for="imageUpload" class="group relative flex flex-col items-center justify-center gap-3 p-10 rounded-xl border-2 border-dashed border-indigo-300 bg-white cursor-pointer hover:border-indigo-400 hover:shadow-md transition-all duration-300">
+                        <label id="imageUploadDropZone" for="imageUpload" class="group relative flex flex-col items-center justify-center gap-3 p-10 rounded-xl border-2 border-dashed border-indigo-300 bg-white cursor-pointer hover:border-indigo-400 hover:shadow-md transition-all duration-300">
                             <div class="w-14 h-14 rounded-2xl bg-indigo-100 flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
@@ -2218,7 +2225,7 @@
             <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                 
                 <!-- Option 1: Legacy Workflow (AI-Assisted) -->
-                <div class="bg-gradient-to-br from-blue-50 to-indigo-50 p-6 rounded-xl border-2 border-blue-200 hover:border-blue-400 hover:shadow-lg transition cursor-pointer" onclick="document.getElementById('excelUpload').click()">
+                <div id="excelUploadDropZone" class="bg-gradient-to-br from-blue-50 to-indigo-50 p-6 rounded-xl border-2 border-blue-200 hover:border-blue-400 hover:shadow-lg transition cursor-pointer" onclick="document.getElementById('excelUpload').click()">
                     <div class="flex items-center gap-3 mb-4">
                         <div class="bg-blue-600 text-white rounded-full w-10 h-10 flex items-center justify-center font-bold flex-shrink-0">1</div>
                         <h3 class="text-lg font-bold text-blue-900">Legacy Excel → AI Processing</h3>
@@ -2241,7 +2248,7 @@
                 </div>
                 
                 <!-- Option 2: Direct GOEHS Upload (Pre-formatted RA 2025 Template) -->
-                <div class="bg-gradient-to-br from-orange-50 to-red-50 p-6 rounded-xl border-2 border-orange-200 hover:border-orange-400 hover:shadow-lg transition cursor-pointer" onclick="document.getElementById('directGoehsUpload').click()">
+                <div id="directGoehsDropZone" class="bg-gradient-to-br from-orange-50 to-red-50 p-6 rounded-xl border-2 border-orange-200 hover:border-orange-400 hover:shadow-lg transition cursor-pointer" onclick="document.getElementById('directGoehsUpload').click()">
                     <div class="flex items-center gap-3 mb-4">
                         <div class="bg-orange-600 text-white rounded-full w-10 h-10 flex items-center justify-center font-bold flex-shrink-0">2</div>
                         <h3 class="text-lg font-bold text-orange-900">RA 2025 Template (1 file) → GOEHS Export</h3>
@@ -2264,7 +2271,7 @@
                 </div>
                 
                 <!-- Option 3: Batch RA 2025 → GOEHS Export (up to 20 files) -->
-                <div class="bg-gradient-to-br from-emerald-50 to-teal-50 p-6 rounded-xl border-2 border-emerald-200 hover:border-emerald-400 hover:shadow-lg transition cursor-pointer" onclick="document.getElementById('batchRA2025Upload').click()">
+                <div id="batchRA2025DropZone" class="bg-gradient-to-br from-emerald-50 to-teal-50 p-6 rounded-xl border-2 border-emerald-200 hover:border-emerald-400 hover:shadow-lg transition cursor-pointer" onclick="document.getElementById('batchRA2025Upload').click()">
                     <div class="flex items-center gap-3 mb-4">
                         <div class="bg-emerald-600 text-white rounded-full w-10 h-10 flex items-center justify-center font-bold flex-shrink-0">3</div>
                         <h3 class="text-lg font-bold text-emerald-900">Batch RA 2025 (~20 files) → GOEHS Export</h3>
