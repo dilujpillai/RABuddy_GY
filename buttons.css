@@ -39,6 +39,18 @@
     flex-shrink: 0 !important;
 }
 
+/* ---- Size: large (a modal's single terminal action, e.g. Download GOEHS XLSX) ---- */
+.rab-btn-lg {
+    font-size: 14px !important;
+    padding: 10px 20px !important;
+    height: 40px !important;
+    border-radius: 8px !important;
+}
+.rab-btn-lg svg {
+    width: 16px !important;
+    height: 16px !important;
+}
+
 /* ---- Size: small (dense toolbars inside modals) ---- */
 .rab-btn-sm {
     font-size: 11px !important;
@@ -87,6 +99,10 @@
 /* ---- Colour: indigo (Download Report) ---- */
 .rab-c-indigo       { background: #4f46e5 !important; color: #fff !important; }
 .rab-c-indigo:hover { background: #4338ca !important; }
+
+/* ---- Colour: navy (Goodyear brand - modal chrome actions, e.g. GOEHS Re-sync) ---- */
+.rab-c-navy       { background: #002c5f !important; color: #fff !important; }
+.rab-c-navy:hover { background: #001530 !important; }
 
 /* ---- Visibility toggle ---- */
 .rab-hidden { display: none !important; }

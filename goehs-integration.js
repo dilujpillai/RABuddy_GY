@@ -2970,7 +2970,7 @@ function populateGoehsHazardsFromTable(tableData) {
         row.innerHTML = `
             <td class="p-1 border-r border-slate-200 text-center bg-white">
                 <div class="goehs-row-delete-wrap">
-                    <button type="button" onclick="removeHazardTableRow('${hazardId}')" class="goehs-row-delete-btn goehs-btn goehs-btn-icon-danger" title="Delete row" aria-label="Delete row">
+                    <button type="button" onclick="removeHazardTableRow('${hazardId}')" class="goehs-row-delete-btn goehs-btn-icon-danger" title="Delete row" aria-label="Delete row">
                         ${renderHazardTableRowActionIcon(false)}
                     </button>
                 </div>
@@ -2987,13 +2987,13 @@ function populateGoehsHazardsFromTable(tableData) {
                     ${modeOptions}
                 </select>
             </td>
-            <td class="p-1 border-r border-slate-200 bg-orange-50">
+            <td class="p-1 border-r border-slate-200 bg-slate-50">
                 <select class="hazard-category w-full p-1 border border-slate-300 rounded text-xs bg-white${categoryMismatch ? ' goehs-mismatch' : ''}"${categoryMismatch && sourceCategory ? ` data-raw-value="${escapeHtml(sourceCategory)}" title="No exact GOEHS match - imported value was: ${escapeHtml(sourceCategory)}"` : ''} onchange="this.classList.remove('goehs-mismatch');updateTableSubHazards(this, '${hazardId}')">
                     <option value="">${categoryMismatch && sourceCategory ? escapeHtml(sourceCategory) + ' (unmatched)' : '--'}</option>
                     ${categoryOptions}
                 </select>
             </td>
-            <td class="p-1 border-r border-slate-200 bg-orange-50">
+            <td class="p-1 border-r border-slate-200 bg-slate-50">
                 <select class="hazard-sub w-full p-1 border border-slate-300 rounded text-xs bg-white${subHazardMismatch ? ' goehs-mismatch' : ''}"${subHazardMismatch && sourceSubHazard ? ` data-raw-value="${escapeHtml(sourceSubHazard)}" title="No exact GOEHS match - imported value was: ${escapeHtml(sourceSubHazard)}"` : ''} onchange="this.classList.remove('goehs-mismatch')">
                     <option value="">${subHazardMismatch && sourceSubHazard ? escapeHtml(sourceSubHazard) + ' (unmatched)' : '--'}</option>
                     ${subHazardOptions}
@@ -3026,10 +3026,10 @@ function populateGoehsHazardsFromTable(tableData) {
             <td class="p-1 border-r border-slate-200 bg-amber-50">
                 <input type="text" class="hazard-init-rating w-full p-1 border border-slate-300 rounded text-xs bg-slate-100 text-center font-semibold" value="${initRating}" readonly>
             </td>
-            <td class="p-1 border-r border-slate-200 bg-blue-50">
+            <td class="p-1 border-r border-slate-200 bg-sky-50">
                 <input type="text" class="hazard-counter-desc w-full p-1 border border-slate-300 rounded text-xs" value="${escapeHtml(hazard.currentControl)}" placeholder="Controls">
             </td>
-            <td class="p-1 border-r border-slate-200 bg-blue-50">
+            <td class="p-1 border-r border-slate-200 bg-sky-50">
                 <select class="hazard-counter-ladder w-full p-1 border border-slate-300 rounded text-xs bg-white" multiple size="4" style="min-height: 70px;" title="Hold Ctrl/Cmd to select multiple">
                     ${ladderOptions}
                 </select>
@@ -3171,7 +3171,7 @@ function addHazardTableRow() {
     row.innerHTML = `
         <td class="p-1 border-r border-slate-200 text-center bg-white">
             <div class="goehs-row-delete-wrap">
-                <button type="button" onclick="removeHazardTableRow('${hazardId}')" class="goehs-row-delete-btn goehs-btn goehs-btn-icon-danger" title="Delete row" aria-label="Delete row">
+                <button type="button" onclick="removeHazardTableRow('${hazardId}')" class="goehs-row-delete-btn goehs-btn-icon-danger" title="Delete row" aria-label="Delete row">
                     ${renderHazardTableRowActionIcon(false)}
                 </button>
             </div>
@@ -3188,13 +3188,13 @@ function addHazardTableRow() {
                 ${modeOptions}
             </select>
         </td>
-        <td class="p-1 border-r border-slate-200 bg-orange-50">
+        <td class="p-1 border-r border-slate-200 bg-slate-50">
             <select class="hazard-category w-full p-1 border border-slate-300 rounded text-xs bg-white" onchange="this.classList.remove('goehs-mismatch');updateTableSubHazards(this, '${hazardId}')">
                 <option value="">--</option>
                 ${categoryOptions}
             </select>
         </td>
-        <td class="p-1 border-r border-slate-200 bg-orange-50">
+        <td class="p-1 border-r border-slate-200 bg-slate-50">
             <select class="hazard-sub w-full p-1 border border-slate-300 rounded text-xs bg-white" onchange="this.classList.remove('goehs-mismatch')">
                 <option value="">--</option>
             </select>
@@ -3226,10 +3226,10 @@ function addHazardTableRow() {
         <td class="p-1 border-r border-slate-200 bg-amber-50">
             <input type="text" class="hazard-init-rating w-full p-1 border border-slate-300 rounded text-xs bg-slate-100 text-center font-semibold" value="" readonly placeholder="--">
         </td>
-        <td class="p-1 border-r border-slate-200 bg-blue-50">
+        <td class="p-1 border-r border-slate-200 bg-sky-50">
             <input type="text" class="hazard-counter-desc w-full p-1 border border-slate-300 rounded text-xs" placeholder="Controls">
         </td>
-        <td class="p-1 border-r border-slate-200 bg-blue-50">
+        <td class="p-1 border-r border-slate-200 bg-sky-50">
             <select class="hazard-counter-ladder w-full p-1 border border-slate-300 rounded text-xs bg-white" multiple size="4" style="min-height: 70px;" title="Hold Ctrl/Cmd to select multiple">
                 ${ladderOptions}
             </select>
@@ -3581,16 +3581,14 @@ function autoPopulateFromRiskTable() {
                 </div>
             `;
         } else {
-            banner.className = 'mb-6 p-4 bg-green-50 border border-green-200 rounded-lg';
+            // Steady state - nothing for the user to act on, so this is a single quiet line
+            // rather than the full box used by the "no data" / "refreshed" states above.
+            banner.className = 'mb-4 px-3 py-2 bg-emerald-50 border border-emerald-200 rounded-lg';
             banner.innerHTML = `
-                <div class="flex items-start gap-3">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-green-600 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                    <div>
-                        <h4 class="font-semibold text-green-800">✓ Risk Table Data Detected: ${taskCount} Task(s), ${count} Hazard(s)</h4>
-                        <p class="text-green-700 text-sm mt-1">Your risk assessment data will automatically populate the final review pane.</p>
-                        <p class="text-green-700 text-sm mt-2"><strong>Next:</strong> Complete the assessment header below, then review final rows and download GOEHS batch upload file.</p>
-                    </div>
-                </div>
+                <p class="flex items-center gap-2 text-emerald-800 text-xs font-medium">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-emerald-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                    Risk table data detected — ${taskCount} task(s), ${count} hazard(s) — auto-populated into Final Review below.
+                </p>
             `;
         }
     }
