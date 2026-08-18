@@ -2295,7 +2295,14 @@
                 
             </div>
             
-            <button onclick="document.getElementById('excelImportModal').style.display='flex'" class="w-full bg-slate-600 hover:bg-slate-700 text-white font-bold py-3 px-6 rounded-lg shadow-md transition">📂 Advanced Import / Column Mapping</button>
+            <!-- Reopening this modal does NOT reset it - the loaded workbook, sheet tabs, and
+                 column mapping all persist in memory (see loadFile in the script below), so
+                 clicking this again just resumes where you left off. The label/caption below
+                 make that resumability visible instead of implying a fresh upload is needed. -->
+            <button id="advancedImportBtn" onclick="document.getElementById('excelImportModal').style.display='flex'" class="w-full bg-slate-600 hover:bg-slate-700 text-white font-bold py-3 px-6 rounded-lg shadow-md transition flex flex-col items-center gap-0.5">
+                <span id="advancedImportBtnLabel">📂 Advanced Import / Column Mapping</span>
+                <span id="advancedImportBtnFile" class="text-xs font-normal text-slate-200 hidden"></span>
+            </button>
         </section>
 
         <!-- ═══════════════════════════════════════════════════════════ -->
@@ -5107,10 +5114,16 @@ data.forEach((row, index) => {
                 }
                 
                 const selectedHazardName = hazardDropdown.value;
+                const isKnownHazard = !!HAZARD_REGISTRY[selectedHazardName];
+                // severity:1/likelihood:1 here are just a placeholder shape for the "unknown
+                // hazard" case, not a real assessment - see the isKnownHazard guard below,
+                // which stops them from being used to auto-fill a blank rating (they'd read
+                // as a normal, deliberate "1 - lowest possible" score with nothing to indicate
+                // the hazard itself was never actually recognized).
                 const hazardDetails = HAZARD_REGISTRY[selectedHazardName] || { group: 'Unknown', severity: 1, likelihood: 1 };
 
                 // Flag non-standard hazard list selections
-                if (!HAZARD_REGISTRY[selectedHazardName]) {
+                if (!isKnownHazard) {
                     hazardDropdown.classList.add('hazard-invalid');
                 } else {
                     hazardDropdown.classList.remove('hazard-invalid');
@@ -5145,18 +5158,55 @@ data.forEach((row, index) => {
                 // Column order: Picture(0), AI(1), Steps(2), Hazard Group(3), Hazard List(4), Risk/Consequences(5), Frequency(6), Severity(7), Likelihood(8)
                 const severityTd = allTds[7]; // 0-indexed
                 const likelihoodTd = allTds[8]; // 0-indexed
-                
+
+                // Only fall back to the hazard's generic registry default when the row has no
+                // rating at all (a brand-new blank row where the user just picked a Hazard
+                // List value) - never when it already has one. This used to fire unconditionally
+                // on every Hazard List change, including AI Fix correcting a classification, so
+                // a real rating from an Excel import or AI extraction got silently replaced by
+                // a generic per-hazard-type guess. Snapping to the nearest valid scale option
+                // also fixes a separate bug: ~half of HAZARD_REGISTRY's severity/likelihood
+                // defaults (e.g. likelihood: 4, 6) aren't valid SEVERITY_SCALE/LIKELIHOOD_SCALE
+                // options at all, so assigning them directly left the dropdown with nothing
+                // selected - visually blank, and silently treated as 1 in the score below.
+                //
+                // And only ever from a REAL registry entry (isKnownHazard) - the "unknown
+                // hazard" placeholder's severity:1/likelihood:1 is not a judgment about the
+                // hazard, just a shape filler, and auto-filling from it would present an
+                // unclassified hazard as confidently "lowest possible risk" with nothing to
+                // flag that it was never actually assessed. Left blank and outlined instead,
+                // matching the RA2025 importer's .scale-value-unverified treatment.
+                const snapToScale = (value, scaleObj, fallback) => {
+                    const allowed = Object.keys(scaleObj).map(Number);
+                    const n = Number(value);
+                    if (!Number.isFinite(n) || allowed.length === 0) return fallback;
+                    return allowed.reduce((closest, v) => Math.abs(v - n) < Math.abs(closest - n) ? v : closest, allowed[0]);
+                };
+                const unassessedTitle = 'Hazard List is not a recognized entry, so no default rating could be suggested - please set Severity/Likelihood manually.';
+
                 if (severityTd) {
                     const severitySelect = severityTd.querySelector('select');
-                    if (severitySelect) {
-                        severitySelect.value = hazardDetails.severity;
+                    if (severitySelect && !severitySelect.value) {
+                        if (isKnownHazard) {
+                            severitySelect.value = snapToScale(hazardDetails.severity, SEVERITY_SCALE, 1);
+                            severitySelect.classList.remove('scale-value-unverified');
+                        } else {
+                            severitySelect.classList.add('scale-value-unverified');
+                            severitySelect.title = unassessedTitle;
+                        }
                     }
                 }
-                
+
                 if (likelihoodTd) {
                     const likelihoodSelect = likelihoodTd.querySelector('select');
-                    if (likelihoodSelect) {
-                        likelihoodSelect.value = hazardDetails.likelihood;
+                    if (likelihoodSelect && !likelihoodSelect.value) {
+                        if (isKnownHazard) {
+                            likelihoodSelect.value = snapToScale(hazardDetails.likelihood, LIKELIHOOD_SCALE, 1);
+                            likelihoodSelect.classList.remove('scale-value-unverified');
+                        } else {
+                            likelihoodSelect.classList.add('scale-value-unverified');
+                            likelihoodSelect.title = unassessedTitle;
+                        }
                     }
                 }
             }
@@ -17532,6 +17582,37 @@ downloadBtn.addEventListener('click', async () => {
     let gyDeletedRows = new Set();
     let gyDeletedItems = []; // Store deleted items for restoration
     
+    // Reflect the currently-loaded workbook (if any) on the "Advanced Import" entry point
+    // button, so it reads as "resume this file" instead of "start a fresh upload" once
+    // something is loaded. Truncates long filenames rather than wrapping/overflowing the button.
+    function updateAdvancedImportButtonState() {
+        const btn = document.getElementById('advancedImportBtn');
+        const labelEl = document.getElementById('advancedImportBtnLabel');
+        const fileEl = document.getElementById('advancedImportBtnFile');
+        if (!btn || !labelEl || !fileEl) return;
+
+        if (gyFilename) {
+            const maxLen = 42;
+            const shownName = gyFilename.length > maxLen ? gyFilename.slice(0, maxLen - 1) + '…' : gyFilename;
+            const sheetNote = Array.isArray(gyAllSheets) && gyAllSheets.length > 1 ? ` · ${gyAllSheets.length} sheets` : '';
+
+            labelEl.textContent = '📂 Continue Mapping';
+            fileEl.textContent = `Loaded: ${shownName}${sheetNote} — click to reopen`;
+            fileEl.classList.remove('hidden');
+            btn.classList.remove('bg-slate-600', 'hover:bg-slate-700');
+            btn.classList.add('bg-indigo-600', 'hover:bg-indigo-700');
+            btn.title = `Reopen the mapper for "${gyFilename}" — it's still loaded, no need to upload it again.`;
+        } else {
+            labelEl.textContent = '📂 Advanced Import / Column Mapping';
+            fileEl.textContent = '';
+            fileEl.classList.add('hidden');
+            btn.classList.remove('bg-indigo-600', 'hover:bg-indigo-700');
+            btn.classList.add('bg-slate-600', 'hover:bg-slate-700');
+            btn.removeAttribute('title');
+        }
+    }
+    window.updateAdvancedImportButtonState = updateAdvancedImportButtonState;
+
     // Update restore button visibility
     function updateRestoreButton() {
         const btn = document.getElementById('gyRestoreDeletedBtn');
@@ -17783,6 +17864,7 @@ async function loadFile(file) {
             
             gyActiveSheetIdx = bestSheetIdx;
             buildGySheetTabs(); // Render sheet tab bar
+            updateAdvancedImportButtonState(); // gyAllSheets is now populated - reflect it
             const applyMapInit = document.getElementById('gyApplyMappingAll');
             if (applyMapInit) applyMapInit.classList.toggle('rab-hidden', gyAllSheets.length <= 1);
             
@@ -17832,6 +17914,7 @@ async function loadFile(file) {
             renderUI();
             statusEl.textContent = `✓ Project Loaded: ${gyFullData.length} steps restored.`;
             statusEl.style.color = '#27ae60';
+            updateAdvancedImportButtonState();
 
         } catch (e) {
             console.error(e);
