@@ -930,6 +930,29 @@
         #fullscreenVideoModal #captureGifBtn span {
             line-height: 1;
         }
+        /* First-video warm-up lock - see setFullscreenControlsReady(). :hover still matches a
+           disabled <button> in Chrome/Firefox, so the hover "lift" affordances are explicitly
+           cancelled here; without this a locked control still brightens under the cursor and
+           goes on reading as clickable, which is the exact impression this lock exists to fix. */
+        #fullscreenVideoModal #captureFrameBtn:disabled,
+        #fullscreenVideoModal #captureGifBtn:disabled,
+        #fullscreenVideoModal #fullscreenPlayPauseBtn:disabled,
+        #fullscreenVideoModal #fullscreenMuteBtn:disabled,
+        #fullscreenVideoModal #fullscreenSeekBar:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+        #fullscreenVideoModal #captureFrameBtn:disabled,
+        #fullscreenVideoModal #captureFrameBtn:disabled:hover,
+        #fullscreenVideoModal #captureGifBtn:disabled,
+        #fullscreenVideoModal #captureGifBtn:disabled:hover,
+        #fullscreenVideoModal #fullscreenPlayPauseBtn:disabled:hover,
+        #fullscreenVideoModal #fullscreenMuteBtn:disabled:hover {
+            filter: none;
+            box-shadow: none;
+            transform: none;
+        }
+
         #fullscreenVideoModal #videoCaptureActions {
             align-items: center;
             justify-content: flex-end;
@@ -2845,12 +2868,16 @@
                                     Use Capture Frame button (or press C)
                                 </div>
                             </div>
-                            <!-- Warmup loader overlay -->
-                            <div id="videoWarmupOverlay" class="absolute inset-0 flex flex-col items-center justify-center rounded-xl" style="z-index:20; background: rgba(0,0,0,0.75); display: none;">
-                                <div class="flex flex-col items-center gap-4">
-                                    <div style="width:48px;height:48px;border:4px solid rgba(255,255,255,0.2);border-top-color:#ffd100;border-radius:50%;animation:warmup-spin 0.8s linear infinite;"></div>
-                                    <p class="text-white text-lg font-semibold">Preparing for image scrubbing...</p>
-                                    <p class="text-indigo-300 text-sm">Loading face detection model for first use</p>
+                            <!-- First-use preparation indicator. This is a pill rather than a cover
+                                 over the video because the video itself plays perfectly during this
+                                 window - what's blocked is the main thread, while face-api compiles
+                                 its WebGL shaders on the very first inference. Blanking the video
+                                 would hide the one thing that IS working. -->
+                            <div id="videoWarmupOverlay" class="absolute left-1/2 bottom-4 flex items-center gap-3 px-4 py-2.5 rounded-full" style="z-index:20; transform: translateX(-50%); background: rgba(15,23,42,0.9); border: 1px solid rgba(255,255,255,0.18); box-shadow: 0 8px 24px rgba(0,0,0,0.45); display: none;">
+                                <div style="width:18px;height:18px;flex-shrink:0;border:2.5px solid rgba(255,255,255,0.25);border-top-color:#ffd100;border-radius:50%;animation:warmup-spin 0.8s linear infinite;"></div>
+                                <div class="leading-tight">
+                                    <p class="text-white text-sm font-semibold">Preparing capture tools…</p>
+                                    <p class="text-indigo-300 text-[11px]">First video only — controls unlock in a moment</p>
                                 </div>
                             </div>
                             <style>@keyframes warmup-spin{to{transform:rotate(360deg)}}</style>
@@ -10350,14 +10377,44 @@ window.LIKELIHOOD_SCALE = LIKELIHOOD_SCALE;
             return renderGifToBlob(gifEncoder);
         }
 
-        async function warmUpFaceApi(player, options = {}) {
+        // The very first face-api inference of a page session compiles its WebGL shaders
+        // synchronously on the main thread, freezing the UI for a second or two. It happens
+        // once (guarded by faceApiWarmedUp), which is exactly why the 1st video feels broken
+        // and every video after it feels instant. We can't make that work asynchronous, so
+        // instead of leaving live-looking controls that silently swallow clicks, the controls
+        // are disabled and labelled for the duration. setFullscreenControlsReady is the single
+        // owner of both the disabled state and the "preparing" pill.
+        const FULLSCREEN_GATED_CONTROL_IDS = [
+            'fullscreenPlayPauseBtn',
+            'fullscreenMuteBtn',
+            'fullscreenSeekBar',
+            'captureFrameBtn',
+            'captureGifBtn'
+        ];
+        let fullscreenControlsReady = true;
+
+        function setFullscreenControlsReady(ready) {
+            fullscreenControlsReady = ready;
+            FULLSCREEN_GATED_CONTROL_IDS.forEach(id => {
+                const el = document.getElementById(id);
+                if (!el) return;
+                // The :disabled styling lives in CSS alongside the rest of this modal's
+                // button rules, so this only owns the state, not the appearance.
+                el.disabled = !ready;
+                if (ready) {
+                    el.removeAttribute('aria-disabled');
+                } else {
+                    el.setAttribute('aria-disabled', 'true');
+                }
+            });
+            const overlay = document.getElementById('videoWarmupOverlay');
+            if (overlay) overlay.style.display = ready ? 'none' : 'flex';
+        }
+
+        async function warmUpFaceApi(player) {
             if (faceApiWarmedUp) return;
-            const showOverlay = options.showOverlay === true;
             const warmupOverlay = document.getElementById('videoWarmupOverlay');
-            if (warmupOverlay) {
-                warmupOverlay.style.pointerEvents = 'none';
-                if (showOverlay) warmupOverlay.style.display = 'flex';
-            }
+            if (warmupOverlay) warmupOverlay.style.pointerEvents = 'none';
             try {
                 // Run a tiny dummy detection to force model initialization
                 const tinyCanvas = document.createElement('canvas');
@@ -10377,9 +10434,9 @@ window.LIKELIHOOD_SCALE = LIKELIHOOD_SCALE;
             } catch (e) {
                 console.warn('Face-api warmup encountered an issue:', e);
                 faceApiWarmedUp = false;
-            } finally {
-                if (warmupOverlay) warmupOverlay.style.display = 'none';
             }
+            // NOTE: the overlay is hidden by setFullscreenControlsReady(true) in the caller,
+            // not here - it's tied to the controls unlocking, not to this call returning.
         }
 
         async function ensureSsdModelLoaded() {
@@ -10689,6 +10746,11 @@ window.LIKELIHOOD_SCALE = LIKELIHOOD_SCALE;
             if (pausedHint) pausedHint.style.opacity = '0';
             if (warmupOverlay) warmupOverlay.style.display = 'none';
 
+            // Lock the controls up front on the first video of the session. Previously they
+            // rendered fully live while the face-api warm-up below froze the main thread, so
+            // pause / scrub / capture appeared to do nothing at all for a second or two.
+            setFullscreenControlsReady(faceApiWarmedUp);
+
             const startPlayer = async () => {
                 if (resumeTime > 0) {
                     try {
@@ -10709,11 +10771,22 @@ window.LIKELIHOOD_SCALE = LIKELIHOOD_SCALE;
                 }
 
                 if (!faceApiWarmedUp) {
+                    // Short delay so playback visibly starts first, then TWO rAFs so the
+                    // disabled controls and the "preparing" pill are actually painted before
+                    // warmUpFaceApi() blocks the main thread. Without that yield the UI would
+                    // freeze while still showing enabled buttons - the original bug.
+                    // The old `_userInteractedWithControls` skip is gone: the controls are
+                    // disabled now, so there's no interaction to detect, and skipping only
+                    // moved the same freeze onto the user's first capture instead.
                     player._warmupTimer = setTimeout(() => {
-                        if (!player._userInteractedWithControls) {
-                            warmUpFaceApi(player, { showOverlay: false });
-                        }
-                    }, 1400);
+                        requestAnimationFrame(() => requestAnimationFrame(async () => {
+                            try {
+                                await warmUpFaceApi(player);
+                            } finally {
+                                setFullscreenControlsReady(true);
+                            }
+                        }));
+                    }, 400);
                 }
             };
 
@@ -10742,6 +10815,14 @@ window.LIKELIHOOD_SCALE = LIKELIHOOD_SCALE;
                         e.preventDefault();
                         closeGifDownloadMenu();
                     }
+                    return;
+                }
+
+                // ESC always works; every other shortcut mirrors a control that is disabled
+                // during the first-video warm-up, so it has to be gated the same way -
+                // otherwise the keyboard would silently bypass the lock.
+                if (!fullscreenControlsReady && e.key !== 'Escape') {
+                    if (e.code === 'Space' || e.key === ' ') e.preventDefault(); // don't scroll
                     return;
                 }
 
@@ -11210,6 +11291,11 @@ window.LIKELIHOOD_SCALE = LIKELIHOOD_SCALE;
             player.load();
             if (pausedHint) pausedHint.style.opacity = '0';
             if (warmupOverlay) warmupOverlay.style.display = 'none';
+            // Release the control lock unconditionally. If the modal is closed mid-warm-up,
+            // cleanupFullscreenVideoPlayerHandlers() above has already cancelled the timer that
+            // would have re-enabled them, so without this the controls would stay dead on the
+            // next open even though the warm-up never needs to run again.
+            setFullscreenControlsReady(true);
             
             // Remove event listener
             if (fullscreenSpacebarListener) {
