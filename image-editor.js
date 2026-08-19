@@ -30,7 +30,9 @@
 
     // ─── DOM REFERENCES (set during init) ───────────────────────────────
     let canvas, ctx;
-    let blurCanvas, blurCtx;
+    // NOTE: this module used to borrow #manualBlurCanvas as scratch space, which the
+    // automatic face-blur pipeline in index.html also owns and resizes. Stroke sessions
+    // allocate their own canvas per drag, so that shared surface is no longer touched.
     let imageWrapper, lightboxImage;
     let toolbar;
 
@@ -102,6 +104,15 @@
     function render() {
         if (!ctx) return;
         ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // Live brush preview. During a drag the <img> underneath still shows the
+        // pre-drag pixels (it is only re-encoded once, on pointerup), so the
+        // in-progress work canvas is blitted over it here. The overlay canvas is
+        // sized to exactly the rendered image area, so this lines up 1:1.
+        if (strokeSession && strokeSession.dirty) {
+            ctx.drawImage(strokeSession.work, 0, 0, canvas.width, canvas.height);
+        }
+
         const annots = getAnnotations();
 
         annots.forEach((a, i) => {
@@ -379,56 +390,192 @@
         if (thumb) state.originalImages.set(id, thumb.src);
     }
 
-    function applyBlurStroke(localPt) {
+    // ─── STROKE SESSIONS (shared by the blur and eraser brushes) ────────
+    //
+    // Both brushes used to do a full round-trip on EVERY pointermove: decode the
+    // current image off its blob URL (and, for the eraser, the pre-blur original
+    // too), repaint a full-resolution canvas, re-encode it to JPEG, mint a new
+    // object URL, then assign that to the lightbox <img> AND the gallery thumbnail
+    // AND rebuild the entire lightbox gallery strip from scratch. A one-second drag
+    // fires dozens of pointermoves, so that meant dozens of full-res decodes and
+    // encodes, dozens of complete gallery teardowns, and one leaked object URL per
+    // move - which is why the thumbnail strip visibly thrashed and the brush lagged
+    // behind the cursor.
+    //
+    // A drag now opens a stroke session instead: pixels are decoded once up front,
+    // each move paints synchronously into an in-memory canvas that is previewed live
+    // on the annotation overlay, and the expensive commit (encode -> object URL ->
+    // <img> + thumbnail + gallery) happens exactly once, on pointerup.
+
+    let strokeSession = null;               // the in-progress drag, or null
+    const originalPixelCache = new Map();   // imageId → decoded pre-blur pixels (canvas)
+    const editorCreatedUrls = new Map();    // imageId → last object URL this editor minted
+
+    function makeCanvas(w, h) {
+        const c = document.createElement('canvas');
+        c.width = w;
+        c.height = h;
+        return c;
+    }
+
+    /** Decode the saved pre-blur original for `id` into a canvas once, then cache it. */
+    function loadOriginalPixels(id) {
+        if (originalPixelCache.has(id)) return Promise.resolve(originalPixelCache.get(id));
+        const src = state.originalImages.get(id);
+        if (!src) return Promise.resolve(null);
+        return new Promise(resolve => {
+            const im = new Image();
+            im.crossOrigin = 'anonymous';
+            im.onload = () => {
+                const c = makeCanvas(im.naturalWidth, im.naturalHeight);
+                c.getContext('2d').drawImage(im, 0, 0);
+                originalPixelCache.set(id, c);
+                resolve(c);
+            };
+            im.onerror = () => resolve(null); // eraser simply no-ops if this fails
+            im.src = src;
+        });
+    }
+
+    function beginStrokeSession(tool) {
+        const id = window.currentLightboxImageId;
         const img = lightboxImage;
-        const thumb = document.getElementById(window.currentLightboxImageId);
-        if (!img || !thumb || !img.naturalWidth) return;
+        if (!id || !img || !img.naturalWidth) return null;
 
-        // Save original before first blur
-        saveOriginalImage();
+        // The lightbox <img> is already decoded and on screen, so it can be drawn
+        // straight into a canvas - no Image() + onload round-trip needed for it.
+        const work = makeCanvas(img.naturalWidth, img.naturalHeight);
+        work.getContext('2d').drawImage(img, 0, 0);
 
-        const nat = toNatural(localPt);
-        const radius = state.brushSize;
-
-        // Save undo state (only on first stroke of a drag)
-        if (!state._blurUndoSaved) {
-            const oldUrl = window._imageEditorUndoMap && window._imageEditorUndoMap.get(window.currentLightboxImageId);
-            if (!window._imageEditorUndoMap) window._imageEditorUndoMap = new Map();
-            window._imageEditorUndoMap.set(window.currentLightboxImageId, img.src);
-            state._blurUndoSaved = true;
-            updateUndoButton();
-        }
-
-        const tempImg = new Image();
-        tempImg.crossOrigin = 'anonymous';
-        tempImg.onload = () => {
-            try {
-                blurCanvas.width = tempImg.naturalWidth;
-                blurCanvas.height = tempImg.naturalHeight;
-                blurCtx.drawImage(tempImg, 0, 0);
-                blurCtx.filter = 'blur(12px)';
-                const ex = Math.max(0, nat.x - radius);
-                const ey = Math.max(0, nat.y - radius);
-                const ew = Math.min(radius * 2, tempImg.naturalWidth - ex);
-                const eh = Math.min(radius * 2, tempImg.naturalHeight - ey);
-                if (ew > 0 && eh > 0) {
-                    blurCtx.drawImage(blurCanvas, ex, ey, ew, eh, ex, ey, ew, eh);
-                }
-                blurCtx.filter = 'none';
-                blurCanvas.toBlob(blob => {
-                    if (!blob) return;
-                    const url = URL.createObjectURL(blob);
-                    img.src = url;
-                    thumb.src = url;
-                    // Update base image — blur changes the "clean" base
-                    state.baseImages.set(window.currentLightboxImageId, url);
-                    if (typeof window.updateLightboxGallery === 'function') window.updateLightboxGallery();
-                }, 'image/jpeg', 0.92);
-            } catch (err) {
-                console.error('Blur stroke error:', err);
-            }
+        const session = {
+            id,
+            tool,
+            work,
+            ctx: work.getContext('2d'),
+            orig: null,
+            pending: [],   // dabs that landed before `orig` finished decoding
+            dirty: false
         };
-        tempImg.src = img.src;
+        strokeSession = session;
+
+        if (tool === 'eraser') {
+            // Deliberately NOT guarded on `strokeSession === session`: a drag can finish
+            // before this decode does, and commitStrokeSession() still needs the pixels
+            // to flush whatever was queued. Guarding on identity here silently threw the
+            // whole stroke away whenever the user erased faster than the image decoded.
+            session.loadPromise = loadOriginalPixels(id).then(origCanvas => {
+                session.orig = origCanvas;
+                flushPendingDabs(session);
+            });
+        }
+        return session;
+    }
+
+    /** Paint any dabs that arrived before the eraser's source pixels were ready. */
+    function flushPendingDabs(session) {
+        if (!session.orig || !session.pending.length) return;
+        session.pending.splice(0).forEach(p => paintEraserDab(session, p));
+        if (strokeSession === session) render();
+    }
+
+    /** Region of the work canvas covered by a dab at `natPt`, or null if off-image. */
+    function dabRect(session, natPt) {
+        const r = state.brushSize;
+        const w = session.work.width;
+        const h = session.work.height;
+        const ex = Math.max(0, natPt.x - r);
+        const ey = Math.max(0, natPt.y - r);
+        const ew = Math.min(r * 2, w - ex);
+        const eh = Math.min(r * 2, h - ey);
+        if (ew <= 0 || eh <= 0) return null;
+        return { ex, ey, ew, eh, w, h };
+    }
+
+    function paintBlurDab(session, natPt) {
+        const d = dabRect(session, natPt);
+        if (!d) return;
+        const c = session.ctx;
+        c.save();
+        c.filter = 'blur(12px)';
+        // Blurring the region by drawing it back onto itself, as before - so holding
+        // the brush in one place keeps compounding the blur, which is the existing
+        // and expected feel of this tool.
+        c.drawImage(session.work, d.ex, d.ey, d.ew, d.eh, d.ex, d.ey, d.ew, d.eh);
+        c.restore();
+        session.dirty = true;
+    }
+
+    function paintEraserDab(session, natPt) {
+        if (!session.orig) { session.pending.push(natPt); return; }
+        const d = dabRect(session, natPt);
+        if (!d) return;
+        // Map the destination rect into the original's own pixel space, in case the
+        // stored original differs in size from the current (blurred) image.
+        const sxr = session.orig.width / d.w;
+        const syr = session.orig.height / d.h;
+        const c = session.ctx;
+        c.save();
+        c.beginPath();
+        c.arc(natPt.x, natPt.y, state.brushSize, 0, Math.PI * 2);
+        c.clip();
+        c.drawImage(session.orig, d.ex * sxr, d.ey * syr, d.ew * sxr, d.eh * syr, d.ex, d.ey, d.ew, d.eh);
+        c.restore();
+        session.dirty = true;
+    }
+
+    /**
+     * End the drag and write the result out ONCE: encode, swap the <img> and the
+     * gallery thumbnail, and rebuild the gallery a single time.
+     */
+    function commitStrokeSession() {
+        const session = strokeSession;
+        strokeSession = null;
+        if (!session) return;
+
+        // A short eraser drag can end before the source pixels have decoded. Wait for
+        // them and paint the queued dabs, otherwise the stroke is lost on release.
+        if (session.pending.length && session.loadPromise) {
+            session.loadPromise.then(() => {
+                flushPendingDabs(session);
+                writeOutStrokeSession(session);
+            });
+            return;
+        }
+        writeOutStrokeSession(session);
+    }
+
+    function writeOutStrokeSession(session) {
+        if (!session.dirty) { render(); return; }
+
+        const id = session.id;
+        const thumb = document.getElementById(id);
+        session.work.toBlob(blob => {
+            if (!blob) { render(); return; }
+            const url = URL.createObjectURL(blob);
+            const previous = editorCreatedUrls.get(id);
+
+            if (lightboxImage && window.currentLightboxImageId === id) lightboxImage.src = url;
+            if (thumb) thumb.src = url;
+            state.baseImages.set(id, url);
+            editorCreatedUrls.set(id, url);
+            if (typeof window.updateLightboxGallery === 'function') window.updateLightboxGallery();
+
+            // Release the blob this one replaces. Guarded: the pre-blur original and
+            // whatever undo is holding are both still live references elsewhere, and
+            // revoking either would break the image rather than just free memory.
+            const undoUrl = window._imageEditorUndoMap && window._imageEditorUndoMap.get(id);
+            if (previous && previous !== url
+                && previous !== state.originalImages.get(id)
+                && previous !== undoUrl) {
+                URL.revokeObjectURL(previous);
+            }
+            render();
+        }, 'image/jpeg', 0.92);
+    }
+
+    function applyBlurStroke(localPt) {
+        if (!strokeSession) return;
+        paintBlurDab(strokeSession, toNatural(localPt));
     }
 
     function updateUndoButton() {
@@ -439,62 +586,8 @@
     // ─── ERASER ENGINE (restores original pixels) ───────────────────────
 
     function applyEraserStroke(localPt) {
-        const id = window.currentLightboxImageId;
-        const img = lightboxImage;
-        const thumb = document.getElementById(id);
-        if (!img || !thumb || !img.naturalWidth) return;
-
-        const originalSrc = state.originalImages.get(id);
-        if (!originalSrc) return; // Nothing to erase — image was never blurred
-
-        const nat = toNatural(localPt);
-        const radius = state.brushSize;
-
-        // We need both the current image and the original
-        const currentImg = new Image();
-        currentImg.crossOrigin = 'anonymous';
-        const origImg = new Image();
-        origImg.crossOrigin = 'anonymous';
-
-        let loaded = 0;
-        const onBothLoaded = () => {
-            loaded++;
-            if (loaded < 2) return;
-            try {
-                blurCanvas.width = currentImg.naturalWidth;
-                blurCanvas.height = currentImg.naturalHeight;
-                // Draw current (blurred) image
-                blurCtx.drawImage(currentImg, 0, 0);
-                // Clip a circle and paint original pixels over it
-                const ex = Math.max(0, nat.x - radius);
-                const ey = Math.max(0, nat.y - radius);
-                const ew = Math.min(radius * 2, currentImg.naturalWidth - ex);
-                const eh = Math.min(radius * 2, currentImg.naturalHeight - ey);
-                if (ew > 0 && eh > 0) {
-                    blurCtx.save();
-                    blurCtx.beginPath();
-                    blurCtx.arc(nat.x, nat.y, radius, 0, Math.PI * 2);
-                    blurCtx.clip();
-                    blurCtx.drawImage(origImg, ex, ey, ew, eh, ex, ey, ew, eh);
-                    blurCtx.restore();
-                }
-                blurCanvas.toBlob(blob => {
-                    if (!blob) return;
-                    const url = URL.createObjectURL(blob);
-                    img.src = url;
-                    thumb.src = url;
-                    // Update base image — erase changes the "clean" base
-                    state.baseImages.set(id, url);
-                    if (typeof window.updateLightboxGallery === 'function') window.updateLightboxGallery();
-                }, 'image/jpeg', 0.92);
-            } catch (err) {
-                console.error('Eraser stroke error:', err);
-            }
-        };
-        currentImg.onload = onBothLoaded;
-        origImg.onload = onBothLoaded;
-        currentImg.src = img.src;
-        origImg.src = originalSrc;
+        if (!strokeSession) return;
+        paintEraserDab(strokeSession, toNatural(localPt));
     }
 
     // ─── POINTER EVENT HANDLERS ─────────────────────────────────────────
@@ -503,16 +596,38 @@
         e.preventDefault();
         const pt = eventToLocal(e);
 
-        if (state.tool === 'blur') {
+        if (state.tool === 'blur' || state.tool === 'eraser') {
+            // Capture the pointer so a drag that wanders outside the canvas still
+            // delivers its pointerup here - otherwise the session would never commit
+            // and the stroke would be lost.
+            if (e.pointerId != null && canvas.setPointerCapture) {
+                try { canvas.setPointerCapture(e.pointerId); } catch (_) { /* non-fatal */ }
+            }
             state.isDrawing = true;
-            state._blurUndoSaved = false;
-            applyBlurStroke(pt);
-            return;
-        }
 
-        if (state.tool === 'eraser') {
-            state.isDrawing = true;
-            applyEraserStroke(pt);
+            if (state.tool === 'blur') {
+                saveOriginalImage();                       // keep the pre-blur pixels for the eraser
+                if (!window._imageEditorUndoMap) window._imageEditorUndoMap = new Map();
+                const id = window.currentLightboxImageId;
+                // Each drag pushes a new undo point, which orphans the one it replaces.
+                // Release it here - commitStrokeSession() can't, because at the moment it
+                // runs that URL is still the live undo target and revoking it would break
+                // undo rather than just free memory.
+                const staleUndo = window._imageEditorUndoMap.get(id);
+                if (staleUndo && staleUndo !== lightboxImage.src && staleUndo !== state.originalImages.get(id)) {
+                    URL.revokeObjectURL(staleUndo);
+                }
+                window._imageEditorUndoMap.set(id, lightboxImage.src);
+                updateUndoButton();
+            } else if (!state.originalImages.get(window.currentLightboxImageId)) {
+                state.isDrawing = false;                   // nothing was ever blurred here
+                return;
+            }
+
+            beginStrokeSession(state.tool);
+            if (state.tool === 'blur') applyBlurStroke(pt);
+            else applyEraserStroke(pt);
+            render();
             return;
         }
 
@@ -685,8 +800,12 @@
         const pt = eventToLocal(e);
 
         if ((state.tool === 'blur' || state.tool === 'eraser') && state.isDrawing) {
+            if (e.pointerId != null && canvas.releasePointerCapture && canvas.hasPointerCapture?.(e.pointerId)) {
+                try { canvas.releasePointerCapture(e.pointerId); } catch (_) { /* non-fatal */ }
+            }
             state.isDrawing = false;
-            state._blurUndoSaved = false;
+            // The single expensive write-out for the whole drag.
+            commitStrokeSession();
             return;
         }
 
@@ -1004,8 +1123,6 @@
     function init() {
         lightboxImage = document.getElementById('lightboxImage');
         imageWrapper = lightboxImage ? lightboxImage.parentElement : null;
-        blurCanvas = document.getElementById('manualBlurCanvas');
-        blurCtx = blurCanvas ? blurCanvas.getContext('2d') : null;
 
         if (!imageWrapper || !lightboxImage) {
             console.warn('Image editor: lightbox elements not found');
@@ -1081,6 +1198,13 @@
 
     /** Called when lightbox closes — render preview, hide canvas */
     function onLightboxClose() {
+        // Commit rather than discard: if the lightbox is closed mid-drag the user
+        // still expects the strokes they just painted to be there.
+        if (strokeSession) commitStrokeSession();
+        // Decoded originals are only a cache; drop them so a long session doesn't
+        // hold a full-resolution canvas per edited image.
+        originalPixelCache.clear();
+
         const closingId = window.currentLightboxImageId;
         if (closingId) {
             // Save base image if we have annotations but haven't saved base yet
@@ -1096,6 +1220,10 @@
 
     /** Called when switching to a new image — preview previous, restore current base */
     function onImageChange(previousImageId) {
+        // Flush any in-progress drag against the OUTGOING image before the id
+        // switches, or the commit would write those pixels onto the wrong image.
+        if (strokeSession) commitStrokeSession();
+
         if (previousImageId) {
             ensureBaseImage(previousImageId);
             updateThumbnailPreview(previousImageId);
