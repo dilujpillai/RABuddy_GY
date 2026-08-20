@@ -25680,6 +25680,22 @@ Return ONLY a valid JSON array (no explanation, no markdown):
          HELP ASSISTANT
          Markup only. Behaviour lives in assistant.js, content in assistant-kb.js.
          ═══════════════════════════════════════════════════════════════════ -->
+    <style>
+        /* Bouncing-dots "thinking" indicator, built by addThinkingBubble() in
+           assistant.js. Replaces a static "…" so a slow reply still reads as active. */
+        #rabAssistantLog .rab-typing { display: inline-flex; align-items: center; gap: 4px; height: 14px; }
+        #rabAssistantLog .rab-typing-dot {
+            width: 6px; height: 6px; border-radius: 50%;
+            background: #64748b; opacity: 0.5;
+            animation: rab-typing-bounce 1.1s ease-in-out infinite;
+        }
+        #rabAssistantLog .rab-typing-dot:nth-child(2) { animation-delay: 0.15s; }
+        #rabAssistantLog .rab-typing-dot:nth-child(3) { animation-delay: 0.3s; }
+        @keyframes rab-typing-bounce {
+            0%, 60%, 100% { transform: translateY(0); opacity: 0.5; }
+            30% { transform: translateY(-4px); opacity: 1; }
+        }
+    </style>
     <button id="rabAssistantFab" type="button" title="Ask about this app"
             class="fixed bottom-5 right-5 z-[200] w-14 h-14 rounded-full bg-[#002c5f] hover:bg-[#001530] text-white shadow-2xl border-2 border-[#ffd100] flex items-center justify-center transition hover:scale-105">
         <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">

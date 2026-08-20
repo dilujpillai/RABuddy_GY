@@ -348,6 +348,49 @@
         if (log) log.scrollTop = log.scrollHeight;
     }
 
+    /** Turns literal HTML-significant characters into entities. Always the FIRST step
+     *  on any model text before it is ever assigned to innerHTML - everything built on
+     *  top of this only ever introduces tags we hardcoded ourselves. */
+    function escapeHtml(s) {
+        return String(s)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;');
+    }
+
+    /**
+     * A deliberately tiny, whitelist-only markdown renderer for assistant answers -
+     * NOT a general markdown library. The model is a plain-text chat participant, not
+     * a page author: it gets exactly **bold**, *italic*, ***both***, and `code`,
+     * nothing else (no links, images, headings, raw HTML). Runs on already-escaped
+     * text, so the only tags that can ever appear are the four hardcoded below -
+     * there is no path from model output to an arbitrary tag or attribute.
+     */
+    function renderMarkdownLite(text) {
+        let html = escapeHtml(text);
+        html = html.replace(/\*\*\*([^*\n]+?)\*\*\*/g, '<strong><em>$1</em></strong>');
+        html = html.replace(/\*\*([^*\n]+?)\*\*/g, '<strong>$1</strong>');
+        html = html.replace(/(^|[^*])\*([^*\n]+?)\*(?!\*)/g, '$1<em>$2</em>');
+        html = html.replace(/`([^`\n]+?)`/g, '<code class="px-1 py-0.5 rounded bg-slate-200/80 text-[0.85em]">$1</code>');
+        return html;
+    }
+
+    /**
+     * Sets an assistant bubble's content, rendering the safe markdown subset above.
+     * DOMPurify.sanitize() is a second, independent guard on top of the escape-first
+     * design of renderMarkdownLite() - the same "generate safe HTML, then sanitize
+     * before innerHTML" pattern already used elsewhere in this app (e.g.
+     * DOMPurify.sanitize(rowData['Hazard Source']) in loadModalTaskDetails).
+     * User messages deliberately do NOT go through this - they are shown as plain
+     * text as typed, with no reason to interpret markdown in your own message.
+     */
+    function setBubbleAnswerText(bubble, text) {
+        const html = renderMarkdownLite(text);
+        bubble.innerHTML = (typeof DOMPurify !== 'undefined')
+            ? DOMPurify.sanitize(html, { ALLOWED_TAGS: ['strong', 'em', 'code'], ALLOWED_ATTR: ['class'] })
+            : escapeHtml(text); // DOMPurify failed to load - fall back to plain escaped text, never raw HTML
+    }
+
     function addMessage(role, text) {
         const log = el('rabAssistantLog');
         if (!log) return;
@@ -359,7 +402,34 @@
         bubble.className = role === 'user'
             ? 'max-w-[85%] px-3 py-2 rounded-2xl rounded-br-sm bg-indigo-600 text-white text-sm whitespace-pre-wrap'
             : 'max-w-[85%] px-3 py-2 rounded-2xl rounded-bl-sm bg-slate-100 text-slate-800 text-sm whitespace-pre-wrap';
-        bubble.textContent = text;   // textContent, never innerHTML — model output is untrusted
+        if (role === 'user') {
+            bubble.textContent = text; // plain text, not interpreted as markdown
+        } else {
+            setBubbleAnswerText(bubble, text);
+        }
+        wrap.appendChild(bubble);
+        log.appendChild(wrap);
+        scrollLogToBottom();
+        return bubble;
+    }
+
+    /**
+     * A bouncing-dots "thinking" indicator, replacing the old static "…". This bubble
+     * is never given model text - its HTML is a fixed string we authored, so unlike
+     * addMessage()/setBubbleAnswerText() it is safe to assign directly. Returns the
+     * bubble so submit() can later swap in the real answer via setBubbleAnswerText().
+     */
+    function addThinkingBubble() {
+        const log = el('rabAssistantLog');
+        if (!log) return null;
+        const wrap = document.createElement('div');
+        wrap.className = 'flex justify-start';
+        const bubble = document.createElement('div');
+        bubble.className = 'max-w-[85%] px-3 py-2.5 rounded-2xl rounded-bl-sm bg-slate-100';
+        bubble.setAttribute('aria-label', 'Thinking…');
+        bubble.innerHTML =
+            '<span class="rab-typing"><span class="rab-typing-dot"></span>' +
+            '<span class="rab-typing-dot"></span><span class="rab-typing-dot"></span></span>';
         wrap.appendChild(bubble);
         log.appendChild(wrap);
         scrollLogToBottom();
@@ -458,7 +528,7 @@
 
         busy = true;
         el('rabAssistantChips')?.classList.add('hidden');
-        const thinking = addMessage('assistant', '…');
+        const thinking = addThinkingBubble();
         try {
             // Picked BEFORE the call: the translation request has to name the exact
             // chips it is translating, and this is the one place both the request and
@@ -470,7 +540,7 @@
             const raw = await ask(question, chipsRequest);
             const answer = untranslated.length ? extractChipTranslations(raw, untranslated) : raw;
             const text = answer || 'I could not get an answer just then. Please try again.';
-            thinking.textContent = text;
+            setBubbleAnswerText(thinking, text);
             history.push({ role: 'assistant', text });
             // The placeholder was scrolled into view while it was still just "…" - the
             // real answer is usually taller, so the bottom of it can now sit below what
@@ -482,7 +552,11 @@
             // failure modes here (endpoint not configured / CORS / HTTP status / empty
             // reply) need different fixes, and hiding them behind one sentence makes the
             // problem undiagnosable for whoever has to look at it.
-            thinking.textContent = 'Help service error — ' + (err && err.message ? err.message : String(err));
+            // Routed through setBubbleAnswerText, not raw textContent, purely for
+            // consistency of the one rendering path - the error string is ours, not
+            // model output, but `detail` inside it can carry response body text from
+            // the AI proxy, so treat it the same as any other untrusted text.
+            setBubbleAnswerText(thinking, 'Help service error — ' + (err && err.message ? err.message : String(err)));
             scrollLogToBottom();
         } finally {
             busy = false;
