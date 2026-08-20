@@ -3752,7 +3752,15 @@
     // �� ️ DEPLOY FIRST: Follow setup guide at https://replit.com or Vercel
     // Replace this URL with your deployed serverless API endpoint
     const API_ENDPOINT = 'https://risk-assessment-api-nine.vercel.app/api/ai';
-        
+
+        // Published for assistant.js, which is a separate file and cannot see this const.
+        // It has to happen HERE: the other copy of this URL (AI_URL) is declared inside
+        // gyBatchProcessAllTabs(), so it only exists while a batch run is in progress -
+        // exporting from there produced a window.AI_URL that was undefined at all other
+        // times. This config block is inside an IIFE that runs at load, so it is reliable.
+        window.AI_URL = API_ENDPOINT;
+        window.AI_MODEL = 'openai/gpt-4o-mini'; // mirrors AI_MODEL in gyBatchProcessAllTabs
+
         const PRIMARY_FREE_MODEL = 'mistralai/mistral-7b-instruct:free';
         const SECONDARY_FREE_MODEL = 'google/gemma-7b-it:free';
         const PAID_MODEL = 'openai/gpt-4o-mini'; // Faster model: ~3-5x speed vs gpt-4o, excellent for task breakdown
@@ -21847,11 +21855,7 @@ ${JSON.stringify(payload)}`;
 
         // ===== AI plumbing =====
         const AI_URL = 'https://risk-assessment-api-nine.vercel.app/api/ai';
-        // Exposed for assistant.js, which is a separate file and cannot see this const.
-        // (Same cross-scope trap that previously broke the lightbox from the task modal.)
-        window.AI_URL = AI_URL;
         const AI_MODEL = 'openai/gpt-4o-mini';
-        window.AI_MODEL = AI_MODEL;
         const BATCH_SIZE = 8;
         const PARALLEL_LANES = 2;
 
