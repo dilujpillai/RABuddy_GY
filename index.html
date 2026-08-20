@@ -3135,8 +3135,10 @@
             <!-- Image Preview + picture controls -->
             <div class="flex-1 flex flex-col min-w-0">
                 <div id="modalImageStage" class="flex-1 bg-slate-50 border border-slate-200 rounded-xl p-4 flex items-center justify-center relative overflow-hidden">
-                    <!-- Has a picture -->
-                    <img id="modalEnlargedImage" src="" alt="Current task image" class="max-w-full max-h-[52vh] object-contain rounded border border-slate-300 bg-white">
+                    <!-- Has a picture. Clicking it opens the editor, same as Edit / Blur -
+                         clicking a picture to open it is the expectation the top gallery
+                         already sets. -->
+                    <img id="modalEnlargedImage" src="" alt="Current task image" title="Click to edit / blur this picture" class="max-w-full max-h-[52vh] object-contain rounded border border-slate-300 bg-white cursor-pointer hover:ring-2 hover:ring-indigo-400 transition">
 
                     <!-- No picture yet. This is the common state for a Free Text assessment,
                          where the table is generated with no images at all. -->
@@ -7321,6 +7323,15 @@ ${JSON.stringify(payload, null, 2)}`;
                  // another step, and so this isn't a destructive action behind one click.
                  window.detachImageFromRow(rowIndex);
                  loadModalTaskDetails(rowIndex);
+             });
+
+             // Clicking the step's picture opens the editor, alongside the Edit / Blur button.
+             const modalEnlargedImageEl = document.getElementById('modalEnlargedImage');
+             if (modalEnlargedImageEl) modalEnlargedImageEl.addEventListener('click', () => {
+                 const rowIndex = currentModalRow();
+                 if (rowIndex === null) return;
+                 const row = document.querySelector(`#table-container tr[data-row-index="${rowIndex}"]`);
+                 openImageEditorForImageId(row && row.dataset.imageId, rowIndex);
              });
 
              // ── Image tray: bulk upload ────────────────────────────────────
@@ -11765,7 +11776,12 @@ window.LIKELIHOOD_SCALE = LIKELIHOOD_SCALE;
                 controls: val(12),
                 userFrequency: val(6),
                 userSeverity: val(7),
-                userLikelihood: val(8)
+                userLikelihood: val(8),
+                // Marks this text as borrowed from a row rather than written by the user, so
+                // detaching can clean it up. saveRiskData() REPLACES this object wholesale
+                // (no spread), so the moment the user edits these fields in the lightbox the
+                // marker disappears - and their words are then treated as their own and kept.
+                _backfilledFromRow: rowIndex
             });
         }
 
@@ -11773,6 +11789,27 @@ window.LIKELIHOOD_SCALE = LIKELIHOOD_SCALE;
         function detachImageFromRow(rowIndex) {
             const row = document.querySelector(`#table-container tr[data-row-index="${rowIndex}"]`);
             if (!row) return false;
+
+            // Take back the step text we lent this image when it was attached, or the photo
+            // keeps showing that step's description/hazards/controls in the top gallery and
+            // the lightbox after it no longer belongs to the step. Only clears text still
+            // carrying the backfill marker - anything the user actually typed is left alone.
+            const detachingId = row.dataset.imageId;
+            if (detachingId && window.riskAssessmentData) {
+                const data = window.riskAssessmentData.get(detachingId);
+                if (data && data._backfilledFromRow !== undefined) {
+                    window.riskAssessmentData.delete(detachingId);
+                    // Blank the live lightbox fields too if that image happens to be open.
+                    if (window.currentLightboxImageId === detachingId) {
+                        ['stepDescription', 'spotHazards', 'existingControls',
+                         'userFrequency', 'userSeverity', 'userLikelihood'].forEach(id => {
+                            const el = document.getElementById(id);
+                            if (el) el.value = '';
+                        });
+                    }
+                }
+            }
+
             row.dataset.imageId = '';
             const pictureCell = row.querySelector('.picture-cell');
             if (pictureCell) {
