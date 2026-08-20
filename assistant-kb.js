@@ -288,6 +288,20 @@
                 definition:
                     'Produces the batch upload file for the GOEHS Risk Registry, mapping ' +
                     'this app\'s fields onto the vendor\'s expected columns.'
+            },
+            {
+                term: 'Save Project / Load Project',
+                definition:
+                    'Save Project bundles the current table, every gallery image, your ' +
+                    'notes, and the Plant/Department identity fields into a single .json ' +
+                    'file you download. Load Project reads that file back in and rebuilds ' +
+                    'everything exactly as it was, so you can close the app and resume ' +
+                    'later without redoing any work.',
+                note:
+                    'This is DIFFERENT from Download: Download produces the final delivery ' +
+                    'package (optimized images, CSV, report) meant to be handed off, not ' +
+                    'reopened here. Save Project is the "resume later" file; Download is ' +
+                    'the "I am done" file.'
             }
         ],
 
