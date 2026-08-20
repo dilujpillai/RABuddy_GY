@@ -221,30 +221,41 @@
         // ── Things users get confused by ───────────────────────────────────────
         glossary: [
             {
-                term: 'AI Fix (Hazard / Sub-Hazard)',
+                term: '🔧 AI Fix Hazard/Risk',
                 definition:
-                    'Sends the row to the AI to correct the hazard classification — it ' +
-                    'picks the closest valid Hazard List entry for what you described.',
+                    'Scans every row for a Hazard Group or Hazard List value that is not a ' +
+                    'standard entry (red outline). It first tries a fast local match against ' +
+                    'the registry; only the rows it cannot confidently resolve that way are ' +
+                    'sent to the AI. Risk/Consequences is deliberately left untouched, since ' +
+                    'that field is often localized or imported free text.',
                 note:
-                    'It changes the classification only. Severity and Likelihood you have ' +
-                    'already set are left alone, whether they came from an Excel import, ' +
-                    'the AI, or your own edit.'
+                    'This is the button to reach for first on a red outline — it fixes the ' +
+                    'row outright rather than just suggesting. It changes the classification ' +
+                    'only: Severity and Likelihood you have already set are left alone, ' +
+                    'whether they came from an Excel import, the AI, or your own edit.'
             },
             {
-                term: 'Intelligent Fix',
+                term: '🎯 Suggest Closest Match',
                 definition:
-                    'Tries a local keyword match first and only calls the AI for rows it ' +
-                    'could not resolve on its own.',
+                    'For any Hazard Group or Hazard List dropdown STILL outlined red after ' +
+                    'AI Fix, applies the nearest standard entry as a best guess — purely by ' +
+                    'local text matching, it never calls the AI.',
                 note:
-                    'Cheaper and faster than AI Fix because most rows never reach the AI. ' +
-                    'Use it for bulk tidying; use AI Fix when one specific row is wrong.',
-                verify: true
+                    'Because it is a guess, not a confirmed fix, the result lands with a ' +
+                    'dashed amber "unverified" outline instead of a plain valid value, so you ' +
+                    'know to review it rather than trust it silently.'
             },
             {
-                term: 'Suggest Closest Match',
+                term: '⚡ Intelligent (GOEHS Countermeasure Ladder)',
                 definition:
-                    'Offers the nearest valid Hazard List entry for a value that is not in ' +
-                    'the registry, without committing the change until you accept it.'
+                    'A DIFFERENT tool from AI Fix / Suggest Closest Match above — this one ' +
+                    'lives in the GOEHS export modal and classifies your Current Control ' +
+                    'text onto the Countermeasure Ladder, using local keyword matching only. ' +
+                    'Free and instant, but it can miss unusual phrasing.',
+                note:
+                    'Sits next to a separate "🤖 AI" button in the same modal, which handles ' +
+                    'exactly the control descriptions the Intelligent button could not match, ' +
+                    'by calling the AI. Use Intelligent first (free), then AI for what is left.'
             },
             {
                 term: 'Countermeasure Ladder / Hierarchy of Controls',
@@ -296,16 +307,23 @@
                     'sensible default could be suggested. Set it yourself.'
             },
             {
-                cue: 'Red outline on the Hazard List or Hazard Group field',
+                cue: 'Red outline on the Hazard Group or Hazard List field',
                 meaning:
-                    'The value is not a recognised entry in the registry. Use Suggest ' +
-                    'Closest Match or pick a valid entry.'
+                    'The current value is not one of the standard registry entries. Both ' +
+                    'fields are ordinary dropdowns, so the fastest fix is often to open the ' +
+                    'dropdown yourself and pick the right value directly. Otherwise use ' +
+                    '"🔧 AI Fix Hazard/Risk" to auto-correct every flagged row in one go, or ' +
+                    '"🎯 Suggest Closest Match" for a quick local best-guess on whatever AI ' +
+                    'Fix could not resolve. The outline clears once the value is valid.'
             },
             {
                 cue: 'Blue row background with a 🤖 AI badge',
                 meaning:
-                    'The row was added or altered by the AI rather than coming straight ' +
-                    'from your source data.'
+                    'NOT simply "the AI touched this row." It specifically means the ' +
+                    "table's current Frequency/Severity/Likelihood for this row disagree " +
+                    'with a rating you separately entered for that picture in the large ' +
+                    'preview. It is a discrepancy flag asking you to check which one is ' +
+                    'right — the row is edited exactly like any other, no special steps.'
             },
             {
                 cue: 'Struck-through, greyed row',
@@ -395,7 +413,8 @@
 
             // Once a table exists — relevant in any workflow
             { q: 'What do the colours in the table mean?',           when: ['*'], needs: 'table' },
-            { q: "What's the difference between AI Fix and Intelligent Fix?", when: ['*'], needs: 'table' },
+            { q: "What's the difference between AI Fix and Suggest Closest Match?", when: ['*'], needs: 'table' },
+            { q: 'What does the blue row with the AI badge mean?',              when: ['*'], needs: 'table' },
             { q: 'How is the risk score calculated?',                when: ['*'], needs: 'table' },
             { q: 'How do I add controls to reduce a risk?',          when: ['*'], needs: 'table' },
             { q: 'What do I get when I download?',                   when: ['*'], needs: 'table' },
