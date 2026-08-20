@@ -88,8 +88,33 @@
 
     // ── Screen awareness ──────────────────────────────────────────────────────
 
-    /** Which tab is on screen right now, mapped to a KB workflow id. */
+    // Modals that are their own "screen" even though the tab behind them has not
+    // changed, checked before the tab lookup so the most specific context wins (the
+    // RA 2025 mapper modal, not just "the excel tab" sitting behind it). GOEHS
+    // Integration in particular has NO tab of its own at all (see KB.screens) - without
+    // this check the assistant could never tell the user was looking at it, no matter
+    // what they asked. Same visibility check screenContext() already uses for its own
+    // "currently open dialog" line, so a modal being open is understood identically in
+    // both places.
+    const MODAL_WORKFLOW_IDS = [
+        ['goehsModal', 'goehs'],
+        ['batchProcessorModal', 'excel-batch'],
+        ['ra2025ColumnMapperModal', 'excel-ra2025'],
+        ['excelImportModal', 'excel-legacy']
+    ];
+
+    function openWorkflowModalId() {
+        for (const [elId, wfId] of MODAL_WORKFLOW_IDS) {
+            const modalEl = document.getElementById(elId);
+            if (modalEl && getComputedStyle(modalEl).display !== 'none') return wfId;
+        }
+        return null;
+    }
+
+    /** Which screen is on view right now - an open modal, else the active tab. */
     function currentWorkflowId() {
+        const modalId = openWorkflowModalId();
+        if (modalId) return modalId;
         const active = document.querySelector('.tab-content:not(.hidden)');
         if (!active || !active.id) return null;
         const tabName = active.id.replace(/^tab-content-/, '');
@@ -163,7 +188,7 @@
         parts.push(`Gallery: ${gallery.length} image(s).`);
 
         const openModal = ['tableImageModal', 'lightboxModal', 'goehsModal', 'excelImportModal',
-                           'ra2025ColumnMapperModal', 'fullscreenVideoModal']
+                           'ra2025ColumnMapperModal', 'batchProcessorModal', 'fullscreenVideoModal']
             .find(id => {
                 const el = document.getElementById(id);
                 return el && getComputedStyle(el).display !== 'none';
@@ -749,6 +774,39 @@
         bar.classList.toggle('hidden', picks.length === 0);
     }
 
+    // ── Live screen-awareness while the panel is open ───────────────────────────
+    //
+    // currentWorkflowId() is only ever asked once, at the moment renderFollowUps()
+    // runs. If the user leaves the panel open and switches tabs, or opens/closes a
+    // tracked modal (GOEHS Integration, the Excel mappers), the chips would keep
+    // showing the PREVIOUS screen's suggestions until the next message. Rather than
+    // hook every place a tab or modal can be opened - switchTab has one funnel, but
+    // e.g. the Legacy Excel mapper is opened from several different inline onclick
+    // handlers with no single function to wrap - poll the same currentWorkflowId()
+    // the prompt itself uses, and re-render only when it actually changes. This is
+    // read-only and cheap (one DOM lookup), and only runs while the panel is visible.
+    let screenWatchTimer = null;
+    let lastWatchedWorkflowId = null;
+
+    function checkScreenChanged() {
+        const id = currentWorkflowId();
+        if (id !== lastWatchedWorkflowId) {
+            lastWatchedWorkflowId = id;
+            renderFollowUps();
+            scrollLogToBottom();
+        }
+    }
+
+    function startScreenWatch() {
+        lastWatchedWorkflowId = currentWorkflowId();
+        stopScreenWatch();
+        screenWatchTimer = setInterval(checkScreenChanged, 1000);
+    }
+
+    function stopScreenWatch() {
+        if (screenWatchTimer) { clearInterval(screenWatchTimer); screenWatchTimer = null; }
+    }
+
     async function submit() {
         const input = el('rabAssistantInput');
         if (!input || busy) return;
@@ -823,6 +881,9 @@
             scrollLogToBottom();
             const input = el('rabAssistantInput');
             if (input) input.focus();
+            startScreenWatch();
+        } else {
+            stopScreenWatch();
         }
     }
 

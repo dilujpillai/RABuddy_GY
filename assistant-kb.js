@@ -929,18 +929,26 @@
             { q: 'How do I add a step without a photo?',             when: ['rich-media'] },
             { q: 'How do I generate the risk assessment table?',     when: ['rich-media', 'free-text'], needs: 'no-table' },
 
-            // Excel — three genuinely different paths, so the chooser leads
+            // Excel — three genuinely different paths, so the chooser leads on the tab
+            // itself. Sub-workflow ids ('excel-legacy' etc.) only become the ACTIVE
+            // screen once that specific mapper modal is open (see MODAL_WORKFLOW_IDS
+            // in assistant.js), so a chip tagged there surfaces only inside that
+            // modal, not for the whole Excel tab in general.
             { q: 'Which Excel import path should I use?',            when: ['excel'] },
-            { q: 'I loaded a legacy sheet — why is my table empty?', when: ['excel'] },
-            { q: 'How do I map my spreadsheet columns?',             when: ['excel'] },
-            { q: 'How do I reuse my pictures from the old sheet?',   when: ['excel'] },
-            { q: 'Can I load another sheet from the same file?',     when: ['excel'] },
-            { q: 'How do I fix mismatches in a batch export?',       when: ['excel'] },
-            { q: 'Why is a value flagged after import?',             when: ['excel'] },
+            { q: 'I loaded a legacy sheet — why is my table empty?', when: ['excel', 'excel-legacy'] },
+            { q: 'How do I map my spreadsheet columns?',             when: ['excel', 'excel-legacy', 'excel-ra2025'] },
+            { q: 'How do I reuse my pictures from the old sheet?',   when: ['excel', 'excel-legacy'] },
+            { q: 'Can I load another sheet from the same file?',     when: ['excel', 'excel-legacy'] },
+            { q: 'How do I fix mismatches in a batch export?',       when: ['excel', 'excel-batch'] },
+            { q: 'Why is a value flagged after import?',             when: ['excel', 'excel-ra2025', 'excel-batch'] },
 
             // Free Text
             { q: 'Can I add pictures to a step afterwards?',         when: ['free-text'] },
             { q: 'How do I attach one photo to several steps?',      when: ['free-text'], needs: 'table' },
+
+            // GOEHS Integration — its own modal, no tab of its own at all
+            { q: 'What is the difference between the AI and Intelligent buttons here?', when: ['goehs'] },
+            { q: 'How do I download the GOEHS batch upload file?',   when: ['goehs'] },
 
             // Once a table exists — relevant in any workflow
             { q: 'What do the colours in the table mean?',           when: ['*'], needs: 'table' },
