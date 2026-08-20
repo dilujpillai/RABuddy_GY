@@ -180,7 +180,70 @@
 
     // ── Prompt assembly ───────────────────────────────────────────────────────
 
-    function buildSystemPrompt() {
+    /** First sentence of a summary, for the always-present workflow index. */
+    function firstSentence(text) {
+        const s = String(text || '').trim();
+        const m = s.match(/^[\s\S]*?[.!?](?=\s|$)/);
+        return (m ? m[0] : s).trim();
+    }
+
+    // Words too common to identify a workflow. Kept deliberately tiny: these are
+    // English function words, not product terms, so this stays behaviour-only.
+    const MATCH_STOPWORDS = new Set([
+        'the', 'and', 'for', 'with', 'from', 'into', 'tab', 'card', 'part', 'via',
+        'this', 'that', 'your', 'you', 'how', 'what', 'does', 'off', 'out', 'via',
+        'working', 'processing', 'template', 'single', 'file', 'files', 'export'
+    ]);
+
+    /** Identifying tokens for a workflow, taken from its own id and label. */
+    function workflowTokens(w) {
+        const raw = (w.id + ' ' + (w.label || '')).toLowerCase();
+        return raw.split(/[^a-z0-9]+/)
+            .filter(t => t.length >= 3 && !MATCH_STOPWORDS.has(t));
+    }
+
+    /**
+     * Which workflows get FULL detail this turn. Always includes what is on screen and
+     * its sub-workflows, plus the betas (tiny, and the beta caveat reads them), plus
+     * anything the question names. A missing/blank question means "include everything",
+     * so the safe direction is the default.
+     */
+    function workflowsNeedingDetail(question) {
+        const all = KB.workflows || [];
+        const ids = new Set();
+        if (question === undefined || question === null || !String(question).trim()) {
+            all.forEach(w => ids.add(w.id));
+            return ids;
+        }
+
+        const activeId = currentWorkflowId();
+        if (activeId) ids.add(activeId);
+        all.forEach(w => {
+            // Sub-workflows of what is on screen: the umbrella entries (e.g. the Excel
+            // chooser) carry no steps of their own, so the parent alone is not usable.
+            if (w.parent && w.parent === activeId) ids.add(w.id);
+            if (w.status === 'beta') ids.add(w.id);
+        });
+
+        const q = ' ' + String(question).toLowerCase().replace(/[^a-z0-9]+/g, ' ') + ' ';
+        all.forEach(w => {
+            if (workflowTokens(w).some(t => q.indexOf(' ' + t + ' ') !== -1)) {
+                ids.add(w.id);
+                // Pull in siblings too: asking about "excel" should show every Excel
+                // path, since choosing the wrong one is the mistake people actually make.
+                if (w.parent) {
+                    ids.add(w.parent);
+                    all.forEach(s => { if (s.parent === w.parent) ids.add(s.id); });
+                }
+                all.forEach(s => { if (s.parent === w.id) ids.add(s.id); });
+            }
+        });
+
+        if (ids.size === 0) all.forEach(w => ids.add(w.id));
+        return ids;
+    }
+
+    function buildSystemPrompt(question) {
         const wf = currentWorkflow();
         const L = [];
 
@@ -220,13 +283,32 @@
         L.push('');
         L.push('=== KNOWLEDGE BASE ===');
 
-        L.push('\n-- Workflows --');
-        KB.workflows.forEach(w => {
+        // Index of EVERY workflow, always present. Full steps for only the relevant
+        // ones follow. The index is what makes the trimming safe: the model can always
+        // see the complete list, so a workflow without full steps here is visibly a
+        // "not included in this message" case, never a "does not exist" one.
+        const detailIds = workflowsNeedingDetail(question);
+
+        L.push('\n-- Every workflow this app has --');
+        KB.workflows.forEach(w =>
+            L.push(`[${w.id}] ${w.label} (${w.status}): ${firstSentence(w.summary)}`));
+
+        L.push('\n-- Full steps for the workflow(s) in play --');
+        KB.workflows.filter(w => detailIds.has(w.id)).forEach(w => {
             L.push(`\n[${w.label}] (${w.status})`);
             L.push(w.summary);
             if (w.steps && w.steps.length) w.steps.forEach((s, i) => L.push(`  ${i + 1}. ${s}`));
             if (w.tips && w.tips.length) w.tips.forEach(t => L.push(`  tip: ${t}`));
         });
+
+        if (detailIds.size < KB.workflows.length) {
+            L.push('\nThe workflows listed in the index but not detailed above ARE fully ' +
+                   'documented - their steps just are not loaded into this particular ' +
+                   'message. If the user asks about one of them, do NOT say it is ' +
+                   'undocumented and do NOT guess at its steps: name it back to them and ' +
+                   'ask them to confirm that is the one they mean, and the full steps will ' +
+                   'be available when they answer.');
+        }
 
         L.push('\n-- Terms --');
         KB.glossary.forEach(g => {
@@ -366,7 +448,7 @@
         const convo = history.slice(-MAX_TURNS * 2)
             .map(m => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.text}`)
             .join('\n');
-        return buildSystemPrompt()
+        return buildSystemPrompt(question)
             + (convo ? `\n\n=== CONVERSATION SO FAR ===\n${convo}` : '')
             + `\n\nUser: ${question}\nAssistant:`
             + (chipsRequest || '');
