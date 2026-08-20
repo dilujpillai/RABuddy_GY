@@ -3110,10 +3110,39 @@
 
         <!-- Main Content: Image (left) | Details (center) | Risk Reduction (right) -->
         <div class="flex gap-4 flex-1 overflow-hidden">
-            <!-- Left: Image Preview -->
-            <div class="flex-1 flex flex-col">
-                <div class="flex-1 bg-slate-50 border border-slate-200 rounded-xl p-4 flex items-center justify-center">
-                    <img id="modalEnlargedImage" src="" alt="Current task image" class="max-w-full max-h-[60vh] object-contain rounded border border-slate-300 bg-white">
+            <!-- Left: Image Preview + picture controls -->
+            <div class="flex-1 flex flex-col min-w-0">
+                <div id="modalImageStage" class="flex-1 bg-slate-50 border border-slate-200 rounded-xl p-4 flex items-center justify-center relative overflow-hidden">
+                    <!-- Has a picture -->
+                    <img id="modalEnlargedImage" src="" alt="Current task image" class="max-w-full max-h-[52vh] object-contain rounded border border-slate-300 bg-white">
+
+                    <!-- No picture yet. This is the common state for a Free Text assessment,
+                         where the table is generated with no images at all. -->
+                    <div id="modalNoImageState" class="hidden flex-col items-center justify-center text-center gap-3 py-8">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M3 7h4l2-2h6l2 2h4v12H3V7z"/><circle cx="12" cy="13" r="3.5"/>
+                        </svg>
+                        <div>
+                            <p class="text-sm font-semibold text-slate-600" data-en-text="No picture for this step">No picture for this step</p>
+                            <p class="text-xs text-slate-400 mt-0.5" data-en-text="Faces are blurred automatically on your device.">Faces are blurred automatically on your device.</p>
+                        </div>
+                    </div>
+
+                    <!-- Shown while the face-blur pass runs on a newly chosen photo. -->
+                    <div id="modalImageBusy" class="hidden absolute inset-0 flex-col items-center justify-center gap-3 bg-white/85 backdrop-blur-sm">
+                        <div style="width:32px;height:32px;border:3px solid rgba(99,102,241,0.25);border-top-color:#4f46e5;border-radius:50%;animation:warmup-spin 0.8s linear infinite;"></div>
+                        <p class="text-xs font-semibold text-slate-600" data-en-text="Checking for faces…">Checking for faces…</p>
+                    </div>
+                </div>
+
+                <!-- Picture actions. Adding a photo here does NOT trigger an AI call - it only
+                     attaches the image to this step, exactly as an uploaded photo would be. -->
+                <div class="flex items-center gap-2 mt-2 flex-wrap">
+                    <input type="file" id="modalPictureInput" accept="image/*" class="hidden">
+                    <button id="modalAddPictureBtn" class="rab-btn rab-c-indigo rab-btn-sm" data-en-text="📷 Add Photo">📷 Add Photo</button>
+                    <button id="modalEditPictureBtn" class="rab-btn rab-c-violet rab-btn-sm" data-en-text="✏️ Edit / Blur">✏️ Edit / Blur</button>
+                    <button id="modalReplacePictureBtn" class="rab-btn rab-c-slate rab-btn-sm" data-en-text="🔁 Replace">🔁 Replace</button>
+                    <button id="modalRemovePictureBtn" class="rab-btn rab-c-ghost rab-btn-sm" title="Unlink this photo from the step (the image stays in the gallery)" data-en-text="Remove">Remove</button>
                 </div>
             </div>
 
@@ -6440,6 +6469,40 @@ ${JSON.stringify(payload, null, 2)}`;
             }
         }
         
+        /**
+         * Switch the task modal's image pane between "has a picture" and "no picture yet",
+         * and match the action buttons to it. Single owner of that pane's visibility so the
+         * two states can't both be showing.
+         */
+        function setModalPictureState(src) {
+            const img = document.getElementById('modalEnlargedImage');
+            const empty = document.getElementById('modalNoImageState');
+            const hasPicture = !!src;
+
+            if (img) {
+                img.src = hasPicture ? src : '';
+                img.classList.toggle('hidden', !hasPicture);
+            }
+            // These use .hidden alongside `flex`, so toggle the flex class too or the
+            // empty state would stay laid out while "hidden".
+            if (empty) {
+                empty.classList.toggle('hidden', hasPicture);
+                empty.classList.toggle('flex', !hasPicture);
+            }
+
+            // Add is only offered when empty; Edit/Replace/Remove only when populated.
+            const show = (id, on) => {
+                const el = document.getElementById(id);
+                // .rab-btn forces display:inline-flex !important, so an inline style.display
+                // toggle silently does nothing here - it has to be the class.
+                if (el) el.classList.toggle('rab-hidden', !on);
+            };
+            show('modalAddPictureBtn', !hasPicture);
+            show('modalEditPictureBtn', hasPicture);
+            show('modalReplacePictureBtn', hasPicture);
+            show('modalRemovePictureBtn', hasPicture);
+        }
+
         function loadModalTaskDetails(rowIndex) {
             const modal = document.getElementById('tableImageModal');
             const enlargedImage = document.getElementById('modalEnlargedImage');
@@ -6483,11 +6546,13 @@ ${JSON.stringify(payload, null, 2)}`;
                 }
             });
             
-            // Get image from first img in row (if exists)
-            const imgInRow = row.querySelector('img');
-            if (imgInRow) {
-                enlargedImage.src = imgInRow.src;
-            }
+            // Get image from first img in row (if exists).
+            // The `else` matters: without it, stepping from a task WITH a picture to one
+            // WITHOUT left the previous task's photo on screen, which reads as if the wrong
+            // image belongs to this step. Most visible on Free Text assessments, where no
+            // row has a picture until the user adds one.
+            const imgInRow = row.querySelector('.picture-cell img');
+            setModalPictureState(imgInRow ? imgInRow.src : null);
             
             // Build prominent hazard source badge for quick context
             const hazardSource = DOMPurify.sanitize(rowData['Hazard Source'] || '—');
@@ -7035,6 +7100,11 @@ ${JSON.stringify(payload, null, 2)}`;
             }
         }
 
+        // Exported for the same cross-<script>-block reason as showLightboxImage above:
+        // closeLightboxFunc() lives in another block and needs to hop back to the task.
+        window.loadModalTaskDetails = (i) => loadModalTaskDetails(i);
+        window.closeTableImageModal = () => closeTableImageModal();
+
         function closeTableImageModal() {
             const modal = document.getElementById('tableImageModal');
             if (modal) {
@@ -7083,7 +7153,93 @@ ${JSON.stringify(payload, null, 2)}`;
                      loadModalTaskDetails(rowIndex);
                  }
              });
-             
+
+             // ── Task picture controls ──────────────────────────────────────
+             // Attaching a photo here deliberately does NOT run the AI step extraction:
+             // the row's text already exists, all we are doing is giving it a picture.
+             const modalPictureInput = document.getElementById('modalPictureInput');
+             const modalAddPictureBtn = document.getElementById('modalAddPictureBtn');
+             const modalReplacePictureBtn = document.getElementById('modalReplacePictureBtn');
+             const modalEditPictureBtn = document.getElementById('modalEditPictureBtn');
+             const modalRemovePictureBtn = document.getElementById('modalRemovePictureBtn');
+             const modalImageBusy = document.getElementById('modalImageBusy');
+
+             const currentModalRow = () => (currentModalRowIndex >= 0 && currentModalRowIndex < allModalRowIndices.length)
+                 ? allModalRowIndices[currentModalRowIndex] : null;
+
+             const pickPicture = () => { if (modalPictureInput) { modalPictureInput.value = ''; modalPictureInput.click(); } };
+             if (modalAddPictureBtn) modalAddPictureBtn.addEventListener('click', pickPicture);
+             if (modalReplacePictureBtn) modalReplacePictureBtn.addEventListener('click', pickPicture);
+
+             if (modalPictureInput) modalPictureInput.addEventListener('change', async (e) => {
+                 const file = e.target.files && e.target.files[0];
+                 const rowIndex = currentModalRow();
+                 if (!file || rowIndex === null) return;
+
+                 // The face-blur pass is real work on a large photo, so show it rather than
+                 // letting the modal sit inert.
+                 if (modalImageBusy) { modalImageBusy.classList.remove('hidden'); modalImageBusy.classList.add('flex'); }
+                 try {
+                     const imageId = await window.createGalleryImageFromFile(file);
+                     if (!imageId) throw new Error('Image could not be processed.');
+                     window.attachImageToRow(imageId, rowIndex);
+                     loadModalTaskDetails(rowIndex);
+                 } catch (err) {
+                     console.error('Could not attach picture to task:', err);
+                     showCustomAlert('Could not add that picture. Please try a different image file.', 'error');
+                 } finally {
+                     if (modalImageBusy) { modalImageBusy.classList.add('hidden'); modalImageBusy.classList.remove('flex'); }
+                 }
+             });
+
+             // Reuse the existing lightbox editor rather than building a second one - it
+             // already owns blur/eraser/annotations and writes back to the gallery image,
+             // which is the same object the table row points at.
+             if (modalEditPictureBtn) modalEditPictureBtn.addEventListener('click', () => {
+                 const rowIndex = currentModalRow();
+                 if (rowIndex === null) return;
+                 const row = document.querySelector(`#table-container tr[data-row-index="${rowIndex}"]`);
+                 const imageId = row && row.dataset.imageId;
+                 const galleryImg = imageId ? document.getElementById(imageId) : null;
+                 if (!galleryImg || !galleryImg.src) {
+                     showCustomAlert('That picture is no longer in the gallery, so it cannot be edited.', 'error');
+                     return;
+                 }
+
+                 // Hide the task modal directly instead of calling closeTableImageModal():
+                 // that runs saveModalChanges() first, which can rebuild the table and drop
+                 // the row->image link a moment before the editor tries to read it - which
+                 // left the lightbox with an empty src showing its alt text.
+                 const taskModal = document.getElementById('tableImageModal');
+                 if (taskModal) taskModal.style.display = 'none';
+
+                 // Remember where to return, so closing the editor goes back to the task.
+                 window.__editorReturnToTaskRow = rowIndex;
+
+                 // Route through the Rich Media tab and open exactly the way clicking the
+                 // thumbnail there does. Opening the lightbox straight from the table left it
+                 // blank: the gallery it measures against lives inside that tab, so with the
+                 // tab hidden the editor had no laid-out image to size itself to. Reusing the
+                 // known-good path beats special-casing this one.
+                 if (typeof switchTab === 'function') switchTab('rich-media');
+
+                 // One frame for the tab to lay out before the editor measures the image.
+                 requestAnimationFrame(() => {
+                     lightboxModal.style.display = 'flex';
+                     window.showLightboxImage(imageId, { parentTaskId: imageId });
+                     if (window.ImageEditor) window.ImageEditor.onLightboxOpen();
+                 });
+             });
+
+             if (modalRemovePictureBtn) modalRemovePictureBtn.addEventListener('click', () => {
+                 const rowIndex = currentModalRow();
+                 if (rowIndex === null) return;
+                 // Unlinks only. The photo stays in the gallery so it can be reused on
+                 // another step, and so this isn't a destructive action behind one click.
+                 window.detachImageFromRow(rowIndex);
+                 loadModalTaskDetails(rowIndex);
+             });
+
              // EHS Reference Toggle
              const ehsRefToggleBtn = document.getElementById('ehsRefToggleBtn');
              const ehsRefContent = document.getElementById('ehsRefContent');
@@ -9884,6 +10040,12 @@ window.LIKELIHOOD_SCALE = LIKELIHOOD_SCALE;
             // Notify image editor of image change — passes previous ID so annotations get baked
             if (window.ImageEditor) window.ImageEditor.onImageChange(previousImageId);
         }
+        // Exported because the task-details modal lives in a different <script> block and
+        // cannot see these declarations directly - calling the bare name from there threw
+        // ReferenceError, which left the lightbox open but never loaded (stale src + empty
+        // fields), and silently broke the return-to-task hop on close.
+        window.showLightboxImage = showLightboxImage;
+
         function updateLightboxGallery() {
             lightboxGallery.innerHTML = '';
             const activeTaskId = getCurrentTaskId();
@@ -9912,6 +10074,21 @@ window.LIKELIHOOD_SCALE = LIKELIHOOD_SCALE;
             currentLightboxImageId = null;
             currentLightboxTaskId = null;
             window.currentLightboxImageId = null;
+
+            // If the editor was opened from a task row, hand the user back to that task
+            // rather than dropping them on the gallery they never came from.
+            const returnRow = window.__editorReturnToTaskRow;
+            window.__editorReturnToTaskRow = null;
+            if (returnRow !== null && returnRow !== undefined) {
+                // Let the editor finish baking annotations into the gallery image first,
+                // so the task modal's thumbnail shows the edit that was just made.
+                setTimeout(() => {
+                    if (typeof populatePictureColumn === 'function') populatePictureColumn();
+                    const taskModal = document.getElementById('tableImageModal');
+                    if (taskModal) taskModal.style.display = 'flex';
+                    window.loadModalTaskDetails(returnRow);
+                }, 120);
+            }
             lightboxGallery.innerHTML = '';
             hideClipFramePanel();
             setImageEditorEnabled(true);
@@ -11326,6 +11503,140 @@ window.LIKELIHOOD_SCALE = LIKELIHOOD_SCALE;
         };
 
         // --- Helper: ensure the "+" add-step tile is always the last item in the gallery ---
+        // ─── TASK PICTURE ATTACHMENT ────────────────────────────────────────
+        // A table row points at its picture through tr[data-image-id], which must name a
+        // .gallery-item img. BOTH exporters resolve pictures that way - the CSV writes the
+        // filename from window.originalFileNames, and addImagesToZip walks the gallery
+        // filtered to the ids rows actually reference. So a picture added here needs no
+        // export changes whatsoever; it only has to become a real gallery member and be
+        // pointed at by a row, exactly like an uploaded one.
+
+        /**
+         * Turn a File into a gallery image, running the SAME local face-blur pass the bulk
+         * uploader uses (processImage), so a photo attached to a step directly gets the
+         * identical privacy treatment as one that came in through the normal upload.
+         * Returns the new gallery image id, or null if the file could not be processed.
+         */
+        async function createGalleryImageFromFile(file) {
+            const fileId = `img-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+            const result = await processImage(file);
+            if (!result || !result.blob) return null;
+
+            const imageUrl = URL.createObjectURL(result.blob);
+            window.originalFileNames.set(fileId, file.name);
+            // Keep the pre-blur pixels so the editor's eraser can reveal a face that was
+            // blurred by mistake - same contract the upload path sets up.
+            if (result.faceCount > 0 && result.originalBlob) {
+                autoBlurOriginalByImageId.set(fileId, URL.createObjectURL(result.originalBlob));
+            }
+
+            const container = document.createElement('div');
+            container.className = 'gallery-item relative w-full pt-[100%] h-0 cursor-grab';
+            container.id = `gallery-item-${fileId}`;
+            container.draggable = true;
+
+            const imgElement = document.createElement('img');
+            imgElement.src = imageUrl;
+            imgElement.alt = `Processed ${file.name}`;
+            imgElement.id = fileId;
+            imgElement.className = 'absolute top-0 left-0 w-full h-full object-cover rounded-lg shadow-md cursor-pointer transition-transform duration-200 hover:scale-105';
+
+            const deleteBtn = document.createElement('button');
+            deleteBtn.className = 'delete-btn absolute top-1.5 right-1.5 z-10 bg-black/60 text-white w-5 h-5 rounded-full text-xs font-bold leading-none flex items-center justify-center hover:bg-red-600 transition';
+            deleteBtn.innerHTML = '&times;';
+            deleteBtn.title = 'Delete this image';
+
+            container.appendChild(imgElement);
+            container.appendChild(deleteBtn);
+            if (galleryDiv.querySelector('p')) galleryDiv.innerHTML = '';
+            galleryDiv.appendChild(container);
+            ensureAddStepButton();
+
+            // These stay hidden until the gallery has something worth acting on.
+            if (typeof downloadBtn !== 'undefined' && downloadBtn) downloadBtn.classList.remove('rab-hidden');
+            document.getElementById('generateAiReportBtn')?.classList.remove('rab-hidden');
+            document.getElementById('saveProjectBtn')?.classList.remove('rab-hidden');
+
+            return fileId;
+        }
+
+        /**
+         * Point a table row at a gallery image. This is a LINK, not a copy - the same photo
+         * can serve several steps, and the ZIP still exports one file that both rows name.
+         */
+        function attachImageToRow(imageId, rowIndex) {
+            const row = document.querySelector(`#table-container tr[data-row-index="${rowIndex}"]`);
+            const galleryImg = document.getElementById(imageId);
+            if (!row || !galleryImg) return false;
+
+            row.dataset.imageId = imageId;
+            const pictureCell = row.querySelector('.picture-cell');
+            if (pictureCell) pictureCell.dataset.filename = window.originalFileNames.get(imageId) || '';
+            backfillGalleryDataFromRow(imageId, rowIndex);
+            populatePictureColumn(); // rebuilds the thumbnail and its click-to-open wiring
+            return true;
+        }
+
+        /**
+         * Reverse of the normal flow: normally the AI reads an image and writes the row, so
+         * window.riskAssessmentData is populated first and the table is derived from it. When
+         * a picture is attached to an EXISTING row (e.g. a Free Text assessment), that map has
+         * no entry for the new image - which is why the editor's notes panel came up empty.
+         * Copy the row's own values across so the image arrives already carrying its task's
+         * context, and so edits in the editor act on real data instead of blank fields.
+         *
+         * Column order is fixed by buildTableFromData():
+         * 0 Picture, 1 AI, 2 Steps, 3 Hazard Group, 4 Hazard List, 5 Risk/Consequences,
+         * 6 Frequency, 7 Severity, 8 Likelihood, 9 Score, 10 Category, 11 Hazard Source,
+         * 12 Current Control, 13 Routine, 14 Actions, 15 Delete
+         */
+        function backfillGalleryDataFromRow(imageId, rowIndex) {
+            const row = document.querySelector(`#table-container tr[data-row-index="${rowIndex}"]`);
+            if (!row || !window.riskAssessmentData) return;
+            const tds = Array.from(row.querySelectorAll('td'));
+            // Cells hold either a <select>, an <input>, or plain text depending on the column.
+            const val = (i) => {
+                const td = tds[i];
+                if (!td) return '';
+                const sel = td.querySelector('select');
+                if (sel) return sel.value || '';
+                const inp = td.querySelector('input');
+                if (inp) return inp.value || '';
+                return (td.textContent || '').trim();
+            };
+
+            const hazardParts = [val(4), val(5)].filter(Boolean);
+            const existing = window.riskAssessmentData.get(imageId) || {};
+            window.riskAssessmentData.set(imageId, {
+                ...existing,
+                description: val(2),
+                hazards: hazardParts.join(' — '),
+                controls: val(12),
+                userFrequency: val(6),
+                userSeverity: val(7),
+                userLikelihood: val(8)
+            });
+        }
+
+        /** Remove a row's picture link. The gallery image itself is left alone. */
+        function detachImageFromRow(rowIndex) {
+            const row = document.querySelector(`#table-container tr[data-row-index="${rowIndex}"]`);
+            if (!row) return false;
+            row.dataset.imageId = '';
+            const pictureCell = row.querySelector('.picture-cell');
+            if (pictureCell) {
+                // populatePictureColumn() early-returns on rows with no imageId without
+                // touching the cell, so the old thumbnail has to be cleared here.
+                pictureCell.innerHTML = '';
+                pictureCell.dataset.filename = '';
+            }
+            return true;
+        }
+
+        window.createGalleryImageFromFile = createGalleryImageFromFile;
+        window.attachImageToRow = attachImageToRow;
+        window.detachImageFromRow = detachImageFromRow;
+
         function ensureAddStepButton() {
             // Remove existing button if present
             const existing = galleryDiv.querySelector('#addEmptyStepTile');
@@ -13601,10 +13912,19 @@ async function saveProject(filenameOverride, silent) {
             
             document.querySelectorAll('#table-container tbody tr').forEach(tr => {
                 const rowIndex = tr.dataset.rowIndex || tr.getAttribute('data-row-index');
-                
+
                 // Persist deleted rows
                 if (tr.classList.contains('deleted-row') || tr.dataset.deleted === 'true') {
                     deleted.push(rowIndex);
+                }
+
+                // Persist picture links. buildTableFromData() renders data-image-id FROM
+                // row.imageId, so a photo attached to a step after the table was built lives
+                // only on the DOM node - without this it would vanish on save/reload. Rows
+                // here are index-aligned with tableState.rows (both come from the same
+                // forEach index in buildTableFromData).
+                if (Array.isArray(tableState.rows) && tableState.rows[rowIndex]) {
+                    tableState.rows[rowIndex].imageId = tr.dataset.imageId || null;
                 }
                 
                 // Persist counter measures / action items with step details
