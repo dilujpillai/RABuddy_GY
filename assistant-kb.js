@@ -56,7 +56,26 @@
                 'only help with this application, and name one or two things you CAN help ' +
                 'with that are closest to what they asked. Do not apologise repeatedly, ' +
                 'do not lecture, and never attempt a partial answer to an out-of-scope ' +
-                'question. Keep the refusal to one or two sentences.'
+                'question. Keep the refusal to one or two sentences.',
+            // Distinct from refusalGuidance above on purpose. Added after a real user asked
+            // "what is Load Project" - a genuine, working app feature that simply had no KB
+            // entry yet - and got the SAME canned out-of-scope refusal as an unrelated
+            // question would. That reads as "you asked the wrong thing" when the truth is
+            // "we haven't written that part of the manual yet," and it's a different failure
+            // that needs different wording.
+            gapGuidance:
+                'A question can be clearly ABOUT this application (a feature, button, ' +
+                'workflow, colour, or behaviour of the app itself) while still not being ' +
+                'covered by the knowledge base below. That is a DOCUMENTATION GAP, not an ' +
+                'out-of-scope question - do NOT use the out-of-scope refusal for it. Instead, ' +
+                'say plainly that you do not have details on that specific part yet, and - ' +
+                'only if something in the knowledge base below is genuinely related - point ' +
+                'to that instead. Never invent specifics (steps, button names, behaviour) ' +
+                'about the undocumented feature itself; not knowing the details is fine, ' +
+                'guessing at them is not. The "Buttons currently visible on screen" list ' +
+                'further down may confirm a button exists even when its exact behaviour ' +
+                'isn\'t documented - you may say it exists, but still must not invent what ' +
+                'it does beyond what the knowledge base actually says.'
         },
 
         // ── Workflows ─────────────────────────────────────────────────────────

@@ -102,9 +102,42 @@
     }
 
     /**
+     * Labels of buttons genuinely rendered on screen right now, deduped. This is
+     * deliberately NOT a substitute for the KB - it only ever reports what is really
+     * there, so it can never invent a feature. What it buys is coverage for the long
+     * tail: a button the KB hasn't documented yet can still be CONFIRMED to exist
+     * (see gapGuidance in the KB, which is the only place allowed to use this for
+     * anything beyond "yes, that button is there").
+     *
+     * offsetWidth/offsetHeight are both 0 when an element or any ancestor is
+     * display:none - the exact mechanism this app's own tab switching (switchTab)
+     * and modal open/close already use (Tailwind's `hidden` class, or inline
+     * style.display). That means this naturally scopes itself to whatever tab or
+     * modal is actually visible right now, with no need to know which container to
+     * look in or keep that in sync with the app's own tab-switching code.
+     */
+    function visibleButtonLabels() {
+        const labels = [];
+        const seen = new Set();
+        document.querySelectorAll('button, [role="button"]').forEach(btn => {
+            if (labels.length >= 40) return; // keep the prompt bounded
+            if (btn.disabled) return;         // not something the user can act on right now
+            if (!btn.offsetWidth && !btn.offsetHeight) return; // not actually rendered
+            const text = (btn.getAttribute('title') || btn.textContent || '')
+                .trim().replace(/\s+/g, ' ');
+            if (!text || text.length > 60 || seen.has(text)) return;
+            seen.add(text);
+            labels.push(text);
+        });
+        return labels;
+    }
+
+    /**
      * A short factual description of what the user is looking at. Deliberately
-     * counts rather than copies: the assistant needs to know a table exists and
-     * roughly how big it is, not the contents of anyone's assessment.
+     * counts table/gallery contents rather than reading them: the assistant needs to
+     * know a table exists and roughly how big it is, not the contents of anyone's
+     * assessment. The one exception is button LABELS (via visibleButtonLabels()) -
+     * those are static UI chrome, not user data, so listing them carries no such risk.
      */
     function screenContext() {
         const parts = [];
@@ -137,6 +170,11 @@
             });
         if (openModal) parts.push(`Currently open dialog: #${openModal}.`);
 
+        const buttons = visibleButtonLabels();
+        if (buttons.length) {
+            parts.push(`Buttons currently visible on screen: ${buttons.join(' | ')}`);
+        }
+
         return parts.join('\n');
     }
 
@@ -155,6 +193,8 @@
         L.push('You must refuse:');
         KB.scope.refused.forEach(r => L.push(`  - ${r}`));
         L.push(KB.scope.refusalGuidance);
+        L.push('');
+        L.push(KB.scope.gapGuidance);
         L.push('');
         L.push('LANGUAGE: ' + KB.language.policy);
         L.push('');
