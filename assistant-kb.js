@@ -40,7 +40,10 @@
                 'Troubleshooting problems the user hits inside this app',
                 'Risk assessment concepts ONLY as this app implements them ' +
                     '(its rating scales, its hierarchy of controls, its registries)',
-                'What the app does with the user\'s data and images'
+                'What the app does with the user\'s data and images',
+            'Which file types, formats, sizes and limits the app accepts at each '
+                + 'upload point, and what the browser needs in order to play or '
+                + 'process them'
             ],
             refused: [
                 'General knowledge, current events, maths, coding, or trivia',
@@ -585,6 +588,60 @@
         ],
 
         // ── symptom → cause → fix ─────────────────────────────────────────────
+        // ── What each upload accepts ──────────────────────────────────────────
+        // Taken from the accept attributes and the validation code. Note that the
+        // picker filter and what the app actually processes are NOT the same list.
+        fileTypes: [
+            {
+                where: 'Rich Media - the main "upload images and videos" area',
+                accepts:
+                    'Images: the file picker offers PNG and JPEG, but any image format '
+                    + 'the browser itself can read is accepted. Videos: the picker offers '
+                    + 'MP4, MOV, AVI, MKV and WEBM, and the app additionally accepts FLV, '
+                    + 'WMV, M4V and 3GP, plus anything the browser reports as a video file.',
+                notes:
+                    'Dragging a file onto the upload area bypasses the picker\'s filter '
+                    + 'entirely, which is why the second list is wider than the first. '
+                    + 'There is no file size limit here. A file that is neither an image '
+                    + 'nor a recognised video is skipped silently, with no error message - '
+                    + 'so if a file simply never appears in the gallery, its format is the '
+                    + 'first thing to check. Separately, being accepted is not the same as '
+                    + 'being playable: video is played through the browser\'s own player, '
+                    + 'so an unusual container may still fail to play or to capture frames '
+                    + 'even though the app took it. MP4 is the safest choice.'
+            },
+            {
+                where: 'Replace a picture, Add Photo, and the task modal image tray',
+                accepts: 'Any image format the browser can read.',
+                notes: 'Videos cannot be attached to a step this way - only still images.'
+            },
+            {
+                where: 'Load Project',
+                accepts: 'A .json project file.',
+                notes: 'This is the file "Save Project" produces. A downloaded ZIP is not a project file and will not load.'
+            },
+            {
+                where: 'Excel Sheet card 1 - Legacy Excel',
+                accepts: '.xlsx, .xlsm, .xls or .csv',
+                notes: 'The widest of the three Excel paths - it is the one meant for non-standard files.'
+            },
+            {
+                where: 'Excel Sheet card 2 - RA 2025 Template, single file',
+                accepts: '.xlsx, .xlsm or .xls',
+                notes: 'No CSV here, because the RA 2025 layout is detected from a real worksheet.'
+            },
+            {
+                where: 'Excel Sheet card 3 - Batch RA 2025',
+                accepts: '.xlsx, .xlsm or .xls, up to 20 files, each under 10 MB',
+                notes: 'Anything failing those limits is listed as skipped with the reason shown, rather than silently dropped.'
+            },
+            {
+                where: 'The Excel mapper\'s own drop zone, inside the import window',
+                accepts: '.xlsx, .xlsm, .xls or .json',
+                notes: 'The .json here is a mapper project saved earlier with "Save Project (JSON)".'
+            }
+        ],
+
         // ── Button reference ──────────────────────────────────────────────────
         // Extracted from the app's own markup. "does" uses each button's real title
         // attribute where it has one. If a button is not listed here, it is not
@@ -782,6 +839,7 @@
         // next question near the top of each workflow's group.
         followUps: [
             // Rich Media — roughly the order a user meets them
+            { q: 'What image and video formats can I upload?',       when: ['rich-media'] },
             { q: 'How do I capture frames from a video?',            when: ['rich-media'] },
             { q: 'How do I blur a face the detector missed?',        when: ['rich-media'], needs: 'gallery' },
             { q: 'A face was blurred by mistake — can I undo it?',   when: ['rich-media'], needs: 'gallery' },

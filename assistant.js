@@ -245,6 +245,12 @@
         // One line per button - the whole KB ships on every request, so this section
         // is deliberately terse. `|| []` keeps an older cached assistant-kb.js from
         // throwing here and taking the entire panel down with it.
+        // Accepted formats per upload point. Sits before Buttons because "what can I
+        // upload" is asked far more often than "what does this button do".
+        L.push('\n-- What each upload accepts --');
+        (KB.fileTypes || []).forEach(f =>
+            L.push(`${f.where}\n  Accepts: ${f.accepts}\n  Notes: ${f.notes}`));
+
         L.push('\n-- Buttons (only these exist; do not invent others) --');
         (KB.buttons || []).forEach(b => L.push(`"${b.label}" (${b.where}): ${b.does}`));
 
