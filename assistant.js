@@ -31,6 +31,10 @@
     const CHIP_CACHE_MAX_PER_LANG = 300; // just a sanity cap, not a tuning knob
 
     let chipLang = detectInitialLanguage();
+    // True once the MODEL has actually told us (via a CHIPS[xx] reply) what language
+    // it answered in - see the comment on chipsNeedingTranslation() below for why this
+    // exists: without it, a wrong starting guess of 'en' could never correct itself.
+    let chipLangConfirmed = false;
     let chipCache = loadChipCache();      // { [lang]: { [englishText]: translated } }
 
     /**
@@ -208,7 +212,17 @@
      * kind of drift that caused earlier bugs in this codebase.
      */
     function chipsNeedingTranslation(picks) {
-        if (!picks.length || chipLang === 'en') return [];
+        if (!picks.length) return [];
+        // Only skip the request once the language is CONFIRMED English - not merely
+        // guessed. detectInitialLanguage() is a best-effort guess from the app's
+        // language selector or the browser locale, and either can be wrong (e.g. an
+        // app/browser left on English while the user types in French). The ONLY
+        // channel that ever corrects that guess is a CHIPS[xx] line in the model's
+        // reply - so gating purely on "chipLang === 'en'" was a dead end: if the guess
+        // started wrong, we would never again ask, so it could never self-correct.
+        // The cost is one small extra request on the very first message for a
+        // genuinely English session; every session after is unaffected either way.
+        if (chipLangConfirmed && chipLang === 'en') return [];
         return picks.filter(f => !getCachedChipLabel(chipLang, f.q));
     }
 
@@ -267,10 +281,17 @@
             // The model's actual reply language is the authoritative signal - correct our
             // starting guess from detectInitialLanguage() the moment we have real evidence,
             // so later messages request the right language from the first uncached chip.
-            if (lang && lang !== chipLang) chipLang = lang;
+            if (lang) chipLang = lang;
+            // This is the ONLY place chipLangConfirmed becomes true - a well-formed reply
+            // is real evidence about the language, even when it confirms our guess was
+            // 'en' all along. Until this fires at least once, chipsNeedingTranslation()
+            // keeps asking on every message rather than trusting an unconfirmed guess.
+            chipLangConfirmed = true;
         }
         // Count mismatch: say nothing about it here, just don't cache - extraction still
-        // strips the line either way, since it must never be shown regardless.
+        // strips the line either way, since it must never be shown regardless. We also
+        // do NOT set chipLangConfirmed here, so the next message tries again rather than
+        // getting permanently stuck on a parse hiccup.
 
         return cleanText;
     }
