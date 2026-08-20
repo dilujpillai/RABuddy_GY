@@ -25696,8 +25696,14 @@ Return ONLY a valid JSON array (no explanation, no markdown):
             30% { transform: translateY(-4px); opacity: 1; }
         }
     </style>
+    <!-- z-[100050]: deliberately above every modal/overlay in the app, including the
+         highest one (the Multi-Tab Excel -> AI Pipeline overlay at z-[100000]). Help
+         should stay reachable no matter which screen the user is stuck on - a widget
+         that gets buried under the exact modal a user is confused by defeats its own
+         purpose. Keep this above the app's actual highest z-index if a new overlay is
+         ever added higher than 100000. -->
     <button id="rabAssistantFab" type="button" title="Ask about this app"
-            class="fixed bottom-5 right-5 z-[200] w-14 h-14 rounded-full bg-[#002c5f] hover:bg-[#001530] text-white shadow-2xl border-2 border-[#ffd100] flex items-center justify-center transition hover:scale-105">
+            class="fixed bottom-5 right-5 z-[100050] w-14 h-14 rounded-full bg-[#002c5f] hover:bg-[#001530] text-white shadow-2xl border-2 border-[#ffd100] flex items-center justify-center transition hover:scale-105">
         <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
             <path stroke-linecap="round" stroke-linejoin="round" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093V15m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
         </svg>
@@ -25706,7 +25712,7 @@ Return ONLY a valid JSON array (no explanation, no markdown):
     <!-- Height was 560px capped at 100vh-9rem - tight enough that a normal answer plus
          the follow-up chips left little of the conversation visible at once. -->
     <div id="rabAssistantPanel"
-         class="hidden fixed bottom-24 right-5 z-[200] w-[min(400px,calc(100vw-2.5rem))] h-[min(660px,calc(100vh-7rem))] bg-white rounded-2xl shadow-2xl border border-slate-200 flex flex-col overflow-hidden">
+         class="hidden fixed bottom-24 right-5 z-[100050] w-[min(400px,calc(100vw-2.5rem))] h-[min(660px,calc(100vh-7rem))] bg-white rounded-2xl shadow-2xl border border-slate-200 flex flex-col overflow-hidden">
 
         <div class="flex items-center justify-between px-4 py-3 bg-gradient-to-r from-[#002c5f] to-[#001530] text-white" style="border-bottom:3px solid #ffd100;">
             <div>
