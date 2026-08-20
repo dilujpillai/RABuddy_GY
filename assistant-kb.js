@@ -518,10 +518,24 @@
                     'package (optimized images, CSV, report) meant to be handed off, not ' +
                     'reopened here. Save Project is the "resume later" file; Download is ' +
                     'the "I am done" file.'
+            },
+            {
+                term: '"Intelligent Fill" (a name in messages, not a button)',
+                definition:
+                    'Several AI failure messages end with "Use Intelligent Fill instead." '
+                    + 'There is NO button labelled "Intelligent Fill" anywhere in the app. '
+                    + 'What they mean is the local, no-network option: "\u26a1 Intelligent", '
+                    + 'found under the "\ud83c\udfaf Fix Countermeasure Ladder \u25be" button on the '
+                    + 'GOEHS screen.',
+                note:
+                    '"Intelligent Fill" is also the name the app uses when it fills GOEHS '
+                    + 'task fields from task-name keywords on its own - that one runs '
+                    + 'automatically and has no button either. If a user is hunting for an '
+                    + '"Intelligent Fill" button, tell them plainly that it does not exist '
+                    + 'and point them at "\u26a1 Intelligent" instead.'
             }
         ],
 
-        // ── Colour / badge meanings ───────────────────────────────────────────
         colorCoding: [
             {
                 cue: 'Red / amber / green risk bands',
@@ -571,6 +585,124 @@
         ],
 
         // ── symptom → cause → fix ─────────────────────────────────────────────
+        // ── Button reference ──────────────────────────────────────────────────
+        // Extracted from the app's own markup. "does" uses each button's real title
+        // attribute where it has one. If a button is not listed here, it is not
+        // documented - say so rather than guessing at what it does.
+        buttons: [
+            // Top bar - visible from anywhere
+            { label: 'Rich Media / Free Text / Excel Sheet / Fire Risk / Cost-Benefit', where: 'top tab bar', does: 'Switches workflow. Fire Risk and Cost-Benefit are marked BETA.' },
+            { label: '\ud83d\udcc1 Project \u25be', where: 'top bar', does: 'Opens a menu holding "Save Project" and "Download Project ZIP".' },
+            { label: '\ud83c\udf10 Language \u25be', where: 'top bar', does: 'Opens the language menu, holding "Translate" and "Revert All Translations".' },
+            { label: 'Translate', where: 'Language menu', does: 'Translates the main table into the chosen language.' },
+            { label: 'Revert All Translations', where: 'Language menu', does: 'Reverts all translations to the original values.' },
+            { label: 'How to Use This App \ud83d\ude80', where: 'top bar', does: 'Opens the built-in walkthrough for every workflow.' },
+            { label: 'Privacy Policy', where: 'top bar', does: 'Explains what stays on your device.' },
+
+            // Rich Media / main table
+            { label: 'Process Files', where: 'Rich Media tab', does: 'Processes the uploaded photos or videos: resizes them and blurs faces on your device.' },
+            { label: 'Generate AI Risk Assessment', where: 'Rich Media tab, above the table', does: 'Builds the whole risk table from your image notes. This is the step the Legacy Excel path also needs.' },
+            { label: 'Download ZIP', where: 'Rich Media tab', does: 'Downloads the table, the processed images and the report.' },
+            { label: 'Save Project', where: 'Rich Media tab and the Project menu', does: 'Saves a project file you can reload later.' },
+            { label: 'Load Project', where: 'Rich Media tab', does: 'Reloads a saved project file, restoring images, notes and the table.' },
+            { label: 'Download Project ZIP', where: 'Project menu', does: 'Downloads a ZIP with both full-size and optimized images.' },
+            { label: 'GOEHS Integration', where: 'above the table', does: 'Opens the GOEHS export screen. Needs a table to exist first.' },
+            { label: 'Remap Columns', where: 'above the table, after an Excel import', does: 'Re-maps the Excel columns if the data was not imported correctly.' },
+            { label: '\ud83d\udd27 AI Fix Hazard/Risk', where: 'above the table', does: 'Scans all rows and auto-corrects Hazard Group / Hazard List values that do not match the standard dropdown options. Risk/Consequences is left alone, since it is often localized or imported text.' },
+            { label: '\ud83c\udfaf Suggest Closest Match', where: 'above the table', does: 'For any Hazard Group / Hazard List dropdown still outlined red after AI Fix, applies the closest standard entry as a best guess for you to review. Purely local - it never calls the AI.' },
+
+            // Picture preview (lightbox) and editor
+            { label: 'Audio Mode', where: 'image preview', does: 'Starts dictation, so you can speak the Description, Hazards or Controls instead of typing. Click one of those fields to choose where the text goes.' },
+            { label: 'Undo Blur', where: 'image editor', does: 'Undoes the last blur stroke on this picture.' },
+            { label: 'Replace', where: 'image preview', does: 'Swaps this picture for a different file, keeping the notes.' },
+            { label: 'Delete', where: 'image preview', does: 'Removes this picture from the gallery.' },
+
+            // Fullscreen video
+            { label: 'Capture Frame', where: 'fullscreen video', does: 'Captures the current frame as a step. Keyboard shortcut: C.' },
+            { label: '3s Clip', where: 'fullscreen video', does: 'Captures a 3-second clip into the review pane. Keyboard shortcut: G.' },
+            { label: 'Play/Pause and Mute', where: 'fullscreen video', does: 'Space toggles play/pause, M toggles mute.' },
+            { label: 'Download GIF ZIP \u25be', where: 'fullscreen video', does: 'Chooses the GIF ZIP size before downloading.' },
+
+            // Task modal (opened from a table row)
+            { label: '\ud83d\udcf7 Add Photo', where: 'task modal', does: 'Attaches a picture to this table row.' },
+            { label: '\u270f\ufe0f Edit / Blur', where: 'task modal', does: 'Opens this row\'s picture in the editor to blur or annotate it.' },
+            { label: '\ud83d\udd01 Replace', where: 'task modal', does: 'Swaps the picture attached to this row.' },
+            { label: 'Remove', where: 'task modal', does: 'Unlinks the photo from the step. The image stays in the gallery.' },
+            { label: '\uff0b Add Images', where: 'task modal image tray', does: 'Adds pictures to the tray so you can drag them onto steps.' },
+            { label: '+ Add Control', where: 'task modal', does: 'Adds another control measure to this row.' },
+            { label: '\ud83d\uddd1\ufe0f Delete', where: 'task modal', does: 'Deletes this task row.' },
+            { label: '\u2190 Previous / Next \u2192', where: 'task modal footer', does: 'Moves between task rows without closing. Arrow keys work too.' },
+
+            // Legacy Excel mapper
+            { label: '\ud83d\udcc2 Advanced Import / Column Mapping', where: 'Excel Sheet tab, below the three cards', does: 'Reopens the mapper. Once a file is loaded it changes to "\ud83d\udcc2 Continue Mapping" and shows the filename - no need to re-upload.' },
+            { label: '\ud83d\udcc4 Single Sheet \u2192 AI / \ud83d\udcda Multi Tab \u2192 AI', where: 'top of the Excel mapper', does: 'Chooses whether to process one sheet or run the multi-tab pipeline.' },
+            { label: '\ud83d\udccb Copy Mapping', where: 'Excel mapper', does: 'Copies the current column mapping - then switch to the next tab and click Paste.' },
+            { label: '\ud83d\udccc Paste', where: 'Excel mapper', does: 'Pastes the copied mapping into this tab.' },
+            { label: '\ud83d\udccb Apply to All Tabs', where: 'Excel mapper', does: 'Applies this mapping to ALL other tabs at once.' },
+            { label: '\ud83e\uddf9 Clear', where: 'Excel mapper', does: 'Clears all mapped columns.' },
+            { label: '\u21bb Refresh', where: 'Excel mapper', does: 'Re-reads the sheet with the current mapping.' },
+            { label: 'Add Step', where: 'Excel mapper', does: 'Adds an empty step card, for a step that needs a new photo.' },
+            { label: '\u21a9\ufe0f Restore', where: 'Excel mapper', does: 'Brings back step cards you deleted. The count is shown on the button.' },
+            { label: '\ud83d\udcbe Save Project (JSON)', where: 'Excel mapper footer', does: 'Saves the mapper output itself, to come back to later.' },
+            { label: '\u2713 Load as New Project', where: 'Excel mapper footer', does: 'Hands the steps and pictures to the Rich Media gallery as a new project. The table is left EMPTY - you then press "Generate AI Risk Assessment".' },
+
+            // RA 2025 mapper
+            { label: '\ud83d\udcca Show full sheet preview & advanced mapping', where: 'RA 2025 mapper', does: 'Expands the full sheet preview so you can map columns by hand.' },
+            { label: '\u2713 Parse & Load to Table', where: 'RA 2025 mapper', does: 'Confirms the mapping and loads the rows straight into the main table.' },
+
+            // Multi-tab pipeline
+            { label: 'Select all / Deselect all / Only with >=3 rows', where: 'Multi-Tab Excel pipeline', does: 'Chooses which sheets of the workbook to queue.' },
+            { label: 'Re-read Rows', where: 'Multi-Tab pipeline', does: 'Re-parses the selected sheets with the current mapping.' },
+            { label: 'Apply Copied to Selected', where: 'Multi-Tab pipeline', does: 'Applies a copied mapping to every selected sheet.' },
+            { label: '\ud83e\udd16 Start AI', where: 'Multi-Tab pipeline', does: 'Runs AI processing over every queued sheet. The number queued is shown on the button.' },
+            { label: 'Review Processed', where: 'Multi-Tab pipeline', does: 'Opens the results for checking, including after a cancel.' },
+            { label: '\ud83d\udd27 AI Fix All Tabs', where: 'Multi-Tab results', does: 'Runs the hazard/risk fix across every processed tab at once.' },
+
+            // GOEHS export screen
+            { label: '\ud83c\udfaf Fix Countermeasure Ladder \u25be', where: 'GOEHS screen', does: 'Fixes the Current and Predictive ladder columns. Opens into two choices: AI, or local keyword matching.' },
+            { label: '\ud83e\udd16 AI', where: 'under Fix Countermeasure Ladder', does: 'Makes an AI call to classify control descriptions the local keyword engine could not match.' },
+            { label: '\u26a1 Intelligent', where: 'under Fix Countermeasure Ladder', does: 'Local keyword matching only - free and instant, but may miss unusual phrasing. Never calls the AI.' },
+            { label: '\ud83e\udd16 AI Fix Hazard/Sub-Hazard', where: 'GOEHS screen', does: 'Uses AI to correct the Hazard / Sub-Hazard classification.' },
+            { label: 'Download GOEHS Batch Upload XLSX', where: 'GOEHS screen', does: 'Downloads the finished GOEHS batch upload file.' },
+
+            // Batch RA 2025
+            { label: '\ud83e\udd16 Auto Fix with AI', where: 'batch file card', does: 'Resolves the dropdown mismatches in that file automatically.' },
+            { label: '\u2713 Accept & Mark Ready', where: 'batch file card', does: 'Marks the file as ready for export.' },
+            { label: '\ud83d\udce6 Download ZIP', where: 'batch screen', does: 'Downloads one archive with a GOEHS CSV, XLSX and JSON per file.' }
+        ],
+
+        // ── Literal error messages the app can show ───────────────────────────
+        // Match on the message the user quotes. These are the exact strings in the
+        // code, so if a user pastes one, it can be identified precisely.
+        errorMessages: [
+            { message: 'No risk assessment notes found. Please add notes to your images in the lightbox preview first.', means: 'No notes have been entered against any picture yet.', fix: 'Click a thumbnail to open the preview and fill in Description, Hazards or Controls, then generate again.' },
+            { message: 'No risk assessment notes found. Please add notes (description, hazards, or controls) to your images.', means: 'Pictures exist, but not one of them has a description, hazard or control filled in.', fix: 'Open at least one picture and add a note. Empty pictures are skipped when the table is generated.' },
+            { message: 'No data to save. Please generate a table or upload images.', means: 'There is nothing in the project yet.', fix: 'Upload images or generate a table first, then save.' },
+            { message: 'Failed to load project: Invalid file. / Invalid Project File Structure', means: 'The chosen file is not a project file saved by this app, or it is damaged.', fix: 'Use the .json file produced by "Save Project". A downloaded ZIP is not a project file.' },
+            { message: 'That picture is no longer in the gallery, so it cannot be edited.', means: 'The picture was deleted from the gallery while the editor was still pointing at it.', fix: 'Close the editor and pick a picture that is still in the gallery.' },
+            { message: 'Could not add that picture. Please try a different image file.', means: 'The browser could not decode that image file.', fix: 'Try a normal JPG or PNG. Unusual or corrupted formats are rejected.' },
+            { message: 'Video is still loading. Please wait a moment.', means: 'Capture was pressed before the browser had buffered enough video.', fix: 'Wait for the video to be ready, then capture again.' },
+            { message: 'Move slightly earlier in the video, then try clip capture again.', means: 'You are within a fraction of a second of the end of the video, so a 3-second clip will not fit.', fix: 'Scrub back a little and capture again.' },
+            { message: 'Could not find GIF data. Try playing the preview first.', means: 'The clip has not been rendered yet.', fix: 'Play the preview once, then download.' },
+            { message: 'Speech recognition not supported in this browser. / Speech-to-text is not supported in your browser.', means: 'The browser has no speech recognition engine.', fix: 'Use Chrome, which supports it. Typing always works.' },
+            { message: 'Microphone access denied. Please allow microphone access in your browser.', means: 'The browser blocked microphone permission.', fix: 'Allow the microphone for this site in the browser address bar, then start Audio Mode again.' },
+            { message: 'No speech detected. Please speak into your microphone.', means: 'Dictation started but heard nothing.', fix: 'Check the right microphone is selected and speak clearly, or type instead.' },
+            { message: 'ZIP library is unavailable. Refresh and try again. / Error: JSZip library not loaded.', means: 'A support library did not load with the page.', fix: 'Refresh the page. If it keeps happening the local files in the lib folder or the CDN are unreachable.' },
+            { message: 'PDFKit is not loaded. Cannot generate PDF.', means: 'The PDF library did not load with the page.', fix: 'Refresh the page, then generate the report again.' },
+            { message: 'Error: Failed to load essential libraries: ... Please ensure local files are in the ./lib/ directory or check CDN links, and refresh.', means: 'One or more of face-api.js, JSZip, pdfkit or blob-stream is missing, so face blurring or export cannot run.', fix: 'Refresh. If it persists, this is an installation or network problem, not something you can fix from inside the app.' },
+            { message: 'Maximum 20 files allowed. You selected N.', means: 'The batch path takes at most 20 files at a time.', fix: 'Split the selection into batches of 20 or fewer.' },
+            { message: 'Please enter an Export Title.', means: 'The batch export needs a title before it can build the ZIP.', fix: 'Fill in Export Title at the top of the batch screen.' },
+            { message: 'No data rows found (auto-detection failed). Use the Column Mapper to set columns manually.', means: 'The importer could not work out which columns hold what.', fix: 'Open that file\'s card and set the columns by hand, then re-read the rows.' },
+            { message: 'Could not auto-detect RA 2025 format. Opening manual column mapper...', means: 'The file did not match the expected RA 2025 layout.', fix: 'Nothing to do - the app opens the manual mapper for you automatically. Set the columns and continue.' },
+            { message: 'AI returned no usable results - check column mapping or try again', means: 'The AI ran but produced nothing usable, usually because the mapped columns did not contain the expected text.', fix: 'Check the column mapping, then try again.' },
+            { message: 'No rows in the table to fix. / No rows in the table.', means: 'A table-wide action was pressed before a table existed.', fix: 'Generate or import the table first.' },
+            { message: 'Network error - API server may be unavailable. Use Intelligent Fill instead.', means: 'The AI service could not be reached at all.', fix: 'Check the connection and retry. To carry on without AI, use the local option: "\u26a1 Intelligent" under "\ud83c\udfaf Fix Countermeasure Ladder".' },
+            { message: 'API endpoint not found (404). The AI service may be temporarily unavailable. Use Intelligent Fill instead.', means: 'The AI service is not answering on the expected address.', fix: 'Retry later. Meanwhile use the local option: "\u26a1 Intelligent" under "\ud83c\udfaf Fix Countermeasure Ladder".' },
+            { message: 'All AI batch(es) failed. Use Intelligent Fill instead.', means: 'Every AI request in the run failed.', fix: 'Fall back to the local keyword matching, "\u26a1 Intelligent", which needs no network.' },
+            { message: 'AI did not return valid JSON / AI response was in an invalid format / Empty AI response', means: 'The AI replied with something the app could not read.', fix: 'Try again - this is usually transient. If it repeats, use the local "\u26a1 Intelligent" option instead.' },
+            { message: 'An error occurred while applying the blur. / Error loading image for manual blur.', means: 'The editor could not process that picture.', fix: 'Close and reopen the picture. If it keeps failing, replace the image with a different file.' }
+        ],
+
         troubleshooting: [
             {
                 symptom:

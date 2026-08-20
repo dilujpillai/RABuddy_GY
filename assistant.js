@@ -242,10 +242,25 @@
         KB.troubleshooting.forEach(t =>
             L.push(`Symptom: ${t.symptom}\n  Cause: ${t.cause}\n  Fix: ${t.fix}`));
 
+        // One line per button - the whole KB ships on every request, so this section
+        // is deliberately terse. `|| []` keeps an older cached assistant-kb.js from
+        // throwing here and taking the entire panel down with it.
+        L.push('\n-- Buttons (only these exist; do not invent others) --');
+        (KB.buttons || []).forEach(b => L.push(`"${b.label}" (${b.where}): ${b.does}`));
+
+        // Literal strings, so a user pasting an error can be matched exactly.
+        L.push('\n-- Error messages the app can show --');
+        (KB.errorMessages || []).forEach(e =>
+            L.push(`"${e.message}"\n  Means: ${e.means}\n  Fix: ${e.fix}`));
+
         L.push('\n=== END KNOWLEDGE BASE ===');
         L.push('If the knowledge base does not cover something, say you are not sure ' +
                'rather than inventing an answer. Never describe a button or feature ' +
-               'that does not appear above.');
+               'that does not appear above. The button list above is the complete ' +
+               'set of documented buttons - if a user asks about one that is not ' +
+               'there, treat it as a documentation gap, not as licence to guess ' +
+               'what it might do. If a user quotes an error message, match it ' +
+               'against the error list and answer with that entry.');
 
         return L.join('\n');
     }
