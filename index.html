@@ -3108,9 +3108,31 @@
             <h2 id="modalTaskTitle" class="text-xl font-bold text-slate-800">Task Details</h2>
         </div>
 
-        <!-- Main Content: Image (left) | Details (center) | Risk Reduction (right) -->
+        <!-- Main Content: Image tray | Image preview | Details | Risk Reduction -->
         <div class="flex gap-4 flex-1 overflow-hidden">
-            <!-- Left: Image Preview + picture controls -->
+
+            <!-- Far left: image tray. A VIEW of the Rich Media gallery, not a second store -
+                 it renders from .gallery-item img so anything uploaded here or there shows in
+                 both, and the row->image link keeps working unchanged. Drag a tile onto the
+                 step's image stage to attach it. -->
+            <aside id="taskImageTray" class="w-[150px] flex-none flex flex-col bg-slate-50 border border-slate-200 rounded-xl overflow-hidden">
+                <div class="px-3 py-2 border-b border-slate-200 bg-white/70">
+                    <p class="text-[11px] font-bold text-slate-600 uppercase tracking-wide" data-en-text="Image Tray">Image Tray</p>
+                    <p class="text-[10px] text-slate-400 leading-tight" data-en-text="Drag onto the step">Drag onto the step</p>
+                </div>
+
+                <div id="taskImageTrayList" class="flex-1 overflow-y-auto p-2 space-y-2 risk-panel-scroll">
+                    <!-- Tiles rendered by renderTaskImageTray() -->
+                </div>
+
+                <div class="p-2 border-t border-slate-200 bg-white/70">
+                    <input type="file" id="taskTrayUploadInput" accept="image/*" multiple class="hidden">
+                    <button id="taskTrayUploadBtn" class="rab-btn rab-c-indigo rab-btn-sm w-full" data-en-text="＋ Add Images">＋ Add Images</button>
+                    <p id="taskTrayUploadStatus" class="text-[10px] text-slate-500 mt-1.5 text-center leading-tight"></p>
+                </div>
+            </aside>
+
+            <!-- Image Preview + picture controls -->
             <div class="flex-1 flex flex-col min-w-0">
                 <div id="modalImageStage" class="flex-1 bg-slate-50 border border-slate-200 rounded-xl p-4 flex items-center justify-center relative overflow-hidden">
                     <!-- Has a picture -->
@@ -6503,6 +6525,95 @@ ${JSON.stringify(payload, null, 2)}`;
             show('modalRemovePictureBtn', hasPicture);
         }
 
+        // ─── TASK MODAL IMAGE TRAY ──────────────────────────────────────────
+        // The tray is a VIEW over the Rich Media gallery, never a second store: it renders
+        // from .gallery-item img, so a photo added here appears in the top gallery too and
+        // stays exportable through the usual tr[data-image-id] -> gallery -> originalFileNames
+        // chain. An image sitting in the tray un-dropped is simply unreferenced by any row,
+        // so the ZIP correctly skips it until it is attached.
+        const TRAY_DRAG_MIME = 'text/rab-image-id';
+
+        function renderTaskImageTray() {
+            const list = document.getElementById('taskImageTrayList');
+            if (!list) return;
+
+            const galleryImages = Array.from(document.querySelectorAll('#imageGallery .gallery-item img, .gallery-item img'));
+            // Which images are already placed on some row - shown as "used" rather than
+            // hidden, because one site photo may legitimately serve several steps.
+            const used = new Set();
+            document.querySelectorAll('#table-container tbody tr').forEach(tr => {
+                if (tr.dataset.imageId) used.add(tr.dataset.imageId);
+            });
+
+            const currentRow = (currentModalRowIndex >= 0 && currentModalRowIndex < allModalRowIndices.length)
+                ? allModalRowIndices[currentModalRowIndex] : null;
+            const currentRowEl = currentRow !== null
+                ? document.querySelector(`#table-container tr[data-row-index="${currentRow}"]`) : null;
+            const currentImageId = currentRowEl ? currentRowEl.dataset.imageId : '';
+
+            list.innerHTML = '';
+            if (galleryImages.length === 0) {
+                list.innerHTML = '<p class="text-[10px] text-slate-400 text-center py-6 leading-snug">No images yet.<br>Use ＋ Add Images.</p>';
+                return;
+            }
+
+            galleryImages.forEach(img => {
+                const tile = document.createElement('div');
+                tile.className = 'relative rounded-lg overflow-hidden border-2 cursor-grab bg-white '
+                    + (img.id === currentImageId ? 'border-indigo-500' : 'border-transparent hover:border-slate-300');
+                tile.draggable = true;
+                tile.dataset.imageId = img.id;
+                tile.title = window.originalFileNames.get(img.id) || img.id;
+
+                const thumb = document.createElement('img');
+                thumb.src = img.src;
+                thumb.className = 'w-full h-[86px] object-cover pointer-events-none';
+                tile.appendChild(thumb);
+
+                if (used.has(img.id)) {
+                    const badge = document.createElement('span');
+                    badge.className = 'absolute top-1 left-1 px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-600 text-white pointer-events-none';
+                    badge.textContent = img.id === currentImageId ? 'THIS STEP' : 'USED';
+                    tile.appendChild(badge);
+                }
+
+                tile.addEventListener('dragstart', (e) => {
+                    e.dataTransfer.setData(TRAY_DRAG_MIME, img.id);
+                    e.dataTransfer.effectAllowed = 'copy';
+                    tile.classList.add('opacity-50');
+                });
+                tile.addEventListener('dragend', () => tile.classList.remove('opacity-50'));
+                // Double-click jumps straight into the editor, same hop as Edit / Blur.
+                tile.addEventListener('dblclick', () => openImageEditorForImageId(img.id, currentRow));
+
+                list.appendChild(tile);
+            });
+        }
+        window.renderTaskImageTray = renderTaskImageTray;
+
+        /** Shared by the Edit/Blur button and tray double-click. */
+        function openImageEditorForImageId(imageId, returnRowIndex) {
+            const galleryImg = imageId ? document.getElementById(imageId) : null;
+            if (!galleryImg || !galleryImg.src) {
+                showCustomAlert('That picture is no longer in the gallery, so it cannot be edited.', 'error');
+                return;
+            }
+            const taskModal = document.getElementById('tableImageModal');
+            if (taskModal) taskModal.style.display = 'none';
+            window.__editorReturnToTaskRow = (returnRowIndex === null || returnRowIndex === undefined) ? null : returnRowIndex;
+
+            if (typeof switchTab === 'function') switchTab('rich-media');
+            requestAnimationFrame(() => {
+                lightboxModal.style.display = 'flex';
+                // Cross-<script>-block call: these are declared in another block, so the bare
+                // name throws ReferenceError (which previously left the lightbox open but
+                // never loaded - a stale src rendering as a broken image).
+                window.showLightboxImage(imageId, { parentTaskId: imageId });
+                if (window.ImageEditor) window.ImageEditor.onLightboxOpen();
+            });
+        }
+        window.openImageEditorForImageId = openImageEditorForImageId;
+
         function loadModalTaskDetails(rowIndex) {
             const modal = document.getElementById('tableImageModal');
             const enlargedImage = document.getElementById('modalEnlargedImage');
@@ -6553,6 +6664,7 @@ ${JSON.stringify(payload, null, 2)}`;
             // row has a picture until the user adds one.
             const imgInRow = row.querySelector('.picture-cell img');
             setModalPictureState(imgInRow ? imgInRow.src : null);
+            renderTaskImageTray(); // keeps "THIS STEP" / "USED" badges in step with the card
             
             // Build prominent hazard source badge for quick context
             const hazardSource = DOMPurify.sanitize(rowData['Hazard Source'] || '—');
@@ -7199,36 +7311,7 @@ ${JSON.stringify(payload, null, 2)}`;
                  const rowIndex = currentModalRow();
                  if (rowIndex === null) return;
                  const row = document.querySelector(`#table-container tr[data-row-index="${rowIndex}"]`);
-                 const imageId = row && row.dataset.imageId;
-                 const galleryImg = imageId ? document.getElementById(imageId) : null;
-                 if (!galleryImg || !galleryImg.src) {
-                     showCustomAlert('That picture is no longer in the gallery, so it cannot be edited.', 'error');
-                     return;
-                 }
-
-                 // Hide the task modal directly instead of calling closeTableImageModal():
-                 // that runs saveModalChanges() first, which can rebuild the table and drop
-                 // the row->image link a moment before the editor tries to read it - which
-                 // left the lightbox with an empty src showing its alt text.
-                 const taskModal = document.getElementById('tableImageModal');
-                 if (taskModal) taskModal.style.display = 'none';
-
-                 // Remember where to return, so closing the editor goes back to the task.
-                 window.__editorReturnToTaskRow = rowIndex;
-
-                 // Route through the Rich Media tab and open exactly the way clicking the
-                 // thumbnail there does. Opening the lightbox straight from the table left it
-                 // blank: the gallery it measures against lives inside that tab, so with the
-                 // tab hidden the editor had no laid-out image to size itself to. Reusing the
-                 // known-good path beats special-casing this one.
-                 if (typeof switchTab === 'function') switchTab('rich-media');
-
-                 // One frame for the tab to lay out before the editor measures the image.
-                 requestAnimationFrame(() => {
-                     lightboxModal.style.display = 'flex';
-                     window.showLightboxImage(imageId, { parentTaskId: imageId });
-                     if (window.ImageEditor) window.ImageEditor.onLightboxOpen();
-                 });
+                 openImageEditorForImageId(row && row.dataset.imageId, rowIndex);
              });
 
              if (modalRemovePictureBtn) modalRemovePictureBtn.addEventListener('click', () => {
@@ -7239,6 +7322,74 @@ ${JSON.stringify(payload, null, 2)}`;
                  window.detachImageFromRow(rowIndex);
                  loadModalTaskDetails(rowIndex);
              });
+
+             // ── Image tray: bulk upload ────────────────────────────────────
+             const trayUploadBtn = document.getElementById('taskTrayUploadBtn');
+             const trayUploadInput = document.getElementById('taskTrayUploadInput');
+             const trayStatus = document.getElementById('taskTrayUploadStatus');
+
+             if (trayUploadBtn && trayUploadInput) {
+                 trayUploadBtn.addEventListener('click', () => { trayUploadInput.value = ''; trayUploadInput.click(); });
+             }
+
+             if (trayUploadInput) trayUploadInput.addEventListener('change', async (e) => {
+                 const files = Array.from(e.target.files || []);
+                 if (!files.length) return;
+
+                 // Sequential on purpose: processImage() runs face detection on the main
+                 // thread, so Promise.all over a folder of photos would lock the UI solid.
+                 trayUploadBtn.disabled = true;
+                 let done = 0, failed = 0;
+                 for (const file of files) {
+                     if (trayStatus) trayStatus.textContent = `Checking faces… ${done + 1}/${files.length}`;
+                     try {
+                         const id = await window.createGalleryImageFromFile(file);
+                         if (id) { done++; renderTaskImageTray(); } else { failed++; }
+                     } catch (err) {
+                         console.error('Tray upload failed for', file.name, err);
+                         failed++;
+                     }
+                 }
+                 trayUploadBtn.disabled = false;
+                 if (trayStatus) {
+                     trayStatus.textContent = failed
+                         ? `${done} added, ${failed} failed`
+                         : `${done} image${done === 1 ? '' : 's'} added — drag onto a step`;
+                     setTimeout(() => { if (trayStatus) trayStatus.textContent = ''; }, 6000);
+                 }
+                 renderTaskImageTray();
+             });
+
+             // ── Image tray: drop a tile onto the current step ──────────────
+             const imageStage = document.getElementById('modalImageStage');
+             if (imageStage) {
+                 const isTrayDrag = (e) => Array.from(e.dataTransfer?.types || []).includes(TRAY_DRAG_MIME);
+
+                 imageStage.addEventListener('dragover', (e) => {
+                     if (!isTrayDrag(e)) return; // ignore unrelated drags (files, text, reorder)
+                     e.preventDefault();
+                     e.dataTransfer.dropEffect = 'copy';
+                     imageStage.classList.add('ring-2', 'ring-indigo-400');
+                 });
+                 imageStage.addEventListener('dragleave', () => {
+                     imageStage.classList.remove('ring-2', 'ring-indigo-400');
+                 });
+                 imageStage.addEventListener('drop', (e) => {
+                     if (!isTrayDrag(e)) return;
+                     e.preventDefault();
+                     imageStage.classList.remove('ring-2', 'ring-indigo-400');
+
+                     const imageId = e.dataTransfer.getData(TRAY_DRAG_MIME);
+                     const rowIndex = currentModalRow();
+                     if (!imageId || rowIndex === null) return;
+
+                     // Replaces any existing picture rather than stacking. The displaced
+                     // image stays in the gallery, matching Remove's non-destructive rule.
+                     if (window.attachImageToRow(imageId, rowIndex)) {
+                         loadModalTaskDetails(rowIndex);
+                     }
+                 });
+             }
 
              // EHS Reference Toggle
              const ehsRefToggleBtn = document.getElementById('ehsRefToggleBtn');
