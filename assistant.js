@@ -154,20 +154,43 @@
 
     async function ask(question) {
         const url = window.AI_URL || window.API_ENDPOINT;
-        if (!url) throw new Error('AI endpoint is not configured.');
-        const res = await fetch(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                model: window.AI_MODEL || undefined,
-                prompt: buildPrompt(question),
-                messages: [{ role: 'user', content: buildPrompt(question) }]
-            })
-        });
-        if (!res.ok) throw new Error(`AI HTTP ${res.status}`);
+        if (!url) throw new Error('AI endpoint is not configured (window.AI_URL is undefined).');
+
+        // Build ONCE. This used to call buildPrompt() twice - once for `prompt` and again
+        // for `messages` - which sent the whole knowledge base down the wire twice and
+        // roughly doubled an already large request.
+        const prompt = buildPrompt(question);
+
+        let res;
+        try {
+            res = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    model: window.AI_MODEL || undefined,
+                    prompt,
+                    messages: [{ role: 'user', content: prompt }]
+                })
+            });
+        } catch (netErr) {
+            // fetch() only rejects on a genuine network/CORS failure - an HTTP error
+            // status resolves normally, so keep the two cases distinguishable.
+            throw new Error(`Network or CORS failure reaching ${url} — ${netErr.message}`);
+        }
+
+        if (!res.ok) {
+            let detail = '';
+            try { detail = (await res.text()).slice(0, 300); } catch (_) {}
+            throw new Error(`AI HTTP ${res.status}${detail ? ` — ${detail}` : ''} ` +
+                            `(prompt was ${prompt.length} chars)`);
+        }
+
         const data = await res.json();
-        return (data.choices && data.choices[0] && data.choices[0].message
-                && data.choices[0].message.content) || '';
+        const text = data.choices && data.choices[0] && data.choices[0].message
+            && data.choices[0].message.content;
+        if (!text) throw new Error('AI returned an empty response: ' +
+                                   JSON.stringify(data).slice(0, 300));
+        return text;
     }
 
     // ── UI ────────────────────────────────────────────────────────────────────
@@ -211,8 +234,11 @@
             history.push({ role: 'assistant', text });
         } catch (err) {
             console.error('[assistant]', err);
-            thinking.textContent =
-                'I could not reach the help service. Check your connection and try again.';
+            // Show the actual reason rather than a generic "check your connection". The
+            // failure modes here (endpoint not configured / CORS / HTTP status / empty
+            // reply) need different fixes, and hiding them behind one sentence makes the
+            // problem undiagnosable for whoever has to look at it.
+            thinking.textContent = 'Help service error — ' + (err && err.message ? err.message : String(err));
         } finally {
             busy = false;
         }
