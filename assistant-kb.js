@@ -71,18 +71,77 @@
                     'Upload site photos or video, let the app blur faces locally, then ' +
                     'generate a risk assessment from what it sees. The usual starting point.',
                 steps: [
-                    'Upload images or video, or capture frames from a video.',
-                    'Faces are detected and blurred automatically, on your device.',
-                    'Click a thumbnail to open the large preview and add notes per step.',
+                    'Upload photos using the file picker, or drag them onto the upload area. ' +
+                        'Videos work too — see the video walkthrough for that path.',
+                    'Each image is resized and scanned for faces on your device, and any ' +
+                        'faces found are blurred automatically. A progress bar shows this ' +
+                        'while it runs.',
+                    'Processed images appear in the gallery as steps, in upload order.',
+                    'Drag thumbnails to reorder them so they follow the real sequence of ' +
+                        'the job — the table is generated in gallery order.',
+                    'Click a thumbnail to open the large preview. Here you add the step ' +
+                        'description, what can go wrong, and existing controls, and you can ' +
+                        'blur or annotate the picture.',
+                    'Repeat for each step. Use the arrows or the thumbnail strip to move ' +
+                        'between pictures without closing the preview.',
                     'Generate the risk assessment table from the gallery.',
-                    'Review and adjust ratings in the table, then download.'
+                    'Review the table — check any values flagged for attention, adjust ' +
+                        'Frequency / Severity / Likelihood, and add controls.',
+                    'Download. You get the table, the processed images, and the report.'
                 ],
                 tips: [
-                    'You can drag thumbnails to reorder steps before generating.',
-                    'The eraser in the image editor un-blurs a face the detector caught ' +
-                        'by mistake — it restores the original pixels underneath.',
-                    'The first video you open takes a moment to prepare the capture tools; ' +
-                        'the controls unlock by themselves once it is ready.'
+                    'The editor toolbar has a blur brush, an eraser, circle, arrow, line and ' +
+                        'a stickman for marking up a picture, with a brush-size control for ' +
+                        'the blur and eraser.',
+                    'The eraser un-blurs — it restores the original pixels underneath, for ' +
+                        'when the detector blurred something that was not a face.',
+                    'Use the blur brush for a face the detector missed. Both work per-picture ' +
+                        'and only affect the copy in this assessment.',
+                    'Use "Add Step" in the gallery to create a step with no photo, for ' +
+                        'something you could not photograph.',
+                    'Dictation is available on the notes fields via Audio Mode, if typing on ' +
+                        'site is awkward.',
+                    'Nothing is destroyed until you download — deleted rows can be restored.'
+                ]
+            },
+            {
+                id: 'rich-media-video',
+                label: 'Working from a video (part of Rich Media)',
+                status: 'approved',
+                parent: 'rich-media',
+                summary:
+                    'Upload a video, scrub to the moments that matter, and capture them as ' +
+                    'still frames or short clips. Each capture becomes a step in your ' +
+                    'assessment. Nothing is uploaded — the video is read on your device.',
+                steps: [
+                    'On the Rich Media tab, upload your video the same way as images — use ' +
+                        'the file picker, or drag the file straight onto the upload area.',
+                    'The video appears in the video section below the image gallery.',
+                    'Click the video to open the full-screen capture view.',
+                    'The FIRST video of a session pauses briefly on "Preparing capture ' +
+                        'tools…" while face detection warms up. The controls are disabled ' +
+                        'until it finishes — this happens once, not for later videos.',
+                    'Play, pause and drag the seek bar to reach the moment you want.',
+                    'Click "Capture Frame" for a still, or "3s Clip" for a short animated ' +
+                        'clip starting at the current position.',
+                    'Captured items collect in the "Captured Frames" panel beside the video ' +
+                        'so you can see what you have taken.',
+                    'Close the capture view when finished. Everything you captured is added ' +
+                        'to the gallery as steps, and the first one opens for review.',
+                    'From there it is the normal Rich Media flow: blur or annotate each ' +
+                        'picture, add your notes, then generate the risk assessment table.'
+                ],
+                tips: [
+                    'Keyboard while the capture view is open: C = capture frame, ' +
+                        'G = 3-second clip, Space = play/pause, M = mute/unmute, Esc = close.',
+                    'Faces are blurred automatically on every capture, on your device.',
+                    'A 3s clip is saved as an animated GIF, sized for sharing rather than ' +
+                        'full quality. The download menu offers Optimized and Balanced ' +
+                        'presets if you need a different size.',
+                    'Capture more than you think you need — deleting a step later is easy, ' +
+                        'going back to re-scrub the video is not.',
+                    'If a face was missed, or wrongly blurred, fix it per-picture afterwards ' +
+                        'in the image editor with the blur brush and the eraser.'
                 ]
             },
             {
@@ -315,10 +374,19 @@
 
         // ── Tone ──────────────────────────────────────────────────────────────
         style: [
-            'Be brief. Two or three sentences is usually enough.',
+            'Match the length to the question. A yes/no or "what does this colour mean" ' +
+                'question deserves two sentences. A "how do I…" question deserves the ' +
+                'FULL numbered walkthrough, start to finish — do not summarise a procedure ' +
+                'into a sentence or two, and do not stop at the first step.',
+            'For any procedural question, give the numbered steps from the knowledge base, ' +
+                'name the actual on-screen buttons in quotes, and mention the relevant ' +
+                'keyboard shortcuts and the gotchas listed for that workflow.',
+            'End a walkthrough by saying what happens next, so the user knows they are on ' +
+                'the right track (e.g. what appears on screen once a step succeeds).',
             'Answer the question that was asked, not the one you wish had been asked.',
-            'Give concrete steps referencing what is actually on screen.',
             'If the answer depends on which workflow they are in and you cannot tell, ask.',
+            'Prefer specifics over generalities: "click Capture Frame, or press C" beats ' +
+                '"use the capture controls".',
             'If you genuinely do not know, say so and suggest where in the app to look. ' +
                 'Never invent a button, menu or feature that is not in this knowledge base.'
         ]
