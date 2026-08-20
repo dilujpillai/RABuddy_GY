@@ -107,10 +107,15 @@
                         'blur or annotate the picture.',
                     'Repeat for each step. Use the arrows or the thumbnail strip to move ' +
                         'between pictures without closing the preview.',
-                    'Generate the risk assessment table from the gallery.',
+                    'Click "Generate AI Risk Assessment". The AI reads every image note '
+                        + 'in gallery order and builds the full table. Ratings you entered '
+                        + 'yourself are kept; extra hazards the AI finds are added and '
+                        + 'marked with an AI badge.',
                     'Review the table — check any values flagged for attention, adjust ' +
                         'Frequency / Severity / Likelihood, and add controls.',
-                    'Download. You get the table, the processed images, and the report.'
+                    'Download with "Download ZIP" \u2014 you get the table, the processed '
+                        + 'images and the report. "Save Project" instead writes a project '
+                        + 'file you can reload later with "Load Project".'
                 ],
                 tips: [
                     'The editor toolbar has a blur brush, an eraser, circle, arrow, line and ' +
@@ -169,24 +174,145 @@
             },
             {
                 id: 'excel',
-                label: 'Excel import (legacy sheets & RA2025)',
+                label: 'Excel Sheet tab — choosing between the three import paths',
                 status: 'approved',
                 summary:
-                    'Bring an existing risk assessment spreadsheet in, map its columns to ' +
-                    'the app\'s fields, and continue working on it here.',
+                    'The Excel Sheet tab offers three separate import paths, shown as three ' +
+                    'numbered cards. They are NOT variations of one flow — they end in ' +
+                    'different places, so picking the right one matters.',
                 steps: [
-                    'Upload an .xlsx, .xlsm or .xls file.',
-                    'The app proposes a column mapping and shows a confidence indicator.',
-                    'Confirm or correct the mapping, then load the sheet.',
-                    'Pictures embedded in the sheet are extracted and can be attached to steps.'
+                    'Card 1 "Legacy Excel → AI Processing" — for old, messy or non-standard ' +
+                        'sheets. Ends in the gallery, and you then generate the table with AI.',
+                    'Card 2 "RA 2025 Template (1 file) → GOEHS Export" — for a single clean ' +
+                        'file already in the RA 2025 standard format. Loads straight into the ' +
+                        'main table, with no AI generation step.',
+                    'Card 3 "Batch RA 2025 (~20 files) → GOEHS Export" — for up to 20 finished ' +
+                        'RA 2025 workbooks. Never touches the main table; it produces a ZIP.',
+                    'Each card has a "❓ How to?" button that opens a short guide for that path.'
                 ],
                 tips: [
-                    'Mapping is remembered per template, not per file — the next sheet with ' +
-                        'the same headers is mapped for you automatically.',
-                    'The Advanced Import button shows the currently loaded file, so you can ' +
-                        'reopen the mapper and work on another sheet without re-uploading.',
-                    'Values the importer could not read are flagged rather than silently ' +
-                        'defaulted, so you can see what needs checking.'
+                    'Need to change the photos? Start with Legacy (card 1) to extract, replace ' +
+                        'or add imagery, then finish the export with card 2 or 3.',
+                    'If your files are already clean RA 2025 and the pictures are fine, skip ' +
+                        'Legacy entirely and go straight to card 2 or 3.',
+                    'The difference that catches people out: only card 1 needs a separate AI ' +
+                        'generation step afterwards. Card 2 fills the table for you.'
+                ]
+            },
+            {
+                id: 'excel-legacy',
+                label: 'Legacy Excel → AI Processing (Excel Sheet tab, card 1)',
+                status: 'approved',
+                parent: 'excel',
+                summary:
+                    'For inherited, messy or non-standard spreadsheets. You map the columns ' +
+                    'and sort out the pictures, hand the result over as a new project, and ' +
+                    'then generate the risk assessment table with AI. Importing does NOT ' +
+                    'produce the table by itself — that is a separate step at the end.',
+                steps: [
+                    'On the Excel Sheet tab, click card 1 "Legacy Excel → AI Processing" and ' +
+                        'pick your workbook (.xlsx, .xlsm, .xls or .csv). The "Excel Import & ' +
+                        'Image Mapper" window opens.',
+                    'Choose "📄 Single Sheet → AI" or "📚 Multi Tab → AI" at the top, ' +
+                        'depending on whether you want one sheet or several.',
+                    'Open "🎯 Column Mapping & Preview" and use the "Map to" row above the ' +
+                        'preview to tell the app which column holds what. The chip beside it ' +
+                        'counts your progress (e.g. "4/10 mapped") and turns green as you go.',
+                    'Map "Description" at least — the app will not continue without it. Then ' +
+                        'Step, Hazard Group and Risk, for a better result.',
+                    'If the header is not on row 1, correct the "Header Row" and "Data Start ' +
+                        'Row" boxes above the preview.',
+                    'Pictures embedded in the workbook appear in the left "🖼️ Source Images" ' +
+                        'pane. Drag them onto the step cards on the right, delete the ones you ' +
+                        'do not want, and use "Add Step" for a step that needs a new photo.',
+                    'Click "✓ Load as New Project". The steps and pictures are handed to the ' +
+                        'Rich Media gallery as a new project, and the window closes.',
+                    'IMPORTANT — the main table is deliberately EMPTY at this point. Go to the ' +
+                        'gallery and click "Generate AI Risk Assessment" to build the table ' +
+                        'from the notes that came out of your spreadsheet.',
+                    'Review the generated table, then export or download as usual.'
+                ],
+                tips: [
+                    'This is the step people miss: after "✓ Load as New Project" you land in ' +
+                        'the gallery, not on a finished table. Nothing is broken — you still ' +
+                        'have to press "Generate AI Risk Assessment" yourself.',
+                    'Multi-tab workbooks: map one tab, then use "📋 Copy Mapping" and "📌 ' +
+                        'Paste" on the next tab, or "📋 Apply to All Tabs" to do them all at ' +
+                        'once. The mapping is not saved between sessions, so copy it before ' +
+                        'you leave.',
+                    '"📂 Advanced Import / Column Mapping" at the bottom of the tab reopens ' +
+                        'the mapper with your file still loaded — it changes to "📂 Continue ' +
+                        'Mapping" and shows the filename. You do not need to upload it again.',
+                    'Steps with no picture are fine. They are imported with a placeholder, and ' +
+                        'the message afterwards tells you how many still need one.',
+                    '"💾 Save Project (JSON)" saves the mapper output itself, if you want to ' +
+                        'stop and come back to it later.',
+                    'Deleted steps are not gone — "↩️ Restore" brings them back.'
+                ]
+            },
+            {
+                id: 'excel-ra2025',
+                label: 'RA 2025 Template, single file → GOEHS Export (Excel Sheet tab, card 2)',
+                status: 'approved',
+                parent: 'excel',
+                summary:
+                    'For one clean file already in the official RA 2025 format. It goes ' +
+                    'straight into the main table — there is no AI generation step.',
+                steps: [
+                    'On the Excel Sheet tab, click card 2 "RA 2025 Template (1 file) → GOEHS ' +
+                        'Export" and pick the file (.xlsx, .xlsm or .xls).',
+                    'The app reads it and detects the language automatically.',
+                    'The column mapper opens in confirm mode, showing the mapping it detected ' +
+                        'plus a confidence summary, so a wrong guess cannot slip through ' +
+                        'silently. Check it and correct anything that looks wrong.',
+                    'If the workbook has several sheets, pick the one you want from the sheet ' +
+                        'strip inside the mapper.',
+                    'Confirm. The rows load straight into the main table, the dashboard ' +
+                        'appears, and the app switches to the tab where the table lives.',
+                    'Edit, translate or adjust the table as needed, then open GOEHS ' +
+                        'Integration to export.'
+                ],
+                tips: [
+                    'Unlike the Legacy path, you do NOT press "Generate AI Risk Assessment" ' +
+                        'here — the table is already filled in from your file.',
+                    'If a column was mapped wrongly, a "Remap Columns" button appears once the ' +
+                        'table is loaded, so you can redo the mapping without starting over.',
+                    'The confidence summary flags rating-scale columns it could not verify, ' +
+                        'rather than quietly assuming a value.'
+                ]
+            },
+            {
+                id: 'excel-batch',
+                label: 'Batch RA 2025 → GOEHS ZIP (Excel Sheet tab, card 3)',
+                status: 'approved',
+                parent: 'excel',
+                summary:
+                    'For exporting up to 20 finished RA 2025 workbooks in one go. It is a ' +
+                    'file-to-file pipeline — it never loads anything into the main table.',
+                steps: [
+                    'On the Excel Sheet tab, click card 3 "Batch RA 2025 (~20 files) → GOEHS ' +
+                        'Export" and select up to 20 files at once.',
+                    'Fill in the export details at the top: Export Title, Organization, ' +
+                        'Location and Assessment Date. These apply to the whole batch.',
+                    'The app scans every file — a workbook with several sheets is split into ' +
+                        'one entry per sheet — and shows a progress bar as it goes.',
+                    'When it finishes you get a dashboard counting the files as "Ready", ' +
+                        '"Attention" or "Failed", with a card for each one.',
+                    'Open any file needing attention. Values that do not match an allowed ' +
+                        'dropdown option are listed, and you can fix each one from a dropdown, ' +
+                        'edit cells directly, or delete rows that do not apply.',
+                    'Or click "🤖 Auto Fix with AI" to have the app resolve the mismatches for ' +
+                        'you, then "✓ Accept & Mark Ready" once you are happy with the file.',
+                    'Click "📦 Download ZIP" to get a single archive containing a GOEHS CSV, ' +
+                        'XLSX and JSON for each file.'
+                ],
+                tips: [
+                    'Limits: 20 files maximum, each under 10 MB, and .xlsx, .xlsm or .xls ' +
+                        'only. Anything else is listed as skipped, with the reason shown.',
+                    'A file that fails auto-detection can still be rescued — open its card, ' +
+                        'set the columns manually, and re-parse it.',
+                    'This path produces files, not a table on screen. If you wanted to edit ' +
+                        'the assessment inside the app, use card 2 instead.'
                 ]
             },
             {
@@ -194,19 +320,39 @@
                 label: 'Free Text',
                 status: 'approved',
                 summary:
-                    'Describe the job in your own words and let the app draft the ' +
-                    'assessment table. No photos needed.',
+                    'Describe the job in your own words and let the app draft the whole '
+                    + 'assessment table from that description. No photos needed \u2014 you can '
+                    + 'add them afterwards.',
                 steps: [
-                    'Type or dictate a description of the task and its hazards.',
-                    'Generate the table.',
-                    'Add pictures to individual steps afterwards if you want them.'
+                    'Open the "Free Text" tab. You will see "\u270d\ufe0f Describe Your Task".',
+                    'Write a detailed description of the work process in the big text box. '
+                        + 'The more detail the better \u2014 include the equipment used, the '
+                        + 'sequence of steps, how many people are involved, and any hazards '
+                        + 'you already know about.',
+                    'Mention any past incidents, near misses or known problem areas. The AI '
+                        + 'raises the Likelihood score for those specific hazards and notes '
+                        + 'the reason in the Hazard Source column, so the history is visible '
+                        + 'in the finished assessment.',
+                    'Click "Generate Task Breakdown".',
+                    'The AI splits your description into individual task steps, works out the '
+                        + 'hazards and consequences for each one, suggests existing controls, '
+                        + 'and fills in the Frequency, Severity and Likelihood ratings.',
+                    'Review the table that appears. Edit any cell, delete steps that do not '
+                        + 'apply, and add controls. Risk scores recalculate as you go.',
+                    'Add pictures to individual steps afterwards if you want them, then '
+                        + 'export or download.'
                 ],
                 tips: [
-                    'A Free Text assessment starts with no images. You can add one to any ' +
-                        'step later from that step\'s card, or park several in the image ' +
-                        'tray and drag them onto the right steps.',
-                    'Pictures added this way get the same automatic face blurring as ' +
-                        'uploaded ones, and export identically.'
+                    'Vague in, vague out. "Changing a filter" produces a thin assessment; a '
+                        + 'paragraph naming the machine, the tools, the isolation steps and '
+                        + 'who does what produces a usable one.',
+                    'A Free Text assessment starts with no images. You can add one to any '
+                        + 'step later from that step\'s card, or park several in the image '
+                        + 'tray and drag them onto the right steps.',
+                    'Pictures added this way get the same automatic face blurring as '
+                        + 'uploaded ones, and export identically.',
+                    'There is a "How to?" button next to the heading if you want the short '
+                        + 'in-app version of this walkthrough.'
                 ]
             },
             {
@@ -427,6 +573,31 @@
         // ── symptom → cause → fix ─────────────────────────────────────────────
         troubleshooting: [
             {
+                symptom:
+                    'I imported a legacy Excel sheet and the risk table is empty (Legacy '
+                    + 'Excel \u2192 AI Processing)',
+                cause:
+                    'Nothing has gone wrong. The Legacy path hands the steps and pictures '
+                    + 'to the gallery as a new project and leaves the table empty on '
+                    + 'purpose \u2014 building it is a separate, deliberate step.',
+                fix:
+                    'Go to the gallery and click "Generate AI Risk Assessment". The AI '
+                    + 'builds the table from the notes imported out of your spreadsheet. '
+                    + 'Only the Legacy path works this way; the RA 2025 single-file path '
+                    + 'fills the table for you.'
+            },
+            {
+                symptom: 'The Excel mapper will not let me continue',
+                cause:
+                    'At least the "Description" column has to be mapped before the app '
+                    + 'can extract anything.',
+                fix:
+                    'Use the "Map to" row above the preview to point Description at the '
+                    + 'right column. The progress chip ("4/10 mapped") turns green as you '
+                    + 'add more. If the headers sit lower down, fix the "Header Row" and '
+                    + '"Data Start Row" boxes first.'
+            },
+            {
                 symptom: 'The video controls do nothing when I first open a video',
                 cause:
                     'The face-detection engine prepares itself the first time it is used ' +
@@ -486,10 +657,14 @@
             { q: 'How do I add a step without a photo?',             when: ['rich-media'] },
             { q: 'How do I generate the risk assessment table?',     when: ['rich-media', 'free-text'], needs: 'no-table' },
 
-            // Excel
+            // Excel — three genuinely different paths, so the chooser leads
+            { q: 'Which Excel import path should I use?',            when: ['excel'] },
+            { q: 'I loaded a legacy sheet — why is my table empty?', when: ['excel'] },
             { q: 'How do I map my spreadsheet columns?',             when: ['excel'] },
-            { q: 'Why is a value flagged after import?',             when: ['excel'] },
+            { q: 'How do I reuse my pictures from the old sheet?',   when: ['excel'] },
             { q: 'Can I load another sheet from the same file?',     when: ['excel'] },
+            { q: 'How do I fix mismatches in a batch export?',       when: ['excel'] },
+            { q: 'Why is a value flagged after import?',             when: ['excel'] },
 
             // Free Text
             { q: 'Can I add pictures to a step afterwards?',         when: ['free-text'] },
