@@ -21,6 +21,67 @@
     let history = [];             // [{role:'user'|'assistant', text}]
     let busy = false;
 
+    // ── Chip translation: language + cache ──────────────────────────────────────
+    // Chip LABELS need translating (the model's own answers already come out in the
+    // user's language on their own). This is deliberately NOT a second AI call: the
+    // translation is requested inside the one call we already make, then cached, so
+    // each chip costs a few tokens once per language and is then free forever.
+
+    const CHIP_CACHE_KEY = 'rab_chip_i18n_v1';
+    const CHIP_CACHE_MAX_PER_LANG = 300; // just a sanity cap, not a tuning knob
+
+    let chipLang = detectInitialLanguage();
+    let chipCache = loadChipCache();      // { [lang]: { [englishText]: translated } }
+
+    /**
+     * Best-guess starting language, before the model has said anything. Reads the
+     * SAME localStorage key the app's own language selector writes
+     * (see index.html ~line 7536) rather than reaching across script files for the
+     * `currentLang` variable, which is a `let` inside another file's IIFE and not on
+     * window — the exact trap that broke the lightbox-from-task-modal path earlier.
+     * This is only a starting point: the model's actual reply language corrects it
+     * from the first exchange onward (see extractChipTranslations below).
+     */
+    function detectInitialLanguage() {
+        try {
+            const saved = window.localStorage && window.localStorage.getItem('appLanguage');
+            if (saved) return saved;
+        } catch (_) { /* localStorage blocked (private mode, policy) - fall through */ }
+        const nav = (navigator.language || 'en').slice(0, 2).toLowerCase();
+        return nav || 'en';
+    }
+
+    function loadChipCache() {
+        try {
+            const raw = window.localStorage && window.localStorage.getItem(CHIP_CACHE_KEY);
+            const parsed = raw ? JSON.parse(raw) : null;
+            return (parsed && typeof parsed === 'object') ? parsed : {};
+        } catch (_) {
+            return {}; // corrupt JSON, storage disabled, or quota - just start fresh in memory
+        }
+    }
+
+    function saveChipCache() {
+        try {
+            if (window.localStorage) window.localStorage.setItem(CHIP_CACHE_KEY, JSON.stringify(chipCache));
+        } catch (_) { /* quota exceeded or storage disabled - cache stays in-memory only */ }
+    }
+
+    function getCachedChipLabel(lang, englishText) {
+        return (chipCache[lang] && chipCache[lang][englishText]) || null;
+    }
+
+    function setCachedChipLabel(lang, englishText, translated) {
+        if (!chipCache[lang]) chipCache[lang] = {};
+        const bucket = chipCache[lang];
+        const keys = Object.keys(bucket);
+        if (!(englishText in bucket) && keys.length >= CHIP_CACHE_MAX_PER_LANG) {
+            delete bucket[keys[0]]; // oldest-ish; this is a soft cap, not an LRU
+        }
+        bucket[englishText] = translated;
+        saveChipCache();
+    }
+
     // ── Screen awareness ──────────────────────────────────────────────────────
 
     /** Which tab is on screen right now, mapped to a KB workflow id. */
@@ -140,26 +201,101 @@
         return L.join('\n');
     }
 
-    function buildPrompt(question) {
+    /**
+     * Which of `picks` still need a translation for the current chipLang. Shared by
+     * the request builder and the response parser so they can never disagree on what
+     * was actually asked for - two independent copies of this filter was exactly the
+     * kind of drift that caused earlier bugs in this codebase.
+     */
+    function chipsNeedingTranslation(picks) {
+        if (!picks.length || chipLang === 'en') return [];
+        return picks.filter(f => !getCachedChipLabel(chipLang, f.q));
+    }
+
+    /**
+     * Appends a translation request for `untranslated` (from chipsNeedingTranslation),
+     * riding on the SAME request that answers the question rather than costing a
+     * second AI call. Chip labels are handled separately from the answer itself
+     * because the answer already comes out in the user's language on its own (see the
+     * LANGUAGE line in buildSystemPrompt) - only the fixed KB strings behind the chips
+     * need explicit translating.
+     */
+    function buildChipTranslationRequest(untranslated) {
+        if (!untranslated.length) return '';
+
+        const lines = [];
+        lines.push('');
+        lines.push('=== UI CHIP TRANSLATION REQUEST ===');
+        lines.push('The lines below are short UI suggestion-button labels for this app, ' +
+                   'not part of the user\'s question. After your answer, on a FINAL ' +
+                   'separate line, output exactly this format (no other text on that line):');
+        lines.push('CHIPS[<2-letter language code you answered in>]: <translation 1> | <translation 2> | ...');
+        lines.push('Translate each into the SAME language as your answer above, in the ' +
+                   'same order. Keep product names (e.g. GOEHS), workflow names, and any ' +
+                   'text already in quotes unchanged. If you answered in English, repeat ' +
+                   'the lines unchanged and use CHIPS[en].');
+        lines.push('Lines to translate:');
+        untranslated.forEach((f, i) => lines.push(`  ${i + 1}. ${f.q}`));
+        return lines.join('\n');
+    }
+
+    /**
+     * Pulls a trailing `CHIPS[xx]: a | b | c` line out of the model's raw response,
+     * caches each translation against its English original, and returns the answer
+     * text with that line removed. The CHIPS line must never reach the user - it is
+     * an instruction artifact, not part of the answer.
+     *
+     * Deliberately strict: a malformed line (wrong count, no matching bracket) is
+     * DROPPED rather than partially applied, so a parsing hiccup degrades to "chips
+     * stay in whatever language they already were" rather than a mismatched set.
+     */
+    function extractChipTranslations(rawText, untranslatedPicks) {
+        // Trim trailing whitespace FIRST. `.` does not match newlines in JS regex, so a
+        // trailing blank line after "CHIPS[..]: ..." (very common in model output) would
+        // otherwise stop `(.+)$` from reaching the true end of string and the whole
+        // pattern would silently fail to match.
+        const trimmed = rawText.replace(/\s+$/, '');
+        const match = trimmed.match(/\n?CHIPS\[([a-zA-Z-]{2,8})\]:\s*(.+)$/);
+        if (!match) return rawText;
+
+        const cleanText = trimmed.slice(0, match.index).trimEnd();
+        const lang = match[1].toLowerCase();
+        const parts = match[2].split('|').map(s => s.trim()).filter(Boolean);
+
+        if (parts.length === untranslatedPicks.length) {
+            untranslatedPicks.forEach((f, i) => setCachedChipLabel(lang, f.q, parts[i]));
+            // The model's actual reply language is the authoritative signal - correct our
+            // starting guess from detectInitialLanguage() the moment we have real evidence,
+            // so later messages request the right language from the first uncached chip.
+            if (lang && lang !== chipLang) chipLang = lang;
+        }
+        // Count mismatch: say nothing about it here, just don't cache - extraction still
+        // strips the line either way, since it must never be shown regardless.
+
+        return cleanText;
+    }
+
+    function buildPrompt(question, chipsRequest) {
         const convo = history.slice(-MAX_TURNS * 2)
             .map(m => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.text}`)
             .join('\n');
         return buildSystemPrompt()
             + (convo ? `\n\n=== CONVERSATION SO FAR ===\n${convo}` : '')
-            + `\n\nUser: ${question}\nAssistant:`;
+            + `\n\nUser: ${question}\nAssistant:`
+            + (chipsRequest || '');
     }
 
     // ── Transport ─────────────────────────────────────────────────────────────
     // Reuses the app's existing AI endpoint and payload shape.
 
-    async function ask(question) {
+    async function ask(question, chipsRequest) {
         const url = window.AI_URL || window.API_ENDPOINT;
         if (!url) throw new Error('AI endpoint is not configured (window.AI_URL is undefined).');
 
         // Build ONCE. This used to call buildPrompt() twice - once for `prompt` and again
         // for `messages` - which sent the whole knowledge base down the wire twice and
         // roughly doubled an already large request.
-        const prompt = buildPrompt(question);
+        const prompt = buildPrompt(question, chipsRequest);
 
         let res;
         try {
@@ -244,30 +380,48 @@
         });
     }
 
+    /**
+     * The chosen KB entries, in display order. Pulled out on its own because both the
+     * chip translation request (built BEFORE the AI call, from what we are about to
+     * show) and the chip rendering (AFTER, once any new translations are cached) need
+     * the identical selection - computing it twice could pick a different set if the
+     * screen changed in between.
+     */
+    function pickFollowUps() {
+        const wfId = currentWorkflowId();
+        const pool = eligibleFollowUps();
+        // Workflow-specific suggestions come first, then the generic ones, so the most
+        // relevant chip is always leftmost rather than buried behind "What can you help with".
+        const specific = pool.filter(f => (f.when || []).includes(wfId));
+        const generic = pool.filter(f => !(f.when || []).includes(wfId));
+        return specific.concat(generic).slice(0, MAX_CHIPS);
+    }
+
+    /** Renders whatever pickFollowUps() currently returns, using cached translations. */
     function renderFollowUps() {
         const bar = el('rabAssistantChips');
         if (!bar) return;
         bar.innerHTML = '';
 
-        // Workflow-specific suggestions come first, then the generic ones, so the most
-        // relevant chip is always leftmost rather than buried behind "What can you help with".
-        const wfId = currentWorkflowId();
-        const pool = eligibleFollowUps();
-        const specific = pool.filter(f => (f.when || []).includes(wfId));
-        const generic = pool.filter(f => !(f.when || []).includes(wfId));
-        const picks = specific.concat(generic).slice(0, MAX_CHIPS);
-
+        const picks = pickFollowUps();
         picks.forEach(f => {
             const chip = document.createElement('button');
             chip.type = 'button';
             chip.className = 'text-left text-[11px] leading-snug px-2.5 py-1.5 rounded-full '
                 + 'border border-indigo-200 bg-indigo-50 text-indigo-800 '
                 + 'hover:bg-indigo-100 hover:border-indigo-300 transition';
-            chip.textContent = f.q;
+            // Cached translation for the current display language, or the English
+            // original as a safe fallback if it has not been translated (yet, or ever -
+            // English never needs it).
+            chip.textContent = getCachedChipLabel(chipLang, f.q) || f.q;
+            chip.title = f.q !== chip.textContent ? f.q : ''; // hover shows the English original
             chip.addEventListener('click', () => {
                 if (busy) return;
                 asked.add(f.q);
                 const input = el('rabAssistantInput');
+                // The submitted text is always the canonical English question, regardless
+                // of the chip's displayed language - the model answers a real question
+                // either way, and this keeps KB matching / the `asked` dedupe simple.
                 if (input) input.value = f.q;
                 submit();
             });
@@ -291,7 +445,15 @@
         el('rabAssistantChips')?.classList.add('hidden');
         const thinking = addMessage('assistant', '…');
         try {
-            const answer = await ask(question);
+            // Picked BEFORE the call: the translation request has to name the exact
+            // chips it is translating, and this is the one place both the request and
+            // the later render agree on what "the current chips" means.
+            const picks = pickFollowUps();
+            const untranslated = chipsNeedingTranslation(picks);
+            const chipsRequest = buildChipTranslationRequest(untranslated);
+
+            const raw = await ask(question, chipsRequest);
+            const answer = untranslated.length ? extractChipTranslations(raw, untranslated) : raw;
             const text = answer || 'I could not get an answer just then. Please try again.';
             thinking.textContent = text;
             history.push({ role: 'assistant', text });
