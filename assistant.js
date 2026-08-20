@@ -333,6 +333,21 @@
 
     function el(id) { return document.getElementById(id); }
 
+    /**
+     * Scrolls the log to its current bottom. Pulled out on its own because the log
+     * needs re-scrolling at THREE points, not just on append: when a message is first
+     * added, when the "…" placeholder's text is later replaced by the real (usually
+     * taller) answer, and when the chip row reappears below the log and shrinks its
+     * available height (the log is flex-1 in a flex-col panel, so the chip bar
+     * showing up steals space from it) - that last one is what was reading as "the
+     * chip block is obscuring the message": the log stayed scrolled to a bottom
+     * position that the chips had since covered, rather than the log's new bottom.
+     */
+    function scrollLogToBottom() {
+        const log = el('rabAssistantLog');
+        if (log) log.scrollTop = log.scrollHeight;
+    }
+
     function addMessage(role, text) {
         const log = el('rabAssistantLog');
         if (!log) return;
@@ -347,7 +362,7 @@
         bubble.textContent = text;   // textContent, never innerHTML — model output is untrusted
         wrap.appendChild(bubble);
         log.appendChild(wrap);
-        log.scrollTop = log.scrollHeight;
+        scrollLogToBottom();
         return bubble;
     }
 
@@ -457,6 +472,10 @@
             const text = answer || 'I could not get an answer just then. Please try again.';
             thinking.textContent = text;
             history.push({ role: 'assistant', text });
+            // The placeholder was scrolled into view while it was still just "…" - the
+            // real answer is usually taller, so the bottom of it can now sit below what
+            // is visible until we scroll again.
+            scrollLogToBottom();
         } catch (err) {
             console.error('[assistant]', err);
             // Show the actual reason rather than a generic "check your connection". The
@@ -464,9 +483,15 @@
             // reply) need different fixes, and hiding them behind one sentence makes the
             // problem undiagnosable for whoever has to look at it.
             thinking.textContent = 'Help service error — ' + (err && err.message ? err.message : String(err));
+            scrollLogToBottom();
         } finally {
             busy = false;
             renderFollowUps();
+            // Chips just went from hidden to visible (or changed count), which shrinks
+            // the log's available height since it is flex-1 above the chip row - without
+            // this the log stays scrolled to its OLD bottom, which the chip bar has since
+            // covered, cutting off the message that was just fully visible a moment ago.
+            scrollLogToBottom();
         }
     }
 
@@ -486,6 +511,9 @@
                 if (wf && wf.status === 'beta') addMessage('assistant', KB.betaNotice);
             }
             renderFollowUps();
+            // Same reason as in submit(): the greeting was scrolled into view before the
+            // chip row existed, which then shrinks the log's height.
+            scrollLogToBottom();
             const input = el('rabAssistantInput');
             if (input) input.focus();
         }
