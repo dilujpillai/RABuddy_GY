@@ -69,6 +69,10 @@
     <script src="lib/blob-stream.min.js"></script>
     <script src="shareable_html_generator.js"></script>
     <script src="image-editor.js"></script>
+    <!-- Help assistant. All of its content lives in assistant-kb.js — extend that file,
+         not assistant.js, to teach it about new features. KB must load first. -->
+    <script src="assistant-kb.js"></script>
+    <script src="assistant.js"></script>
 
     <!-- React 18 + htm (no build step) -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
@@ -21843,7 +21847,11 @@ ${JSON.stringify(payload)}`;
 
         // ===== AI plumbing =====
         const AI_URL = 'https://risk-assessment-api-nine.vercel.app/api/ai';
+        // Exposed for assistant.js, which is a separate file and cannot see this const.
+        // (Same cross-scope trap that previously broke the lightbox from the task modal.)
+        window.AI_URL = AI_URL;
         const AI_MODEL = 'openai/gpt-4o-mini';
+        window.AI_MODEL = AI_MODEL;
         const BATCH_SIZE = 8;
         const PARALLEL_LANES = 2;
 
@@ -25663,6 +25671,40 @@ Return ONLY a valid JSON array (no explanation, no markdown):
         };
     });
 </script>
+
+    <!-- ═══════════════════════════════════════════════════════════════════
+         HELP ASSISTANT
+         Markup only. Behaviour lives in assistant.js, content in assistant-kb.js.
+         ═══════════════════════════════════════════════════════════════════ -->
+    <button id="rabAssistantFab" type="button" title="Ask about this app"
+            class="fixed bottom-5 right-5 z-[200] w-14 h-14 rounded-full bg-[#002c5f] hover:bg-[#001530] text-white shadow-2xl border-2 border-[#ffd100] flex items-center justify-center transition hover:scale-105">
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093V15m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+        </svg>
+    </button>
+
+    <div id="rabAssistantPanel"
+         class="hidden fixed bottom-24 right-5 z-[200] w-[min(400px,calc(100vw-2.5rem))] h-[min(560px,calc(100vh-9rem))] bg-white rounded-2xl shadow-2xl border border-slate-200 flex flex-col overflow-hidden">
+
+        <div class="flex items-center justify-between px-4 py-3 bg-gradient-to-r from-[#002c5f] to-[#001530] text-white" style="border-bottom:3px solid #ffd100;">
+            <div>
+                <p class="font-bold text-sm">Buddy Help</p>
+                <p class="text-[11px] text-blue-200">Ask in any language</p>
+            </div>
+            <button id="rabAssistantClose" type="button" class="text-white/80 hover:text-white text-2xl leading-none px-1" title="Close">&times;</button>
+        </div>
+
+        <div id="rabAssistantLog" class="flex-1 overflow-y-auto p-3 space-y-2 bg-slate-50"></div>
+
+        <div class="p-2.5 border-t border-slate-200 bg-white">
+            <div class="flex items-end gap-2">
+                <textarea id="rabAssistantInput" rows="1" placeholder="Ask about this app…"
+                          class="flex-1 resize-none px-3 py-2 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400 max-h-24"></textarea>
+                <button id="rabAssistantSend" type="button" class="rab-btn rab-c-navy rab-btn-sm flex-none">Send</button>
+            </div>
+            <p class="text-[10px] text-slate-400 mt-1.5 text-center">Answers cover this application only.</p>
+        </div>
+    </div>
 
 </body>
 </html>
