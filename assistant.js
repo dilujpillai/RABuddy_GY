@@ -419,21 +419,76 @@
             .replace(/>/g, '&gt;');
     }
 
-    /**
-     * A deliberately tiny, whitelist-only markdown renderer for assistant answers -
-     * NOT a general markdown library. The model is a plain-text chat participant, not
-     * a page author: it gets exactly **bold**, *italic*, ***both***, and `code`,
-     * nothing else (no links, images, headings, raw HTML). Runs on already-escaped
-     * text, so the only tags that can ever appear are the four hardcoded below -
-     * there is no path from model output to an arbitrary tag or attribute.
-     */
-    function renderMarkdownLite(text) {
-        let html = escapeHtml(text);
+    /** Inline-only formatting: **bold**, *italic*, ***both***, `code`. Runs on
+     *  already-escaped text, so the only tags it can ever introduce are the three
+     *  hardcoded here. */
+    function renderInlineMarkdown(line) {
+        let html = escapeHtml(line);
         html = html.replace(/\*\*\*([^*\n]+?)\*\*\*/g, '<strong><em>$1</em></strong>');
         html = html.replace(/\*\*([^*\n]+?)\*\*/g, '<strong>$1</strong>');
         html = html.replace(/(^|[^*])\*([^*\n]+?)\*(?!\*)/g, '$1<em>$2</em>');
         html = html.replace(/`([^`\n]+?)`/g, '<code class="px-1 py-0.5 rounded bg-slate-200/80 text-[0.85em]">$1</code>');
         return html;
+    }
+
+    /**
+     * A deliberately tiny, whitelist-only markdown renderer for assistant answers -
+     * NOT a general markdown library. The model is a plain-text chat participant, not
+     * a page author: it gets **bold**, *italic*, ***both***, `code`, and numbered /
+     * bulleted lists - nothing else (no links, images, headings, raw HTML).
+     *
+     * Numbered lists are the reason this exists as a block-level renderer rather than
+     * the earlier inline-only version: a bare `\n` inside a `white-space: pre-wrap`
+     * bubble only ever buys ONE line-height of gap, which reads as "bundled text" for
+     * anything longer than a couple of short lines - reported directly against a
+     * 7-step numbered answer. Consecutive list-marker lines are grouped into a real
+     * <ol>/<ul> with actual margin between items, which pre-wrap text alone cannot
+     * give no matter how many newlines are in the source.
+     *
+     * Still escape-first per line, so - same guarantee as the inline renderer - the
+     * only tags that can ever appear are the ones hardcoded in this function.
+     */
+    function renderMarkdownLite(text) {
+        const lines = String(text).split('\n');
+        const orderedRe = /^\s*\d{1,3}[.)]\s+(.*)$/;
+        const bulletRe = /^\s*[-*•]\s+(.*)$/;
+        const blocks = [];
+        let i = 0;
+
+        while (i < lines.length) {
+            if (orderedRe.test(lines[i])) {
+                const items = [];
+                while (i < lines.length && orderedRe.test(lines[i])) {
+                    items.push('<li>' + renderInlineMarkdown(lines[i].match(orderedRe)[1]) + '</li>');
+                    i++;
+                }
+                blocks.push('<ol class="list-decimal ml-4 space-y-1 my-1.5">' + items.join('') + '</ol>');
+                continue;
+            }
+            if (bulletRe.test(lines[i])) {
+                const items = [];
+                while (i < lines.length && bulletRe.test(lines[i])) {
+                    items.push('<li>' + renderInlineMarkdown(lines[i].match(bulletRe)[1]) + '</li>');
+                    i++;
+                }
+                blocks.push('<ul class="list-disc ml-4 space-y-1 my-1.5">' + items.join('') + '</ul>');
+                continue;
+            }
+            if (lines[i].trim() === '') { i++; continue; } // blank line: blocks carry their own margin
+
+            // Consecutive plain lines become one paragraph, joined by <br> - a run of
+            // hard newlines from the model is treated as hard breaks (matching the old
+            // pre-wrap behaviour exactly), just laid out with real margin now instead
+            // of only ever a single line-height gap.
+            const paraLines = [];
+            while (i < lines.length && lines[i].trim() !== '' && !orderedRe.test(lines[i]) && !bulletRe.test(lines[i])) {
+                paraLines.push(renderInlineMarkdown(lines[i]));
+                i++;
+            }
+            blocks.push('<p class="my-1.5 first:mt-0 last:mb-0">' + paraLines.join('<br>') + '</p>');
+        }
+
+        return blocks.join('');
     }
 
     /**
@@ -448,7 +503,10 @@
     function setBubbleAnswerText(bubble, text) {
         const html = renderMarkdownLite(text);
         bubble.innerHTML = (typeof DOMPurify !== 'undefined')
-            ? DOMPurify.sanitize(html, { ALLOWED_TAGS: ['strong', 'em', 'code'], ALLOWED_ATTR: ['class'] })
+            ? DOMPurify.sanitize(html, {
+                ALLOWED_TAGS: ['strong', 'em', 'code', 'ol', 'ul', 'li', 'p', 'br'],
+                ALLOWED_ATTR: ['class']
+              })
             : escapeHtml(text); // DOMPurify failed to load - fall back to plain escaped text, never raw HTML
     }
 
