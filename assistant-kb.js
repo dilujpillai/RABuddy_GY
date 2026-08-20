@@ -362,9 +362,58 @@
                 id: 'fire-ra',
                 label: 'Fire Risk Assessment',
                 status: 'beta',
-                summary: 'A dedicated fire risk assessment module.',
-                steps: [],
-                tips: []
+                summary:
+                    'Evaluates a physical zone (a room or area), not a task step - the '
+                    + 'app\'s other workflows assess hazards per work step, this one '
+                    + 'assesses a whole location for the risk of a fire starting, '
+                    + 'spreading, and being controlled. Scores it with the Fire Triangle '
+                    + 'Risk Index (FTRI), 0-100.',
+                steps: [
+                    'Open the "Fire Risk" tab and click "+ Add Zone". Give the zone a '
+                        + 'descriptive name (e.g. "Mixing Room - Bldg 4").',
+                    'Fill in the Location Profile card: building, floor, occupancy, area '
+                        + 'size and occupant count.',
+                    'In the Fire Triangle Assessment card, tick the real ignition sources '
+                        + '(HEAT), combustible materials (FUEL) and atmosphere conditions '
+                        + '(OXYGEN) present in the zone, from the checklists shown - each '
+                        + 'item is tagged with the NFPA standard it comes from.',
+                    'Or, in the AI-Assisted Zone Analysis card, describe the zone in your '
+                        + 'own words (typing or the microphone icon) and click "Analyze '
+                        + 'with AI". It reads your description and ticks the matching '
+                        + 'ignition/fuel/oxygen items and controls for you - it does NOT '
+                        + 'look at photos, only the text you write.',
+                    'In the Existing Fire Protection Controls card, tick what is actually '
+                        + 'in place across five categories: Detection, Suppression, '
+                        + 'Compartmentation, Evacuation and Management. Each item shows '
+                        + 'its effectiveness and the standard behind it; some are marked '
+                        + 'mandatory.',
+                    'Add pictures under "Zone Photos" and a layout under "Floor Plan & '
+                        + 'Heat Map" if you have them, and use "Zone Notes & Observations" '
+                        + 'for anything else worth recording.',
+                    'Click "Calculate Fire Risk Index" to get the FTRI score (0-100) with '
+                        + 'the full breakdown.',
+                    'Use "Copy Report" to export the findings for sharing, and "Delete '
+                        + 'Zone" if a zone needs removing. A single assessment can hold '
+                        + 'several zones - each is scored independently.'
+                ],
+                tips: [
+                    'This module is BETA and marked "NOT FOR PRODUCTION USE" - it needs '
+                        + 'internal EHS approval before its results are relied on.',
+                    'The three fire triangle legs compound each other: when heat, fuel '
+                        + 'and oxygen are all rated strong, the app applies a multiplier on '
+                        + 'top of the individual scores, because a complete triangle makes '
+                        + 'ignition far more likely than any single strong leg.',
+                    'FTRI bands: 80+ is CRITICAL (cease operations), 60-79 HIGH (act '
+                        + 'within 24-48h), 30-59 MEDIUM (plan within 30 days), under 30 LOW '
+                        + '(annual review).',
+                    '"Analyze with AI" merges its findings into whatever you have already '
+                        + 'ticked rather than replacing it, so selections you made by hand '
+                        + 'are not lost.',
+                    'This module states its own score and cites the standards it draws '
+                        + 'on (NFPA, OSHA, FM Global) - it does not judge whether a zone '
+                        + 'satisfies any of them. That determination is not something '
+                        + 'this assistant makes either.'
+                ]
             },
             {
                 id: 'cost-benefit',
@@ -536,6 +585,39 @@
                     + 'automatically and has no button either. If a user is hunting for an '
                     + '"Intelligent Fill" button, tell them plainly that it does not exist '
                     + 'and point them at "\u26a1 Intelligent" instead.'
+            },
+            {
+                term: 'Fire Triangle',
+                definition:
+                    'The three elements required for combustion: HEAT (an ignition '
+                    + 'source - hot work, electrical faults, friction, static discharge), '
+                    + 'FUEL (combustibles - rubber, solvents, dust, oils, packaging), and '
+                    + 'OXYGEN (the atmosphere feeding it - normal air, or an enriched or '
+                    + 'oxidizing environment). Remove any one leg and fire cannot start or '
+                    + 'sustain. This is the concept behind the Fire Risk Assessment (BETA) '
+                    + 'module\'s scoring.',
+                note:
+                    'In that module, "Fire Triangle Assessment" is a checklist: you tick '
+                    + 'off which real ignition sources, fuel sources and oxygen conditions '
+                    + 'are present in the zone, drawn from built-in registries (each item '
+                    + 'tagged with the NFPA standard it comes from). When all three legs '
+                    + 'are strong, the app applies a compounding multiplier, since a '
+                    + 'complete fire triangle makes ignition far more likely than any one '
+                    + 'strong leg alone.'
+            },
+            {
+                term: 'FTRI (Fire Triangle Risk Index)',
+                definition:
+                    'The 0-100 score the Fire Risk Assessment (BETA) module calculates '
+                    + 'for a zone: FTRI = (Fire Triangle score \u00d7 (1 - Control '
+                    + 'Effectiveness) \u00d7 Consequence Amplifier) / 30 \u00d7 100. Higher '
+                    + 'means greater risk.',
+                note:
+                    'Bands: 80+ CRITICAL (cease operations), 60-79 HIGH (act within '
+                    + '24-48h), 30-59 MEDIUM (plan within 30 days), under 30 LOW (annual '
+                    + 'review). This is the app\'s own module output, not a legal or '
+                    + 'regulatory determination - it does not state whether a zone '
+                    + 'satisfies a particular code.'
             }
         ],
 

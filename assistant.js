@@ -204,9 +204,9 @@
 
     /**
      * Which workflows get FULL detail this turn. Always includes what is on screen and
-     * its sub-workflows, plus the betas (tiny, and the beta caveat reads them), plus
-     * anything the question names. A missing/blank question means "include everything",
-     * so the safe direction is the default.
+     * its sub-workflows, plus anything the question names (betas included - they are
+     * not special-cased). A missing/blank question means "include everything", so the
+     * safe direction is the default.
      */
     function workflowsNeedingDetail(question) {
         const all = KB.workflows || [];
@@ -222,8 +222,14 @@
             // Sub-workflows of what is on screen: the umbrella entries (e.g. the Excel
             // chooser) carry no steps of their own, so the parent alone is not usable.
             if (w.parent && w.parent === activeId) ids.add(w.id);
-            if (w.status === 'beta') ids.add(w.id);
         });
+        // Betas used to get a free always-on pass here because they started out at a
+        // couple of lines each (effectively free). Once fire-ra grew real content that
+        // stopped being true - shipping it on every unrelated question would undo the
+        // point of this filter - so betas now earn inclusion the same way everything
+        // else does: being on screen, or the question naming them below. The beta
+        // caveat banner is unaffected - it reads currentWorkflow() from the screen
+        // directly, not this detail set.
 
         const q = ' ' + String(question).toLowerCase().replace(/[^a-z0-9]+/g, ' ') + ' ';
         all.forEach(w => {
