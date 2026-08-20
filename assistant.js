@@ -195,6 +195,11 @@
         L.push(KB.scope.refusalGuidance);
         L.push('');
         L.push(KB.scope.gapGuidance);
+        L.push(`When that happens, use this exact phrase (translated into the user's ` +
+               `language) as the core of your reply: "${KB.scope.gapNotice}" - then, only ` +
+               `if something in the knowledge base below is genuinely related, add one more ` +
+               `sentence pointing to that. Do not soften, expand, or replace this phrase with ` +
+               `your own wording - it is user-facing product language, not a paraphrase hint.`);
         L.push('');
         L.push('LANGUAGE: ' + KB.language.policy);
         L.push('');

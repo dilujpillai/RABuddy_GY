@@ -67,15 +67,19 @@
                 'A question can be clearly ABOUT this application (a feature, button, ' +
                 'workflow, colour, or behaviour of the app itself) while still not being ' +
                 'covered by the knowledge base below. That is a DOCUMENTATION GAP, not an ' +
-                'out-of-scope question - do NOT use the out-of-scope refusal for it. Instead, ' +
-                'say plainly that you do not have details on that specific part yet, and - ' +
-                'only if something in the knowledge base below is genuinely related - point ' +
-                'to that instead. Never invent specifics (steps, button names, behaviour) ' +
-                'about the undocumented feature itself; not knowing the details is fine, ' +
-                'guessing at them is not. The "Buttons currently visible on screen" list ' +
-                'further down may confirm a button exists even when its exact behaviour ' +
-                'isn\'t documented - you may say it exists, but still must not invent what ' +
-                'it does beyond what the knowledge base actually says.'
+                'out-of-scope question - do NOT use the out-of-scope refusal for it. Never ' +
+                'invent specifics (steps, button names, behaviour) about the undocumented ' +
+                'feature itself; not knowing the details is fine, guessing at them is not. ' +
+                'The "Buttons currently visible on screen" list further down may confirm a ' +
+                'button exists even when its exact behaviour isn\'t documented - you may say ' +
+                'it exists, but still must not invent what it does beyond what the knowledge ' +
+                'base actually says.',
+            // A literal phrase, not just abstract guidance, for the same reason betaNotice
+            // (below) is a fixed string rather than "mention this is beta somehow": telling
+            // the model exactly what to say is more reliable than describing the shape of
+            // what to say. Composed into the prompt in buildSystemPrompt().
+            gapNotice:
+                'This knowledge is not currently accessible to me — it will be updated soon.'
         },
 
         // ── Workflows ─────────────────────────────────────────────────────────
@@ -221,6 +225,50 @@
                     'Weighs the cost of a proposed control against the risk reduction it buys.',
                 steps: [],
                 tips: []
+            },
+            {
+                // Not a tab of its own - opened as a modal FROM whichever workflow tab the
+                // user is on (Rich Media, Excel, Free Text). It is still listed here so the
+                // model has real content for it; buildSystemPrompt() includes every workflow
+                // on every question regardless of which tab is "active", so this does not
+                // need special screen-detection wiring to be answerable.
+                id: 'goehs',
+                label: 'GOEHS Integration',
+                status: 'approved',
+                summary:
+                    'Exports your risk assessment as the batch upload file the GOEHS Risk ' +
+                    'Registry expects. Requires a risk table to already exist - GOEHS reads ' +
+                    'its tasks and hazards FROM that table, it does not build one from scratch.',
+                steps: [
+                    'Generate a risk assessment table first, using any workflow (Rich Media, ' +
+                        'Excel import, or Free Text).',
+                    'Click the "GOEHS Integration" button near the table.',
+                    'The modal opens as one page (header and final review together) with a ' +
+                        'banner confirming how many tasks and hazards it pulled in from your ' +
+                        'table automatically.',
+                    'Fill in the assessment header: Organization, Location, Department and ' +
+                        'Workstation (the last two optional), Assessment Title, Date, and ' +
+                        'Approver.',
+                    'Review the hazard rows below: Hazard/Sub-Hazard, Outcome, initial ' +
+                        'Frequency/Severity/Likelihood, Countermeasures, Countermeasure ' +
+                        'Ladder, and residual F/S/L are all editable here.',
+                    'For the Countermeasure Ladder specifically, use the "🤖 AI" or ' +
+                        '"⚡ Intelligent" buttons to auto-classify a control description - ' +
+                        'see the glossary entry for the difference between the two.',
+                    'If you change the main risk table after opening GOEHS, use "Re-sync" to ' +
+                        'pull the update in rather than reopening the modal from scratch.',
+                    'Click "Download GOEHS Batch Upload XLSX" to export the finished file.'
+                ],
+                tips: [
+                    'Editing a hazard field here (Category, Sub-Hazard, Outcome, Hazard ' +
+                        'Source, Current Control, or Countermeasure Ladder) writes back to ' +
+                        'the main risk table too - the two stay in sync in both directions, ' +
+                        'not just GOEHS reading from the table.',
+                    'The banner at the top always tells you whether your data was freshly ' +
+                        'detected, refreshed because the main table changed since you last ' +
+                        'opened GOEHS, or found nothing at all - worth reading before you ' +
+                        'start on the header.'
+                ]
             }
         ],
 
@@ -309,7 +357,10 @@
                     'this app\'s fields onto the vendor\'s expected columns.'
             },
             {
-                term: 'Save Project / Load Project',
+                // A user may say "the Project button" (singular, generic) meaning either
+                // one of the actual pair - answer for BOTH rather than asking which, unless
+                // context genuinely disambiguates.
+                term: 'Save Project / Load Project (aka "the Project button(s)")',
                 definition:
                     'Save Project bundles the current table, every gallery image, your ' +
                     'notes, and the Plant/Department identity fields into a single .json ' +
