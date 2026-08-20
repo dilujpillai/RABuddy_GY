@@ -215,6 +215,68 @@
         return bubble;
     }
 
+    // ── Suggested follow-up chips ─────────────────────────────────────────────
+    // Picked here in code, never by the model: a suggestion must always be something
+    // the assistant can actually answer, and this costs no extra AI call.
+
+    const asked = new Set();   // don't re-offer something already used this session
+    const MAX_CHIPS = 3;
+
+    /** Screen preconditions a follow-up can declare via `needs`. */
+    function precondition(needs) {
+        if (!needs) return true;
+        const hasTable = document.querySelectorAll('#table-container tbody tr').length > 0;
+        const hasGallery = document.querySelectorAll('.gallery-item img').length > 0;
+        if (needs === 'table') return hasTable;
+        if (needs === 'no-table') return !hasTable;
+        if (needs === 'gallery') return hasGallery;
+        return true;
+    }
+
+    function eligibleFollowUps() {
+        const list = KB.followUps || [];
+        const wfId = currentWorkflowId();
+        return list.filter(f => {
+            if (asked.has(f.q)) return false;
+            if (!precondition(f.needs)) return false;
+            const when = f.when || ['*'];
+            return when.includes('*') || (wfId && when.includes(wfId));
+        });
+    }
+
+    function renderFollowUps() {
+        const bar = el('rabAssistantChips');
+        if (!bar) return;
+        bar.innerHTML = '';
+
+        // Workflow-specific suggestions come first, then the generic ones, so the most
+        // relevant chip is always leftmost rather than buried behind "What can you help with".
+        const wfId = currentWorkflowId();
+        const pool = eligibleFollowUps();
+        const specific = pool.filter(f => (f.when || []).includes(wfId));
+        const generic = pool.filter(f => !(f.when || []).includes(wfId));
+        const picks = specific.concat(generic).slice(0, MAX_CHIPS);
+
+        picks.forEach(f => {
+            const chip = document.createElement('button');
+            chip.type = 'button';
+            chip.className = 'text-left text-[11px] leading-snug px-2.5 py-1.5 rounded-full '
+                + 'border border-indigo-200 bg-indigo-50 text-indigo-800 '
+                + 'hover:bg-indigo-100 hover:border-indigo-300 transition';
+            chip.textContent = f.q;
+            chip.addEventListener('click', () => {
+                if (busy) return;
+                asked.add(f.q);
+                const input = el('rabAssistantInput');
+                if (input) input.value = f.q;
+                submit();
+            });
+            bar.appendChild(chip);
+        });
+
+        bar.classList.toggle('hidden', picks.length === 0);
+    }
+
     async function submit() {
         const input = el('rabAssistantInput');
         if (!input || busy) return;
@@ -226,6 +288,7 @@
         history.push({ role: 'user', text: question });
 
         busy = true;
+        el('rabAssistantChips')?.classList.add('hidden');
         const thinking = addMessage('assistant', '…');
         try {
             const answer = await ask(question);
@@ -241,6 +304,7 @@
             thinking.textContent = 'Help service error — ' + (err && err.message ? err.message : String(err));
         } finally {
             busy = false;
+            renderFollowUps();
         }
     }
 
@@ -259,6 +323,7 @@
                     : 'Hi — ask me anything about this app, in any language.');
                 if (wf && wf.status === 'beta') addMessage('assistant', KB.betaNotice);
             }
+            renderFollowUps();
             const input = el('rabAssistantInput');
             if (input) input.focus();
         }

@@ -363,6 +363,49 @@
             }
         ],
 
+        // ── Suggested follow-up questions ─────────────────────────────────────
+        // Rendered as tappable chips under the assistant's answer. Chosen in code from
+        // this list — the model is NOT asked to invent them, so a suggestion can never
+        // point at a feature that does not exist, and it costs no extra AI call.
+        //
+        //   when:  workflow ids (matching `screens` values) this applies to. '*' = always.
+        //   needs: optional screen precondition, checked in assistant.js —
+        //            'table'    → only once a risk table exists
+        //            'no-table' → only before a table has been generated
+        //            'gallery'  → only once there is at least one image
+        // Order matters: earlier entries are offered first. Keep the most likely
+        // next question near the top of each workflow's group.
+        followUps: [
+            // Rich Media — roughly the order a user meets them
+            { q: 'How do I capture frames from a video?',            when: ['rich-media'] },
+            { q: 'How do I blur a face the detector missed?',        when: ['rich-media'], needs: 'gallery' },
+            { q: 'A face was blurred by mistake — can I undo it?',   when: ['rich-media'], needs: 'gallery' },
+            { q: 'How do I reorder my steps?',                       when: ['rich-media'], needs: 'gallery' },
+            { q: 'How do I add a step without a photo?',             when: ['rich-media'] },
+            { q: 'How do I generate the risk assessment table?',     when: ['rich-media', 'free-text'], needs: 'no-table' },
+
+            // Excel
+            { q: 'How do I map my spreadsheet columns?',             when: ['excel'] },
+            { q: 'Why is a value flagged after import?',             when: ['excel'] },
+            { q: 'Can I load another sheet from the same file?',     when: ['excel'] },
+
+            // Free Text
+            { q: 'Can I add pictures to a step afterwards?',         when: ['free-text'] },
+            { q: 'How do I attach one photo to several steps?',      when: ['free-text'], needs: 'table' },
+
+            // Once a table exists — relevant in any workflow
+            { q: 'What do the colours in the table mean?',           when: ['*'], needs: 'table' },
+            { q: "What's the difference between AI Fix and Intelligent Fix?", when: ['*'], needs: 'table' },
+            { q: 'How is the risk score calculated?',                when: ['*'], needs: 'table' },
+            { q: 'How do I add controls to reduce a risk?',          when: ['*'], needs: 'table' },
+            { q: 'What do I get when I download?',                   when: ['*'], needs: 'table' },
+            { q: 'How do I export to GOEHS?',                        when: ['*'], needs: 'table' },
+
+            // Always available
+            { q: 'What happens to my photos — are they uploaded?',   when: ['*'] },
+            { q: 'What can you help me with?',                       when: ['*'] }
+        ],
+
         // ── Language ──────────────────────────────────────────────────────────
         language: {
             policy:

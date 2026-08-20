@@ -25700,6 +25700,10 @@ Return ONLY a valid JSON array (no explanation, no markdown):
 
         <div id="rabAssistantLog" class="flex-1 overflow-y-auto p-3 space-y-2 bg-slate-50"></div>
 
+        <!-- Suggested follow-ups. Chosen in assistant.js from the KB catalogue, never
+             invented by the model, so a chip always leads somewhere it can answer. -->
+        <div id="rabAssistantChips" class="hidden flex flex-wrap gap-1.5 px-2.5 pt-2 pb-1 bg-slate-50 border-t border-slate-200"></div>
+
         <div class="p-2.5 border-t border-slate-200 bg-white">
             <div class="flex items-end gap-2">
                 <textarea id="rabAssistantInput" rows="1" placeholder="Ask about this app…"
