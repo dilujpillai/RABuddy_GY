@@ -3100,7 +3100,10 @@
     </div>
     </div>
     <div id="tableImageModal" class="modal-overlay hidden fixed inset-0 z-[100] bg-black/70 backdrop-blur-sm p-4 items-center justify-center" style="display: none;">
-    <div class="modal-content bg-white m-auto p-6 sm:p-8 rounded-lg shadow-2xl w-full max-w-6xl max-h-[92vh] overflow-hidden relative flex flex-col">
+    <!-- max-w-6xl (1152px) was sized when this held three columns; the image tray made it
+         four, which left the picture and details panes cramped while the page gutters stayed
+         wide. The min() keeps it from touching the edges on smaller laptops. -->
+    <div class="modal-content bg-white m-auto p-6 sm:p-8 rounded-lg shadow-2xl w-full max-w-[min(1700px,96vw)] max-h-[92vh] overflow-hidden relative flex flex-col">
         <span id="closeTableImageModal" class="close-btn absolute top-4 right-5 text-slate-400 text-3xl font-bold cursor-pointer hover:text-slate-600 transition">&times;</span>
 
         <!-- Header -->
