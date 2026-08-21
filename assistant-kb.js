@@ -618,6 +618,55 @@
                     + 'review). This is the app\'s own module output, not a legal or '
                     + 'regulatory determination - it does not state whether a zone '
                     + 'satisfies a particular code.'
+            },
+            {
+                term: 'Does the AI look at my photos?',
+                definition:
+                    'No - the AI never sees your images. "Generate AI Risk Assessment" sends '
+                    + 'TEXT only: each picture\'s Description, Hazards and Controls as you '
+                    + 'typed them, plus any ratings you set. The photo is never uploaded.',
+                note:
+                    'So the result depends entirely on your notes - an unannotated photo '
+                    + 'contributes nothing and is skipped. It is also why images never leave '
+                    + 'your device. Photos are for the humans reviewing it and for the export. '
+                    + 'Same in Fire RA: "Analyze with AI" reads your typed zone description, '
+                    + 'not the zone photos.'
+            },
+            {
+                term: 'Photos pasted into Excel cells (do they survive the import?)',
+                definition:
+                    'Yes. The Legacy Excel path extracts pictures from the workbook itself, '
+                    + 'including ones pasted straight into cells and ones from much older '
+                    + 'Excel versions. They appear in the "Source Images" pane.',
+                note:
+                    'They are NOT matched to rows automatically - drag each onto the right '
+                    + 'step card. If a picture\'s sheet cannot be determined, every image in '
+                    + 'the workbook is shown rather than hiding any.'
+            },
+            {
+                term: 'Case, punctuation and spacing when matching imported values',
+                definition:
+                    'Forgiving. Values are trimmed and compared without regard to upper/lower '
+                    + 'case, then by partial match, then by closest spelling. So "HEAT '
+                    + 'STRESS", "Heat stress " and "Heat-stress" all resolve to one entry.',
+                note:
+                    'But an imported value that is not an exact match is still outlined red '
+                    + 'first, so you can see what was off - "\ud83d\udd27 AI Fix Hazard/Risk" or '
+                    + '"\ud83c\udfaf Suggest Closest Match" is what applies the tolerant matching. '
+                    + 'Nothing changes silently.'
+            },
+            {
+                term: 'Why is the Risk / Consequences column not translated?',
+                definition:
+                    'Only Hazard Group and Hazard List are translated. Risk / Consequences is '
+                    + 'not, because it is usually free text from your own sheet rather than a '
+                    + 'fixed dropdown value.',
+                note:
+                    'A current limitation, not a fault in the file - the same applies to the '
+                    + 'rating scales and most UI labels outside English, French and German. '
+                    + 'If Hazard Group and Hazard List translate but Risk / Consequences does '
+                    + 'not, that is expected behaviour: confirm it rather than sending the '
+                    + 'user hunting for a setting that does not exist.'
             }
         ],
 
@@ -921,6 +970,7 @@
         // next question near the top of each workflow's group.
         followUps: [
             // Rich Media — roughly the order a user meets them
+            { q: 'Does the AI look at my photos?',                    when: ['rich-media'] },
             { q: 'What image and video formats can I upload?',       when: ['rich-media'] },
             { q: 'How do I capture frames from a video?',            when: ['rich-media'] },
             { q: 'How do I blur a face the detector missed?',        when: ['rich-media'], needs: 'gallery' },
@@ -938,6 +988,7 @@
             { q: 'I loaded a legacy sheet — why is my table empty?', when: ['excel', 'excel-legacy'] },
             { q: 'How do I map my spreadsheet columns?',             when: ['excel', 'excel-legacy', 'excel-ra2025'] },
             { q: 'How do I reuse my pictures from the old sheet?',   when: ['excel', 'excel-legacy'] },
+            { q: 'Are photos pasted into cells kept on import?',      when: ['excel', 'excel-legacy'] },
             { q: 'Can I load another sheet from the same file?',     when: ['excel', 'excel-legacy'] },
             { q: 'How do I fix mismatches in a batch export?',       when: ['excel', 'excel-batch'] },
             { q: 'Why is a value flagged after import?',             when: ['excel', 'excel-ra2025', 'excel-batch'] },
@@ -989,7 +1040,17 @@
             'Prefer specifics over generalities: "click Capture Frame, or press C" beats ' +
                 '"use the capture controls".',
             'If you genuinely do not know, say so and suggest where in the app to look. ' +
-                'Never invent a button, menu or feature that is not in this knowledge base.'
+                'Never invent a button, menu or feature that is not in this knowledge base.',
+            'Never offer help you then withdraw. You explain how to use this app; you do ' +
+                'not operate it for the user. So do not say you will build, generate or ' +
+                'create something and then refuse it a message later - say up front that ' +
+                'you will walk them through doing it, and then actually walk them through ' +
+                'it, step by step, to the end.',
+            'Resolve "it", "that", "this" and bare references like "the table" against ' +
+                'the MOST RECENT thing discussed, not an earlier one. If a user asks a ' +
+                'follow-up, they almost always mean the topic of the message immediately ' +
+                'before it. When it is genuinely ambiguous, name the two possibilities and ' +
+                'ask which they mean - never silently answer the older one.'
         ]
     };
 
