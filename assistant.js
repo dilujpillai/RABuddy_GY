@@ -571,6 +571,42 @@
     }
 
     /**
+     * Collects one run of list items starting at lines[i].
+     *
+     * It deliberately tolerates two things that used to terminate the list early -
+     * and terminating early is what restarted the numbering, so every item rendered
+     * as "1.":
+     *   - a BLANK LINE between items, which models emit constantly. It only ends the
+     *     run if the next non-blank line is not another item of the same kind.
+     *   - a CONTINUATION line indented under an item, which now joins that item
+     *     instead of becoming a paragraph wedged between two lists.
+     * A line matching the OTHER list style still ends the run, so a bulleted sub-list
+     * under a numbered step keeps rendering as its own <ul>, exactly as before.
+     */
+    function collectListItems(lines, i, re, otherRe) {
+        const items = [];
+        while (i < lines.length) {
+            const m = lines[i].match(re);
+            if (m) { items.push([renderInlineMarkdown(m[2])]); i++; continue; }
+
+            if (lines[i].trim() === '') {
+                let j = i;
+                while (j < lines.length && lines[j].trim() === '') j++;
+                if (j < lines.length && re.test(lines[j])) { i = j; continue; }
+                break;
+            }
+
+            if (items.length && /^\s+\S/.test(lines[i]) && !otherRe.test(lines[i])) {
+                items[items.length - 1].push(renderInlineMarkdown(lines[i].trim()));
+                i++;
+                continue;
+            }
+            break;
+        }
+        return { html: items.map(parts => '<li>' + parts.join('<br>') + '</li>').join(''), i: i };
+    }
+
+    /**
      * A deliberately tiny, whitelist-only markdown renderer for assistant answers -
      * NOT a general markdown library. The model is a plain-text chat participant, not
      * a page author: it gets **bold**, *italic*, ***both***, `code`, and numbered /
@@ -585,32 +621,30 @@
      * give no matter how many newlines are in the source.
      *
      * Still escape-first per line, so - same guarantee as the inline renderer - the
-     * only tags that can ever appear are the ones hardcoded in this function.
+     * only tags that can ever appear are the ones hardcoded in it and in its helper.
      */
     function renderMarkdownLite(text) {
         const lines = String(text).split('\n');
-        const orderedRe = /^\s*\d{1,3}[.)]\s+(.*)$/;
-        const bulletRe = /^\s*[-*•]\s+(.*)$/;
+        const orderedRe = /^\s*(\d{1,3})[.)]\s+(.*)$/;
+        const bulletRe = /^\s*([-*•])\s+(.*)$/;
         const blocks = [];
         let i = 0;
 
         while (i < lines.length) {
             if (orderedRe.test(lines[i])) {
-                const items = [];
-                while (i < lines.length && orderedRe.test(lines[i])) {
-                    items.push('<li>' + renderInlineMarkdown(lines[i].match(orderedRe)[1]) + '</li>');
-                    i++;
-                }
-                blocks.push('<ol class="list-decimal ml-4 space-y-1 my-1.5">' + items.join('') + '</ol>');
+                // Start from the model's own number. When prose genuinely does split a
+                // list, the second half has to resume at 4 rather than drop back to 1.
+                const first = parseInt(lines[i].match(orderedRe)[1], 10);
+                const run = collectListItems(lines, i, orderedRe, bulletRe);
+                i = run.i;
+                blocks.push('<ol class="list-decimal ml-4 space-y-1 my-1.5"'
+                    + (first === 1 ? '' : ' start="' + first + '"') + '>' + run.html + '</ol>');
                 continue;
             }
             if (bulletRe.test(lines[i])) {
-                const items = [];
-                while (i < lines.length && bulletRe.test(lines[i])) {
-                    items.push('<li>' + renderInlineMarkdown(lines[i].match(bulletRe)[1]) + '</li>');
-                    i++;
-                }
-                blocks.push('<ul class="list-disc ml-4 space-y-1 my-1.5">' + items.join('') + '</ul>');
+                const run = collectListItems(lines, i, bulletRe, orderedRe);
+                i = run.i;
+                blocks.push('<ul class="list-disc ml-4 space-y-1 my-1.5">' + run.html + '</ul>');
                 continue;
             }
             if (lines[i].trim() === '') { i++; continue; } // blank line: blocks carry their own margin
@@ -644,7 +678,7 @@
         bubble.innerHTML = (typeof DOMPurify !== 'undefined')
             ? DOMPurify.sanitize(html, {
                 ALLOWED_TAGS: ['strong', 'em', 'code', 'ol', 'ul', 'li', 'p', 'br'],
-                ALLOWED_ATTR: ['class']
+                ALLOWED_ATTR: ['class', 'start']   // `start` preserves a split list's numbering
               })
             : escapeHtml(text); // DOMPurify failed to load - fall back to plain escaped text, never raw HTML
     }
