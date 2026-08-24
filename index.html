@@ -71,7 +71,7 @@
     <script src="image-editor.js"></script>
     <!-- Help assistant. All of its content lives in assistant-kb.js — extend that file,
          not assistant.js, to teach it about new features. KB must load first. -->
-    <script src="assistant-kb.js?v=20260824g"></script>
+    <script src="assistant-kb.js?v=20260824h"></script>
     <script src="assistant.js?v=20260824g"></script>
 
     <!-- React 18 + htm (no build step) -->
@@ -1766,7 +1766,7 @@
                     </ul>
                 </li>
                 <li>Review the <strong>🛡️ Fire Protection Controls</strong> — select all controls in place. Missing mandatory controls are flagged.</li>
-                <li>Click <strong>🔥 Calculate Fire Risk Index</strong> to get the FTRI score (0–100) with full breakdown of fire triangle, control effectiveness, and consequence amplifier.</li>
+                <li>The FTRI score (0–100) calculates itself automatically — there is no button to press. As soon as at least one Heat, Fuel and Oxygen item is ticked, the score and full breakdown appear on their own, and update again whenever the zone changes.</li>
                 <li>Use the <strong>🗺️ Floor Plan</strong> view to map zones onto a building layout for visual heat-map reporting.</li>
                 <li>Save, load, merge, and export as PDF or HTML — all data stays local on your device.</li>
             </ul>
@@ -1881,7 +1881,7 @@
                     </ul>
                 </li>
                 <li>Vérifiez les <strong>🛡️ Contrôles de Protection Incendie</strong> — les contrôles obligatoires manquants sont signalés.</li>
-                <li>Cliquez sur <strong>🔥 Calculer l'Indice de Risque Incendie</strong> pour obtenir le score FTRI (0–100).</li>
+                <li>Le score FTRI (0–100) se calcule automatiquement — aucun bouton à cliquer. Dès qu'un élément de chaleur, de combustible et d'oxygène est coché, le score apparaît et se met à jour à chaque changement.</li>
                 <li>Utilisez la vue <strong>🗺️ Plan d'Étage</strong> pour cartographier les zones sur le bâtiment.</li>
             </ul>
         </div>
@@ -1995,7 +1995,7 @@
                     </ul>
                 </li>
                 <li>Überprüfen Sie die <strong>🛡️ Brandschutzkontrollen</strong> — fehlende Pflichtkontrollen werden gekennzeichnet.</li>
-                <li>Klicken Sie auf <strong>🔥 Brandrisikoindex berechnen</strong> für den FTRI-Score (0–100).</li>
+                <li>Der FTRI-Score (0–100) wird automatisch berechnet — kein Button nötig. Sobald mindestens ein Wärme-, Brennstoff- und Sauerstoff-Element ausgewählt ist, erscheint der Score und aktualisiert sich bei jeder Änderung.</li>
                 <li>Verwenden Sie die <strong>🗺️ Grundrissansicht</strong> um Zonen auf den Gebäudeplan abzubilden.</li>
             </ul>
         </div>
@@ -2442,8 +2442,8 @@
 
                             <!-- Step 6 -->
                             <div class="border-l-4 border-purple-400 pl-4">
-                                <h5 class="font-bold text-purple-800">Step 6: Calculate & Interpret the FTRI Score</h5>
-                                <p class="mt-1">Click <strong>"Calculate Fire Risk Index"</strong> to generate the score. The system calculates:</p>
+                                <h5 class="font-bold text-purple-800">Step 6: Read & Interpret the FTRI Score</h5>
+                                <p class="mt-1">The score calculates itself automatically — there is no button to press. As soon as at least one Heat, Fuel and Oxygen item is ticked for the zone, the system calculates:</p>
                                 <div class="bg-purple-50 rounded p-3 mt-2 text-xs font-mono">
                                     FTRI = (Fire Triangle Score × (1 − Control Effectiveness) × Consequence Amplifier) / 30 × 100
                                 </div>
