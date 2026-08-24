@@ -631,6 +631,17 @@ function convertRA2025ToTableFormat(riskItems) {
             '_frequencyUnverified': !!item.assessment_pre_control.frequency_unverified,
             '_severityUnverified': !!item.assessment_pre_control.severity_unverified,
             '_likelihoodUnverified': !!item.assessment_pre_control.likelihood_unverified,
+            // Flags a value that was present but off the standard ladder and got snapped
+            // to the closest real option before buildTableFromData ever saw it (RA2025's
+            // own parseFrequency/parseSeverity/parseLikelihood already did the snapping) -
+            // without this, buildTableFromData's own snap check sees an already-valid
+            // number and never flags the row for review.
+            '_frequencyAutoCorrected': !!item.assessment_pre_control.frequency_corrected,
+            '_severityAutoCorrected': !!item.assessment_pre_control.severity_corrected,
+            '_likelihoodAutoCorrected': !!item.assessment_pre_control.likelihood_corrected,
+            '_frequencyRawValue': item.assessment_pre_control.frequency_raw_value,
+            '_severityRawValue': item.assessment_pre_control.severity_raw_value,
+            '_likelihoodRawValue': item.assessment_pre_control.likelihood_raw_value,
             'imageId': null
         };
     });

@@ -4881,11 +4881,26 @@ data.forEach((row, index) => {
                 const clampedFrequency = snapToNearestScaleStep(clampedFrequencyRaw, validFrequencies, clampedFrequencyRaw);
                 const clampedSeverity = snapToNearestScaleStep(clampedSeverityRaw, validSeverities, clampedSeverityRaw);
                 const clampedLikelihood = snapToNearestScaleStep(clampedLikelihoodRaw, validLikelihoods, clampedLikelihoodRaw);
-                const frequencyWasAutoCorrected = Number.isFinite(frequencyValue) && clampedFrequency !== clampedFrequencyRaw;
-                const severityWasAutoCorrected = Number.isFinite(severityValue) && clampedSeverity !== clampedSeverityRaw;
-                const likelihoodWasAutoCorrected = Number.isFinite(likelihoodValue) && clampedLikelihood !== clampedLikelihoodRaw;
+                // The RA2025 Legacy Excel importer (index.html's "RA 2025 Column Mapper
+                // IIFE") snaps its own Frequency/Severity/Likelihood BEFORE this function
+                // ever runs, so by the time it gets here the value already sits on the
+                // ladder and the check above finds nothing to correct. It flags that on
+                // the row itself (_frequencyAutoCorrected etc, set in
+                // convertRA2025ToTableFormat/batchConvertToTableFormat) - OR it in here so
+                // Legacy Excel rows still get the amber cell, gallery marker and toast.
+                const frequencyWasAutoCorrected = (Number.isFinite(frequencyValue) && clampedFrequency !== clampedFrequencyRaw) || !!row['_frequencyAutoCorrected'];
+                const severityWasAutoCorrected = (Number.isFinite(severityValue) && clampedSeverity !== clampedSeverityRaw) || !!row['_severityAutoCorrected'];
+                const likelihoodWasAutoCorrected = (Number.isFinite(likelihoodValue) && clampedLikelihood !== clampedLikelihoodRaw) || !!row['_likelihoodAutoCorrected'];
                 const rowWasAutoCorrected = frequencyWasAutoCorrected || severityWasAutoCorrected || likelihoodWasAutoCorrected;
                 if (rowWasAutoCorrected) autoCorrectedRowCount++;
+
+                // Prefer the true pre-snap value from the source Excel cell when the RA2025
+                // importer supplied one (_frequencyRawValue etc) - frequencyValue at that
+                // point is already the post-snap number, since RA2025 snaps before this
+                // function ever runs, so it can't show what was actually typed/imported.
+                const displayFrequencyRaw = Number.isFinite(row['_frequencyRawValue']) ? row['_frequencyRawValue'] : frequencyValue;
+                const displaySeverityRaw = Number.isFinite(row['_severityRawValue']) ? row['_severityRawValue'] : severityValue;
+                const displayLikelihoodRaw = Number.isFinite(row['_likelihoodRawValue']) ? row['_likelihoodRawValue'] : likelihoodValue;
 
     const hazardDetails = HAZARD_REGISTRY[hazardListValue] || { group: 'Unknown', severity: clampedSeverity, likelihood: clampedLikelihood };
     const frequency = clampedFrequency;
@@ -4953,9 +4968,9 @@ data.forEach((row, index) => {
                     <td class="${tdClasses} group">${createHazardGroupDropdown(hazardGroup)}</td>
                     <td class="${tdClasses} hazard-list-cell">${createTextDropdown(Object.keys(HAZARD_REGISTRY), hazardListValue, `recalculateRow(${index}, 'hazard')`)}</td>
                     <td class="${tdClasses} consequence-cell">${createTextDropdown(CONSEQUENCE_REGISTRY, consequenceValue, `recalculateRow(${index})`)}</td>
-                    <td class="${tdClasses}">${createDropdown(FREQUENCY_SCALE, frequency, `recalculateRow(${index})`, frequencyWasAutoCorrected ? 'scale-value-autocorrected' : '', frequencyWasAutoCorrected ? `Imported value ${frequencyValue} was not a standard option - adjusted to the closest one (${frequency}). Please confirm.` : '')}</td>
-                    <td class="${tdClasses}">${createDropdown(SEVERITY_SCALE, severity, `recalculateRow(${index})`, severityWasAutoCorrected ? 'scale-value-autocorrected' : '', severityWasAutoCorrected ? `Imported value ${severityValue} was not a standard option - adjusted to the closest one (${severity}). Please confirm.` : '')}</td>
-                    <td class="${tdClasses}">${createDropdown(LIKELIHOOD_SCALE, likelihood, `recalculateRow(${index})`, likelihoodWasAutoCorrected ? 'scale-value-autocorrected' : '', likelihoodWasAutoCorrected ? `Imported value ${likelihoodValue} was not a standard option - adjusted to the closest one (${likelihood}). Please confirm.` : '')}</td>
+                    <td class="${tdClasses}">${createDropdown(FREQUENCY_SCALE, frequency, `recalculateRow(${index})`, frequencyWasAutoCorrected ? 'scale-value-autocorrected' : '', frequencyWasAutoCorrected ? `Imported value ${displayFrequencyRaw} was not a standard option - adjusted to the closest one (${frequency}). Please confirm.` : '')}</td>
+                    <td class="${tdClasses}">${createDropdown(SEVERITY_SCALE, severity, `recalculateRow(${index})`, severityWasAutoCorrected ? 'scale-value-autocorrected' : '', severityWasAutoCorrected ? `Imported value ${displaySeverityRaw} was not a standard option - adjusted to the closest one (${severity}). Please confirm.` : '')}</td>
+                    <td class="${tdClasses}">${createDropdown(LIKELIHOOD_SCALE, likelihood, `recalculateRow(${index})`, likelihoodWasAutoCorrected ? 'scale-value-autocorrected' : '', likelihoodWasAutoCorrected ? `Imported value ${displayLikelihoodRaw} was not a standard option - adjusted to the closest one (${likelihood}). Please confirm.` : '')}</td>
                     <td class="${tdClasses} score font-bold">${riskScore.toFixed(2)}</td>
                     <td class="${tdClasses} cat font-semibold">${getRiskCategory(riskScore)}</td>
                     <td class="${tdClasses}"><input type="text" value="${DOMPurify.sanitize(row['Hazard Source'] || '')}" class="${inputClasses}"></td>
@@ -17244,6 +17259,11 @@ downloadBtn.addEventListener('click', async () => {
         scheduleRA2025PreviewScrollSync(true);
     };
 
+    // Ties resolve to the HIGHER value on purpose (matches snapToNearestScaleStep() in
+    // the main <script> block, which this deliberately does not call - RA2025's importer
+    // keeps its own copy so its blank/carry-forward logic above stays fully isolated).
+    // Severity 2 sits exactly between 1 and 3 - round DOWN to 1 would silently understate
+    // risk, which an EHS tool must never do on an even split.
     function nearestScaleValue(inputValue, allowedValues, fallback) {
         if (!Number.isFinite(inputValue) || !Array.isArray(allowedValues) || allowedValues.length === 0) {
             return fallback;
@@ -17254,7 +17274,7 @@ downloadBtn.addEventListener('click', async () => {
         for (let i = 1; i < allowedValues.length; i++) {
             const current = allowedValues[i];
             const diff = Math.abs(inputValue - current);
-            if (diff < minDiff) {
+            if (diff < minDiff || (diff === minDiff && current > nearest)) {
                 nearest = current;
                 minDiff = diff;
             }
@@ -17385,34 +17405,54 @@ downloadBtn.addEventListener('click', async () => {
             let severity = parseSeverity(rawSeverity);
             let likelihood = parseLikelihood(rawLikelihood);
 
+            // Flag a value that WAS present and parseable but did not sit on the standard
+            // ladder (e.g. someone typed severity "2") so the main table can mark it for
+            // review, same as buildTableFromData does for AI-generated rows. Compared
+            // against the raw extracted number, not the blank/carry-forward result below,
+            // so a genuinely blank cell (handled by *_unverified further down) or a
+            // carried-forward merged-cell value is never mistaken for a correction.
+            const rawFrequencyNumeric = extractNumericValue(rawFrequency);
+            const rawSeverityNumeric = extractNumericValue(rawSeverity);
+            const rawLikelihoodNumeric = extractNumericValue(rawLikelihood);
+            const frequencyWasCorrected = Number.isFinite(rawFrequencyNumeric) && rawFrequencyNumeric !== frequency;
+            const severityWasCorrected = Number.isFinite(rawSeverityNumeric) && rawSeverityNumeric !== severity;
+            const likelihoodWasCorrected = Number.isFinite(rawLikelihoodNumeric) && rawLikelihoodNumeric !== likelihood;
+
+            // Per-row fallback only (not cached into lastScaleValues) - a row with no real
+            // or carried value still needs a valid scale number to calculate a risk score,
+            // but it must not contaminate lastScaleValues for the merged-cell rows that
+            // follow it. Tracked explicitly by blank-and-nothing-to-carry, NOT by
+            // Number.isFinite(frequency/severity/likelihood) - parseFrequency/parseSeverity/
+            // parseLikelihood already return a finite fallback (1/5/3) for a blank cell via
+            // nearestScaleValue's own `fallback` argument, so that check could never be true
+            // and the unverified flag - and the dashed-amber .scale-value-unverified marker
+            // it drives - silently never fired for any Legacy Excel row.
+            let frequencyUnverified = false;
             if (isFrequencyBlank && Number.isFinite(lastScaleValues.frequency)) {
                 frequency = lastScaleValues.frequency;
-            } else if (Number.isFinite(frequency)) {
+            } else if (isFrequencyBlank) {
+                frequencyUnverified = true;
+            } else {
                 lastScaleValues.frequency = frequency;
             }
 
+            let severityUnverified = false;
             if (isSeverityBlank && Number.isFinite(lastScaleValues.severity)) {
                 severity = lastScaleValues.severity;
-            } else if (Number.isFinite(severity)) {
+            } else if (isSeverityBlank) {
+                severityUnverified = true;
+            } else {
                 lastScaleValues.severity = severity;
             }
 
+            let likelihoodUnverified = false;
             if (isLikelihoodBlank && Number.isFinite(lastScaleValues.likelihood)) {
                 likelihood = lastScaleValues.likelihood;
-            } else if (Number.isFinite(likelihood)) {
+            } else if (isLikelihoodBlank) {
+                likelihoodUnverified = true;
+            } else {
                 lastScaleValues.likelihood = likelihood;
             }
-
-            // Per-row fallback only (not cached above) - a row with no real/carried value
-            // still needs a valid scale number, but it must not contaminate lastScaleValues
-            // for the merged-cell rows that follow it. Track which fields actually hit this
-            // fallback so the UI can flag them instead of showing a silent, indistinguishable "1".
-            const frequencyUnverified = !Number.isFinite(frequency);
-            const severityUnverified = !Number.isFinite(severity);
-            const likelihoodUnverified = !Number.isFinite(likelihood);
-            if (frequencyUnverified) frequency = 1;
-            if (severityUnverified) severity = 5;
-            if (likelihoodUnverified) likelihood = 3;
 
             const parsedRiskScore = cols.riskScore ? parseRiskScoreValue(row[cols.riskScore]) : null;
             const riskScore = Number.isFinite(parsedRiskScore)
@@ -17443,7 +17483,13 @@ downloadBtn.addEventListener('click', async () => {
                     risk_level: riskLevel,
                     frequency_unverified: frequencyUnverified,
                     severity_unverified: severityUnverified,
-                    likelihood_unverified: likelihoodUnverified
+                    likelihood_unverified: likelihoodUnverified,
+                    frequency_corrected: frequencyWasCorrected,
+                    severity_corrected: severityWasCorrected,
+                    likelihood_corrected: likelihoodWasCorrected,
+                    frequency_raw_value: frequencyWasCorrected ? rawFrequencyNumeric : null,
+                    severity_raw_value: severityWasCorrected ? rawSeverityNumeric : null,
+                    likelihood_raw_value: likelihoodWasCorrected ? rawLikelihoodNumeric : null
                 },
                 mitigation_plan: {
                     current_controls: row[cols.currentControl] || '',
@@ -24286,7 +24332,18 @@ ${JSON.stringify(payload, null, 2)}`;
                 // (column not found, or unrecognized cell format) rather than a genuinely-parsed value.
                 '_frequencyUnverified': !!item.assessment_pre_control?.frequency_unverified,
                 '_severityUnverified': !!item.assessment_pre_control?.severity_unverified,
-                '_likelihoodUnverified': !!item.assessment_pre_control?.likelihood_unverified
+                '_likelihoodUnverified': !!item.assessment_pre_control?.likelihood_unverified,
+                // Flags a value that was present but off the standard ladder and got
+                // snapped to the closest real option before buildTableFromData ever saw
+                // it (RA2025's own parseFrequency/parseSeverity/parseLikelihood already
+                // did the snapping) - without this, buildTableFromData's own snap check
+                // sees an already-valid number and never flags the row for review.
+                '_frequencyAutoCorrected': !!item.assessment_pre_control?.frequency_corrected,
+                '_severityAutoCorrected': !!item.assessment_pre_control?.severity_corrected,
+                '_likelihoodAutoCorrected': !!item.assessment_pre_control?.likelihood_corrected,
+                '_frequencyRawValue': item.assessment_pre_control?.frequency_raw_value,
+                '_severityRawValue': item.assessment_pre_control?.severity_raw_value,
+                '_likelihoodRawValue': item.assessment_pre_control?.likelihood_raw_value
             };
         });
     }
