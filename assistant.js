@@ -365,6 +365,10 @@
             L.push(`${f.where}\n  Accepts: ${f.accepts}\n  Notes: ${f.notes}`));
 
         L.push('\n-- Buttons (only these exist; do not invent others) --');
+        // The app itself turns a button's exact name into a clickable "jump to it"
+        // chip for a subset of these - no markup needed from you, and nothing to
+        // remember: just spell the name exactly as listed (case does not matter) when
+        // you mention it in prose, the same way you already would.
         (KB.buttons || []).forEach(b => L.push(`"${b.label}" (${b.where}): ${b.does}`));
 
         // Literal strings, so a user pasting an error can be matched exactly.
@@ -664,6 +668,55 @@
         return blocks.join('');
     }
 
+    // ── Clickable button references ─────────────────────────────────────────────
+    // When the model names a real button in its answer, that name is turned into a
+    // clickable chip that scrolls to and pulses the actual button in the app. The
+    // MODEL never writes the link markup itself - only KB.buttons entries that carry
+    // a `dom` id (added deliberately, per button, after confirming against the
+    // shipped index.html which element that id really points at) are ever linked.
+    // Matching the model's own wording instead of trusting emitted syntax means a
+    // hallucinated button name simply stays plain text; it can never produce a
+    // broken or misleading link.
+    const JUMP_OPEN = 'J', JUMP_MID = '', JUMP_CLOSE = '/J';
+
+    /** Strips a KB label down to the plain words the model would actually say -
+     *  leading emoji/icon glyphs and a trailing "▾" dropdown caret. */
+    function stripLabelDecoration(label) {
+        return String(label).replace(/^[^\w]+/, '').replace(/\s*▾$/, '').trim();
+    }
+
+    /** Wraps every occurrence of a jump-able button's name in the RAW answer text
+     *  (before any HTML exists) with an invisible marker pair carrying its index into
+     *  KB.buttons. Runs before renderMarkdownLite() precisely because it works on
+     *  plain text - the markers contain no '<', '>' or '&', so escapeHtml() leaves
+     *  them untouched and they survive being carried into a <li>, <p>, bold span, etc.
+     *  exactly like any other character. */
+    function linkifyButtons(text) {
+        const candidates = (KB.buttons || [])
+            .map((b, idx) => ({ idx, core: stripLabelDecoration(b.label) }))
+            .filter(c => c.core.length >= 3 && KB.buttons[c.idx].dom);
+        if (!candidates.length) return text;
+        // Longest label first, so e.g. "Download Project ZIP" wins over a shorter
+        // candidate that could otherwise match a prefix of it at the same position.
+        candidates.sort((a, b) => b.core.length - a.core.length);
+        const esc = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const re = new RegExp('\\b(' + candidates.map(c => esc(c.core)).join('|') + ')\\b', 'gi');
+        const byCore = new Map(candidates.map(c => [c.core.toLowerCase(), c.idx]));
+        return text.replace(re, (m) => {
+            const idx = byCore.get(m.toLowerCase());
+            return idx === undefined ? m : (JUMP_OPEN + idx + JUMP_MID + m + JUMP_CLOSE);
+        });
+    }
+
+    /** Converts the marker pairs left by linkifyButtons() into real, clickable
+     *  buttons. Runs LAST, on the fully-built HTML string, so it does not matter
+     *  whether bold/italic wrapped around a marker pair in the meantime - the
+     *  markers are still adjacent to exactly the label text they wrapped. */
+    function resolveJumpMarkers(html) {
+        return html.replace(/J(\d+)([\s\S]*?)\/J/g,
+            (_, idx, label) => '<button type="button" class="rab-jump-link" data-rab-jump="' + idx + '">' + label + '</button>');
+    }
+
     /**
      * Sets an assistant bubble's content, rendering the safe markdown subset above.
      * DOMPurify.sanitize() is a second, independent guard on top of the escape-first
@@ -674,11 +727,12 @@
      * text as typed, with no reason to interpret markdown in your own message.
      */
     function setBubbleAnswerText(bubble, text) {
-        const html = renderMarkdownLite(text);
+        let html = renderMarkdownLite(linkifyButtons(text));
+        html = resolveJumpMarkers(html);
         bubble.innerHTML = (typeof DOMPurify !== 'undefined')
             ? DOMPurify.sanitize(html, {
-                ALLOWED_TAGS: ['strong', 'em', 'code', 'ol', 'ul', 'li', 'p', 'br'],
-                ALLOWED_ATTR: ['class', 'start']   // `start` preserves a split list's numbering
+                ALLOWED_TAGS: ['strong', 'em', 'code', 'ol', 'ul', 'li', 'p', 'br', 'button'],
+                ALLOWED_ATTR: ['class', 'start', 'type', 'data-rab-jump']   // start=list resume; the rest=jump links
               })
             : escapeHtml(text); // DOMPurify failed to load - fall back to plain escaped text, never raw HTML
     }
@@ -921,6 +975,34 @@
         }
     }
 
+    /**
+     * Handles a click on a `[data-rab-jump]` chip produced by resolveJumpMarkers().
+     * `entry.reveal` (if present) is an ordered list of OTHER elements' ids to click
+     * first - tab buttons and dropdown/menu toggles only, never the target itself and
+     * never anything that mutates data or pops an OS file dialog - so the button the
+     * user asked about becomes visible without the assistant performing that button's
+     * own action for them. If it still is not visible afterwards (e.g. the table has
+     * not been generated yet, so this build's action bar is legitimately hidden), the
+     * KB's own `where` text is surfaced as a toast instead of a silent no-op.
+     */
+    function jumpToButton(idx) {
+        const entry = (KB.buttons || [])[idx];
+        if (!entry || !entry.dom) return;
+        (entry.reveal || []).forEach(id => {
+            const revealEl = document.getElementById(id);
+            if (revealEl) revealEl.click();
+        });
+        const target = document.getElementById(entry.dom);
+        const visible = !!target && !!(target.offsetWidth || target.offsetHeight || target.getClientRects().length);
+        if (visible) {
+            target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            target.classList.add('rab-jump-highlight');
+            setTimeout(() => target.classList.remove('rab-jump-highlight'), 1600);
+        } else if (typeof window.showCustomAlert === 'function') {
+            window.showCustomAlert('You’ll find "' + stripLabelDecoration(entry.label) + '" ' + entry.where + '.', 'info');
+        }
+    }
+
     function init() {
         el('rabAssistantFab')?.addEventListener('click', () => toggle());
         el('rabAssistantClose')?.addEventListener('click', () => toggle(false));
@@ -928,6 +1010,10 @@
         el('rabAssistantInput')?.addEventListener('keydown', (e) => {
             // Enter sends; Shift+Enter is a newline.
             if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submit(); }
+        });
+        el('rabAssistantLog')?.addEventListener('click', (e) => {
+            const chip = e.target.closest('[data-rab-jump]');
+            if (chip) jumpToButton(Number(chip.getAttribute('data-rab-jump')));
         });
     }
 

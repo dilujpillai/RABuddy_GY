@@ -430,6 +430,33 @@
             0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
             50% { box-shadow: 0 0 0 4px rgba(239, 68, 68, 0); }
         }
+        /* Clickable button reference inside a help-assistant answer - see
+           assistant.js linkifyButtons()/resolveJumpMarkers(). Styled as an inline
+           text link (not a real button) so it reads as "click to jump there", not
+           as a duplicate of the actual app button. */
+        .rab-jump-link {
+            display: inline;
+            color: #4338ca;
+            font-weight: 600;
+            text-decoration: underline;
+            text-underline-offset: 2px;
+            cursor: pointer;
+            background: none;
+            border: none;
+            padding: 0;
+            font: inherit;
+        }
+        .rab-jump-link:hover { color: #3730a3; }
+        @keyframes rab-jump-pulse {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(79, 70, 229, 0.55); }
+            50% { box-shadow: 0 0 0 6px rgba(79, 70, 229, 0); }
+        }
+        .rab-jump-highlight {
+            animation: rab-jump-pulse 0.4s ease-in-out 3;
+            outline: 2px solid #4f46e5;
+            outline-offset: 2px;
+            border-radius: 6px;
+        }
         .goehs-ai-prefilled {
             background-color: #ecfdf5 !important;
             border-color: #10b981 !important;

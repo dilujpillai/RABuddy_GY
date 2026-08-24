@@ -780,24 +780,24 @@
         buttons: [
             // Top bar - visible from anywhere
             { label: 'Rich Media / Free Text / Excel Sheet / Fire Risk / Cost-Benefit', where: 'top tab bar', does: 'Switches workflow. Fire Risk and Cost-Benefit are marked BETA.' },
-            { label: '\ud83d\udcc1 Project \u25be', where: 'top bar', does: 'Opens a menu holding "Save Project" and "Download Project ZIP".' },
-            { label: '\ud83c\udf10 Language \u25be', where: 'top bar', does: 'Opens the language menu, holding "Translate" and "Revert All Translations".' },
-            { label: 'Translate', where: 'Language menu', does: 'Translates the main table into the chosen language.' },
-            { label: 'Revert All Translations', where: 'Language menu', does: 'Reverts all translations to the original values.' },
-            { label: 'How to Use This App \ud83d\ude80', where: 'top bar', does: 'Opens the built-in walkthrough for every workflow.' },
-            { label: 'Privacy Policy', where: 'top bar', does: 'Explains what stays on your device.' },
+            { label: '\ud83d\udcc1 Project \u25be', where: 'top bar', does: 'Opens a menu holding "Save Project" and "Download Project ZIP".', dom: 'projectMenuBtn' },
+            { label: '\ud83c\udf10 Language \u25be', where: 'top bar', does: 'Opens the language menu, holding "Translate" and "Revert All Translations".', dom: 'languageMenuBtn' },
+            { label: 'Translate', where: 'Language menu', does: 'Translates the main table into the chosen language.', dom: 'translateTableBtn', reveal: ['languageMenuBtn'] },
+            { label: 'Revert All Translations', where: 'Language menu', does: 'Reverts all translations to the original values.', dom: 'revertTranslationsBtn', reveal: ['languageMenuBtn', 'translateTableBtn'] },
+            { label: 'How to Use This App \ud83d\ude80', where: 'top bar', does: 'Opens the built-in walkthrough for every workflow.', dom: 'howToUseBtn' },
+            { label: 'Privacy Policy', where: 'top bar', does: 'Explains what stays on your device.', dom: 'privacyBtn' },
 
             // Rich Media / main table
-            { label: 'Process Files', where: 'Rich Media tab', does: 'Processes the uploaded photos or videos: resizes them and blurs faces on your device.' },
-            { label: 'Generate AI Risk Assessment', where: 'Rich Media tab, above the table', does: 'Builds the whole risk table from your image notes. This is the step the Legacy Excel path also needs.' },
-            { label: 'Download ZIP', where: 'Rich Media tab', does: 'Downloads the table, the processed images and the report.' },
-            { label: 'Save Project', where: 'Rich Media tab and the Project menu', does: 'Saves a project file you can reload later.' },
-            { label: 'Load Project', where: 'Rich Media tab', does: 'Reloads a saved project file, restoring images, notes and the table.' },
-            { label: 'Download Project ZIP', where: 'Project menu', does: 'Downloads a ZIP with both full-size and optimized images.' },
-            { label: 'GOEHS Integration', where: 'above the table', does: 'Opens the GOEHS export screen. Needs a table to exist first.' },
-            { label: 'Remap Columns', where: 'above the table, after an Excel import', does: 'Re-maps the Excel columns if the data was not imported correctly.' },
-            { label: '\ud83d\udd27 AI Fix Hazard/Risk', where: 'above the table', does: 'Scans all rows and auto-corrects Hazard Group / Hazard List values that do not match the standard dropdown options. Risk/Consequences is left alone, since it is often localized or imported text.' },
-            { label: '\ud83c\udfaf Suggest Closest Match', where: 'above the table', does: 'For any Hazard Group / Hazard List dropdown still outlined red after AI Fix, applies the closest standard entry as a best guess for you to review. Purely local - it never calls the AI.' },
+            { label: 'Process Files', where: 'Rich Media tab', does: 'Processes the uploaded photos or videos: resizes them and blurs faces on your device.', dom: 'processBtn', reveal: ['tab-rich-media'] },
+            { label: 'Generate AI Risk Assessment', where: 'Rich Media tab, above the table', does: 'Builds the whole risk table from your image notes. This is the step the Legacy Excel path also needs.', dom: 'generateAiReportBtn', reveal: ['tab-rich-media'] },
+            { label: 'Download ZIP', where: 'Rich Media tab', does: 'Downloads the table, the processed images and the report.', dom: 'downloadBtn', reveal: ['tab-rich-media'] },
+            { label: 'Save Project', where: 'Rich Media tab and the Project menu', does: 'Saves a project file you can reload later.', dom: 'saveProjectBtn2', reveal: ['projectMenuBtn'] },
+            { label: 'Load Project', where: 'Rich Media tab', does: 'Reloads a saved project file, restoring images, notes and the table.', dom: 'loadProjectBtn', reveal: ['tab-rich-media'] },
+            { label: 'Download Project ZIP', where: 'Project menu', does: 'Downloads a ZIP with both full-size and optimized images.', dom: 'downloadProjectZipBtn', reveal: ['projectMenuBtn'] },
+            { label: 'GOEHS Integration', where: 'above the table', does: 'Opens the GOEHS export screen. Needs a table to exist first.', dom: 'goehsIntegrationBtn' },
+            { label: 'Remap Columns', where: 'above the table, after an Excel import', does: 'Re-maps the Excel columns if the data was not imported correctly.', dom: 'remapColumnsBtn' },
+            { label: '\ud83d\udd27 AI Fix Hazard/Risk', where: 'above the table', does: 'Scans all rows and auto-corrects Hazard Group / Hazard List values that do not match the standard dropdown options. Risk/Consequences is left alone, since it is often localized or imported text.', dom: 'aiFixMainTableBtn' },
+            { label: '\ud83c\udfaf Suggest Closest Match', where: 'above the table', does: 'For any Hazard Group / Hazard List dropdown still outlined red after AI Fix, applies the closest standard entry as a best guess for you to review. Purely local - it never calls the AI.', dom: 'aiClosestMatchBtn' },
 
             // Picture preview (lightbox) and editor
             { label: 'Audio Mode', where: 'image preview', does: 'Starts dictation, so you can speak the Description, Hazards or Controls instead of typing. Click one of those fields to choose where the text goes.' },
@@ -822,7 +822,7 @@
             { label: '\u2190 Previous / Next \u2192', where: 'task modal footer', does: 'Moves between task rows without closing. Arrow keys work too.' },
 
             // Legacy Excel mapper
-            { label: '\ud83d\udcc2 Advanced Import / Column Mapping', where: 'Excel Sheet tab, below the three cards', does: 'Reopens the mapper. Once a file is loaded it changes to "\ud83d\udcc2 Continue Mapping" and shows the filename - no need to re-upload.' },
+            { label: '\ud83d\udcc2 Advanced Import / Column Mapping', where: 'Excel Sheet tab, below the three cards', does: 'Reopens the mapper. Once a file is loaded it changes to "\ud83d\udcc2 Continue Mapping" and shows the filename - no need to re-upload.', dom: 'advancedImportBtn', reveal: ['tab-excel'] },
             { label: '\ud83d\udcc4 Single Sheet \u2192 AI / \ud83d\udcda Multi Tab \u2192 AI', where: 'top of the Excel mapper', does: 'Chooses whether to process one sheet or run the multi-tab pipeline.' },
             { label: '\ud83d\udccb Copy Mapping', where: 'Excel mapper', does: 'Copies the current column mapping - then switch to the next tab and click Paste.' },
             { label: '\ud83d\udccc Paste', where: 'Excel mapper', does: 'Pastes the copied mapping into this tab.' },
