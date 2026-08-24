@@ -367,8 +367,8 @@
         L.push('\n-- Buttons (only these exist; do not invent others) --');
         // The app itself turns a button's exact name into a clickable "jump to it"
         // chip for a subset of these - no markup needed from you, and nothing to
-        // remember: just spell the name exactly as listed (case does not matter) when
-        // you mention it in prose, the same way you already would.
+        // remember: just spell the name exactly as listed, WITH its capitalization,
+        // when you mention it in prose, the same way you already would.
         (KB.buttons || []).forEach(b => L.push(`"${b.label}" (${b.where}): ${b.does}`));
 
         // Literal strings, so a user pasting an error can be matched exactly.
@@ -700,10 +700,15 @@
         // candidate that could otherwise match a prefix of it at the same position.
         candidates.sort((a, b) => b.core.length - a.core.length);
         const esc = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        const re = new RegExp('\\b(' + candidates.map(c => esc(c.core)).join('|') + ')\\b', 'gi');
-        const byCore = new Map(candidates.map(c => [c.core.toLowerCase(), c.idx]));
+        // Case-SENSITIVE on purpose: "Free Text" (the tab) must not catch the generic
+        // lowercase phrase "free text" the glossary uses elsewhere for a plain-text
+        // field. A model naming a real button already tends to keep its capitalization
+        // (it's quoting a UI label, not writing a common noun), so this loses little
+        // while removing that collision entirely.
+        const re = new RegExp('\\b(' + candidates.map(c => esc(c.core)).join('|') + ')\\b', 'g');
+        const byCore = new Map(candidates.map(c => [c.core, c.idx]));
         return text.replace(re, (m) => {
-            const idx = byCore.get(m.toLowerCase());
+            const idx = byCore.get(m);
             return idx === undefined ? m : (JUMP_OPEN + idx + JUMP_MID + m + JUMP_CLOSE);
         });
     }
@@ -981,9 +986,17 @@
      * first - tab buttons and dropdown/menu toggles only, never the target itself and
      * never anything that mutates data or pops an OS file dialog - so the button the
      * user asked about becomes visible without the assistant performing that button's
-     * own action for them. If it still is not visible afterwards (e.g. the table has
-     * not been generated yet, so this build's action bar is legitimately hidden), the
-     * KB's own `where` text is surfaced as a toast instead of a silent no-op.
+     * own action for them.
+     *
+     * `entry.nav` is the one deliberate exception: it marks a target as pure
+     * navigation (currently just the 5 tab buttons) with no data effect at all, so
+     * clicking its chip actually performs the switch instead of only pointing at it -
+     * the same trust level as a normal in-app link, not an action like "Generate" or
+     * "Download" that the user needs to consciously choose to run.
+     *
+     * If the target is still not visible afterwards (e.g. the table has not been
+     * generated yet, so this build's action bar is legitimately hidden), the KB's own
+     * `where` text is surfaced as a toast instead of a silent no-op.
      */
     function jumpToButton(idx) {
         const entry = (KB.buttons || [])[idx];
@@ -993,6 +1006,7 @@
             if (revealEl) revealEl.click();
         });
         const target = document.getElementById(entry.dom);
+        if (entry.nav && target) target.click();
         const visible = !!target && !!(target.offsetWidth || target.offsetHeight || target.getClientRects().length);
         if (visible) {
             target.scrollIntoView({ behavior: 'smooth', block: 'center' });

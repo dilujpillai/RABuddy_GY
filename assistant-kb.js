@@ -779,7 +779,17 @@
         // documented - say so rather than guessing at what it does.
         buttons: [
             // Top bar - visible from anywhere
-            { label: 'Rich Media / Free Text / Excel Sheet / Fire Risk / Cost-Benefit', where: 'top tab bar', does: 'Switches workflow. Fire Risk and Cost-Benefit are marked BETA.' },
+            // Split into one entry per tab (was a single combined label) so each tab
+            // name becomes its own clickable jump link. `nav: true` marks these as
+            // safe for the link to actually PERFORM (switch tabs) rather than only
+            // point at, unlike every other jump-able button here - a tab switch is
+            // pure navigation with no data effect, the same trust level as a normal
+            // in-app link, not an action like "Generate" or "Download".
+            { label: 'Rich Media', where: 'top tab bar', does: 'Switches to the Rich Media workflow (photos & video).', dom: 'tab-rich-media', nav: true },
+            { label: 'Free Text', where: 'top tab bar', does: 'Switches to the Free Text workflow.', dom: 'tab-free-text', nav: true },
+            { label: 'Excel Sheet', where: 'top tab bar', does: 'Switches to the Excel Sheet workflow.', dom: 'tab-excel', nav: true },
+            { label: 'Fire Risk', where: 'top tab bar', does: 'Switches to the Fire Risk Assessment workflow. Marked BETA.', dom: 'tab-fire-ra', nav: true },
+            { label: 'Cost-Benefit', where: 'top tab bar', does: 'Switches to the Cost-Benefit Analysis workflow. Marked BETA.', dom: 'tab-cost-benefit', nav: true },
             { label: '\ud83d\udcc1 Project \u25be', where: 'top bar', does: 'Opens a menu holding "Save Project" and "Download Project ZIP".', dom: 'projectMenuBtn' },
             { label: '\ud83c\udf10 Language \u25be', where: 'top bar', does: 'Opens the language menu, holding "Translate" and "Revert All Translations".', dom: 'languageMenuBtn' },
             { label: 'Translate', where: 'Language menu', does: 'Translates the main table into the chosen language.', dom: 'translateTableBtn', reveal: ['languageMenuBtn'] },
