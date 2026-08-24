@@ -392,8 +392,11 @@
                     'Add pictures under "Zone Photos" and a layout under "Floor Plan & '
                         + 'Heat Map" if you have them, and use "Zone Notes & Observations" '
                         + 'for anything else worth recording.',
-                    'Click "Calculate Fire Risk Index" to get the FTRI score (0-100) with '
-                        + 'the full breakdown.',
+                    'The FTRI score is calculated automatically - there is no "Calculate" '
+                        + 'button to press. As soon as at least one Heat, Fuel and Oxygen '
+                        + 'item is ticked for the zone, the score and full breakdown appear '
+                        + 'on their own (a few hundred milliseconds after each change), and '
+                        + 'recalculate again every time you change something about the zone.',
                     'Use "Copy Report" to export the findings for sharing, and "Delete '
                         + 'Zone" if a zone needs removing. A single assessment can hold '
                         + 'several zones - each is scored independently.'

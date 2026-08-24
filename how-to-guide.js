@@ -218,7 +218,7 @@
                     { color: 'orange', title: '🔺 Step 3 — Fire Triangle Checklist', body: 'Use the <strong>Fire Triangle Checklist</strong> to confirm heat, fuel, and oxygen hazard factors. The animated fire triangle visualizes the risk balance in real time as you make selections.' },
                     { color: 'amber', title: '🧪 Step 4 — Chemical Inventory', body: 'Record chemicals from SDS sheets. Don\'t know the name? Use <strong>🤖 AI Lookup</strong> to auto-fill NFPA 704 ratings and flash point data. The engine compares your volumes against the <strong>NFPA 30 MAQ</strong> thresholds and amplifies the fuel leg if exceeded.' },
                     { color: 'red', title: '🛡️ Step 5 — Fire Protection Controls', body: 'Select all active fire protection controls. Missing mandatory controls are automatically flagged. Tick <strong>🚿 Sprinkler system</strong> if applicable — this raises the NFPA 30 MAQ threshold 4×.' },
-                    { color: 'orange', title: '🔥 Step 6 — Calculate & Export', body: 'Click <strong>"Calculate Fire Risk Index"</strong> to get the FTRI score (0–100) with a full breakdown of the fire triangle, control effectiveness, and consequence amplifier. Use the <strong>🗺️ Floor Plan</strong> view to map zones, then export as PDF or HTML.' }
+                    { color: 'orange', title: '🔥 Step 6 — Read the Score & Export', body: 'The FTRI score calculates itself automatically — there is no button to press. As soon as at least one heat, fuel and oxygen item is ticked, the score and full breakdown appear on their own, and update again whenever you change something. Use the <strong>🗺️ Floor Plan</strong> view to map zones, then export as PDF or HTML.' }
                 ]
             },
             fr: {
@@ -231,7 +231,7 @@
                     { color: 'orange', title: '🔺 Étape 3 — Checklist Triangle du Feu', body: 'Confirmez les facteurs de chaleur, combustible et oxygène. Le triangle du feu animé visualise l\'équilibre des risques en temps réel.' },
                     { color: 'amber', title: '🧪 Étape 4 — Inventaire Chimique', body: 'Enregistrez les produits chimiques. Utilisez <strong>🤖 Recherche IA</strong> pour les NFPA 704 et points d\'éclair. Le moteur compare vos volumes aux seuils MAQ NFPA 30.' },
                     { color: 'red', title: '🛡️ Étape 5 — Contrôles de Protection', body: 'Sélectionnez tous les contrôles actifs. Les contrôles obligatoires manquants sont automatiquement signalés.' },
-                    { color: 'orange', title: '🔥 Étape 6 — Calculez et Exportez', body: 'Cliquez sur <strong>"Calculer l\'Indice de Risque Incendie"</strong> pour obtenir le score FTRI (0–100). Exportez en PDF ou HTML.' }
+                    { color: 'orange', title: '🔥 Étape 6 — Lisez le Score et Exportez', body: 'Le score FTRI se calcule automatiquement — aucun bouton à cliquer. Dès qu\'un élément de chaleur, de combustible et d\'oxygène est coché, le score apparaît. Exportez en PDF ou HTML.' }
                 ]
             },
             de: {
@@ -244,7 +244,7 @@
                     { color: 'orange', title: '🔺 Schritt 3 — Branddreieck-Checkliste', body: 'Bestätigen Sie Hitze-, Brennstoff- und Sauerstofffaktoren. Das animierte Branddreieck visualisiert das Risikoverhältnis in Echtzeit.' },
                     { color: 'amber', title: '🧪 Schritt 4 — Chemikalieninventar', body: 'Chemikalien aus SDB erfassen. <strong>🤖 KI-Suche</strong> für NFPA 704 und Flammpunkt nutzen. Engine vergleicht Mengen mit NFPA 30 MAQ.' },
                     { color: 'red', title: '🛡️ Schritt 5 — Brandschutzkontrollen', body: 'Alle aktiven Kontrollen auswählen. Fehlende Pflichtkontrollen werden automatisch markiert.' },
-                    { color: 'orange', title: '🔥 Schritt 6 — Berechnen & Exportieren', body: 'Auf <strong>"Brandrisikoindex berechnen"</strong> klicken für FTRI-Score (0–100). Als PDF oder HTML exportieren.' }
+                    { color: 'orange', title: '🔥 Schritt 6 — Score ablesen & Exportieren', body: 'Der FTRI-Score wird automatisch berechnet — kein Button nötig. Sobald mindestens ein Wärme-, Brennstoff- und Sauerstoff-Element ausgewählt ist, erscheint der Score. Als PDF oder HTML exportieren.' }
                 ]
             }
         },
