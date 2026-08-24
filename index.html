@@ -71,7 +71,7 @@
     <script src="image-editor.js"></script>
     <!-- Help assistant. All of its content lives in assistant-kb.js — extend that file,
          not assistant.js, to teach it about new features. KB must load first. -->
-    <script src="assistant-kb.js?v=20260824g"></script>
+    <script src="assistant-kb.js?v=20260824i"></script>
     <script src="assistant.js?v=20260824g"></script>
 
     <!-- React 18 + htm (no build step) -->
@@ -2772,6 +2772,7 @@
 
                         <button id="aiFixMainTableBtn" class="rab-btn rab-c-amber" title="Scan all rows and auto-correct Hazard Group / Hazard List values that don't match the standard dropdown options. Risk/Consequences is left as-is (see the indigo-outlined dropdown) since it's often localized/imported text.">🔧 AI Fix Hazard/Risk</button>
                         <button id="aiClosestMatchBtn" class="rab-btn rab-c-blue" title="For any Hazard Group / Hazard List dropdown still outlined red after AI Fix, apply the closest standard entry as a best-guess suggestion for you to review">🎯 Suggest Closest Match</button>
+                        <button id="undoClosestMatchBtn" class="rab-btn rab-c-slate rab-hidden" title="Revert every Hazard Group / Hazard List value back to what it was before the last Suggest Closest Match run">↩️ Undo Suggestions</button>
                         <span id="mainTableIssuePill" title="Hazard Group / Hazard List dropdowns that don't match a standard entry" class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-700">✓ 0 issues</span>
                     </div>
                 </div>
@@ -5555,6 +5556,15 @@ data.forEach((row, index) => {
         // double-check it rather than trust it outright. Risk/Consequences is intentionally
         // left alone here - snapping it to the (English-only) registry would silently
         // translate away localized/imported text; see .consequence-nonstandard above.
+        // Snapshot of every row's Hazard Group / Hazard List value from immediately before
+        // the last closestMatchRemainingMismatches() run, keyed by the row's own
+        // data-row-index attribute (not array position) so Undo still lands on the right
+        // row even if rows were deleted/reordered between the two clicks - if a row's
+        // index is gone by Undo time, that one row is just skipped rather than the whole
+        // undo silently doing nothing. Cleared after a successful undo so the button can't
+        // be pressed twice and re-apply a stale snapshot.
+        let lastClosestMatchSnapshot = null;
+
         function closestMatchRemainingMismatches() {
             const rows = Array.from(document.querySelectorAll('#table-container tbody tr'));
             if (rows.length === 0) {
@@ -5563,14 +5573,23 @@ data.forEach((row, index) => {
             }
             const HAZ_KEYS_LOCAL = Object.keys(HAZARD_REGISTRY);
             let count = 0;
+            const snapshot = [];
 
             rows.forEach(row => {
                 const groupSel = row.querySelector('.group select');
                 const hazSel = row.querySelector('.hazard-list-cell select');
+                const rowIndex = row.getAttribute('data-row-index');
+                const before = {
+                    rowIndex,
+                    hazardValue: hazSel ? hazSel.value : null,
+                    groupValue: groupSel ? groupSel.value : null
+                };
+                let rowChanged = false;
 
                 if (hazSel && !HAZARD_REGISTRY[hazSel.value]) {
                     setSelectValueAndFire(hazSel, snapToRegistryList(hazSel.value, HAZ_KEYS_LOCAL), true);
                     count++;
+                    rowChanged = true;
                 }
                 // Re-check group after the hazard fix above may already have cascaded it.
                 if (groupSel && !HAZARD_GROUPS.includes(groupSel.value)) {
@@ -5579,17 +5598,74 @@ data.forEach((row, index) => {
                         : snapToRegistryList(groupSel.value, HAZARD_GROUPS);
                     setSelectValueAndFire(groupSel, snap, true);
                     count++;
+                    rowChanged = true;
                 }
+
+                if (rowChanged) snapshot.push(before);
             });
+
+            const undoBtn = document.getElementById('undoClosestMatchBtn');
+            if (count > 0) {
+                lastClosestMatchSnapshot = snapshot;
+                if (undoBtn) undoBtn.classList.remove('rab-hidden');
+            } else if (undoBtn && !lastClosestMatchSnapshot) {
+                undoBtn.classList.add('rab-hidden');
+            }
 
             showCustomAlert(
                 count > 0
-                    ? `🎯 Applied ${count} closest-match suggestion(s) - review the dashed amber-outlined dropdowns, these are best guesses, not confirmed matches.`
+                    ? `🎯 Applied ${count} closest-match suggestion(s) - review the dashed amber-outlined dropdowns, these are best guesses, not confirmed matches. Not happy with them? Click "Undo Suggestions" to revert.`
                     : 'No remaining mismatches - everything already matches a standard entry.',
                 count > 0 ? 'info' : 'success'
             );
         }
         window.closestMatchRemainingMismatches = closestMatchRemainingMismatches;
+
+        // Reverts every row touched by the last Suggest Closest Match run back to its
+        // pre-suggestion Hazard Group / Hazard List value, firing the same change event
+        // the original suggestion did so severity/likelihood/risk score (which
+        // recalculateRow derives from the hazard) cascade back correctly too - not just
+        // the two dropdowns themselves.
+        function undoClosestMatchSuggestions() {
+            if (!lastClosestMatchSnapshot || lastClosestMatchSnapshot.length === 0) {
+                showCustomAlert('Nothing to undo.', 'info');
+                return;
+            }
+            let restored = 0, skipped = 0;
+            lastClosestMatchSnapshot.forEach(entry => {
+                const row = document.querySelector(`#table-container tbody tr[data-row-index="${entry.rowIndex}"]`);
+                if (!row) { skipped++; return; }
+                const groupSel = row.querySelector('.group select');
+                const hazSel = row.querySelector('.hazard-list-cell select');
+                if (hazSel && entry.hazardValue !== null && hazSel.value !== entry.hazardValue) {
+                    hazSel.value = entry.hazardValue;
+                    hazSel.dispatchEvent(new Event('change', { bubbles: true }));
+                    hazSel.style.outline = '';
+                    hazSel.style.outlineOffset = '';
+                    hazSel.title = '';
+                }
+                if (groupSel && entry.groupValue !== null && groupSel.value !== entry.groupValue) {
+                    groupSel.value = entry.groupValue;
+                    groupSel.dispatchEvent(new Event('change', { bubbles: true }));
+                    groupSel.style.outline = '';
+                    groupSel.style.outlineOffset = '';
+                    groupSel.title = '';
+                }
+                restored++;
+            });
+
+            lastClosestMatchSnapshot = null;
+            const undoBtn = document.getElementById('undoClosestMatchBtn');
+            if (undoBtn) undoBtn.classList.add('rab-hidden');
+
+            showCustomAlert(
+                skipped > 0
+                    ? `↩️ Reverted ${restored} row(s). ${skipped} row(s) from that run no longer exist in the table.`
+                    : `↩️ Reverted ${restored} row(s) back to their previous values.`,
+                'info'
+            );
+        }
+        window.undoClosestMatchSuggestions = undoClosestMatchSuggestions;
 
         async function aiFixMainTableRows() {
             const btn = document.getElementById('aiFixMainTableBtn');
@@ -9676,6 +9752,11 @@ window.LIKELIHOOD_SCALE = LIKELIHOOD_SCALE;
         const aiClosestMatchBtn = document.getElementById('aiClosestMatchBtn');
         if (aiClosestMatchBtn) {
             aiClosestMatchBtn.onclick = closestMatchRemainingMismatches;
+        }
+
+        const undoClosestMatchBtn = document.getElementById('undoClosestMatchBtn');
+        if (undoClosestMatchBtn) {
+            undoClosestMatchBtn.onclick = undoClosestMatchSuggestions;
         }
 
         const hazardLangSelect = document.getElementById('hazardLangSelect');
