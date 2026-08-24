@@ -473,8 +473,9 @@
         ],
 
         betaNotice:
-            'This part of the app is still in beta and being fine-tuned, so treat its ' +
-            'output as a draft to check rather than a finished answer.',
+            'This module is BETA and still needs advanced calibration and fine-tuning - ' +
+            'it is not yet advised for real use. Treat anything it produces as a draft ' +
+            'to verify against your own judgment, not a finished answer.',
 
         // ── Maps a tab to a workflow so the bot knows where the user is ────────
         screens: {

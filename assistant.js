@@ -29,6 +29,7 @@
 
     const CHIP_CACHE_KEY = 'rab_chip_i18n_v1';
     const CHIP_CACHE_MAX_PER_LANG = 300; // just a sanity cap, not a tuning knob
+    const FIRST_VISIT_KEY = 'rab_assistant_seen_v1';
 
     let chipLang = detectInitialLanguage();
     // True once the MODEL has actually told us (via a CHIPS[xx] reply) what language
@@ -264,9 +265,10 @@
         // couple of lines each (effectively free). Once fire-ra grew real content that
         // stopped being true - shipping it on every unrelated question would undo the
         // point of this filter - so betas now earn inclusion the same way everything
-        // else does: being on screen, or the question naming them below. The beta
-        // caveat banner is unaffected - it reads currentWorkflow() from the screen
-        // directly, not this detail set.
+        // else does: being on screen, or the question naming them below. The BETA
+        // caveat banner in buildSystemPrompt() DOES key off this same set (it did not
+        // used to - see the comment there), so a beta earning its way in here is also
+        // what makes the caveat fire for it.
 
         const q = ' ' + String(question).toLowerCase().replace(/[^a-z0-9]+/g, ' ') + ' ';
         all.forEach(w => {
@@ -287,7 +289,13 @@
     }
 
     function buildSystemPrompt(question) {
-        const wf = currentWorkflow();
+        // Computed early (rather than where the detail section is built further down)
+        // because the BETA caveat below now depends on it too - it needs to fire
+        // whenever Fire Risk or Cost-Benefit are the TOPIC of the question, not only
+        // when the user happens to be sitting on that tab. Asking "what does the fire
+        // risk module do?" from Rich Media used to skip the caveat entirely, since the
+        // old check only ever read the active screen.
+        const detailIds = workflowsNeedingDetail(question);
         const L = [];
 
         L.push(`You are the built-in help assistant for ${KB.product.name}.`);
@@ -313,9 +321,16 @@
         KB.style.forEach(s => L.push(`  - ${s}`));
         L.push('');
 
-        if (wf && wf.status === 'beta') {
-            L.push(`IMPORTANT: the user is in "${wf.label}", which is BETA. Begin your ` +
-                   `answer with this caveat, in the user's language: "${KB.betaNotice}"`);
+        // Fires whenever a BETA workflow is IN PLAY at all - on screen, named in the
+        // question, or pulled in as a sibling - not just when it is the active tab.
+        // Deliberately independent of screen state: a user reading about Fire Risk
+        // from the Rich Media tab still needs the warning before they go try it.
+        const betaWorkflowsInPlay = (KB.workflows || []).filter(w => w.status === 'beta' && detailIds.has(w.id));
+        if (betaWorkflowsInPlay.length) {
+            const names = betaWorkflowsInPlay.map(w => `"${w.label}"`).join(' and ');
+            const verb = betaWorkflowsInPlay.length > 1 ? 'are' : 'is';
+            L.push(`IMPORTANT: ${names} ${verb} BETA. Begin your answer with this caveat, ` +
+                   `in the user's language: "${KB.betaNotice}"`);
             L.push('');
         }
 
@@ -330,7 +345,7 @@
         // ones follow. The index is what makes the trimming safe: the model can always
         // see the complete list, so a workflow without full steps here is visibly a
         // "not included in this message" case, never a "does not exist" one.
-        const detailIds = workflowsNeedingDetail(question);
+        // (detailIds itself was computed earlier - the BETA caveat above needs it too.)
 
         L.push('\n-- Every workflow this app has --');
         KB.workflows.forEach(w =>
@@ -1105,6 +1120,18 @@
             const chip = e.target.closest('[data-rab-jump]');
             if (chip) jumpToButton(Number(chip.getAttribute('data-rab-jump')));
         });
+
+        // First-ever visit: open the panel automatically so a new user actually
+        // discovers Buddy exists, instead of it sitting as an easy-to-miss FAB in
+        // the corner. Every visit AFTER that is untouched - this fires once per
+        // browser, not once per page load, via the same flag pattern already used
+        // for the chip-translation cache.
+        let seenBefore = true;
+        try {
+            seenBefore = !!(window.localStorage && window.localStorage.getItem(FIRST_VISIT_KEY));
+            if (window.localStorage) window.localStorage.setItem(FIRST_VISIT_KEY, '1');
+        } catch (_) { /* localStorage blocked (private mode, policy) - leave it closed */ }
+        if (!seenBefore) toggle(true);
     }
 
     if (document.readyState === 'loading') {
