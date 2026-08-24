@@ -71,8 +71,8 @@
     <script src="image-editor.js"></script>
     <!-- Help assistant. All of its content lives in assistant-kb.js — extend that file,
          not assistant.js, to teach it about new features. KB must load first. -->
-    <script src="assistant-kb.js?v=20260824e"></script>
-    <script src="assistant.js?v=20260824e"></script>
+    <script src="assistant-kb.js?v=20260824f"></script>
+    <script src="assistant.js?v=20260824f"></script>
 
     <!-- React 18 + htm (no build step) -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
@@ -480,6 +480,31 @@
             pointer-events: none;
         }
         .rab-jump-overlay.rab-jump-overlay-show { opacity: 1; }
+        /* Marks the assistant panel as having just opened itself for the very first
+           time (see the FIRST_VISIT_KEY logic in assistant.js) with a shimmering
+           gold/indigo/cyan glow, so a brand-new user's eye is drawn to it as "AI" -
+           not just another UI panel appearing. Implemented as box-shadow rather than
+           a border/pseudo-element ring on purpose: #rabAssistantPanel has
+           overflow-hidden (needed to keep its own scrollable content in check), which
+           would clip a ring meant to extend past its edges. box-shadow paints outside
+           the box regardless of the box's own overflow setting, so this is unaffected
+           by that. Removed again a few seconds after it is added - see
+           addFirstOpenSparkle() - this is a one-time reveal, not a permanent state. */
+        @keyframes rab-sparkle-glow {
+            0%   { box-shadow: 0 0 0 0 rgba(255, 209, 0, 0.55), 0 0 26px 6px rgba(255, 209, 0, 0.35); }
+            33%  { box-shadow: 0 0 0 0 rgba(79, 70, 229, 0.55), 0 0 30px 8px rgba(79, 70, 229, 0.35); }
+            66%  { box-shadow: 0 0 0 0 rgba(34, 211, 238, 0.55), 0 0 30px 8px rgba(34, 211, 238, 0.35); }
+            100% { box-shadow: 0 0 0 0 rgba(255, 209, 0, 0.55), 0 0 26px 6px rgba(255, 209, 0, 0.35); }
+        }
+        .rab-first-open-sparkle {
+            animation: rab-sparkle-glow 1.8s ease-in-out infinite;
+        }
+        @media (prefers-reduced-motion: reduce) {
+            .rab-first-open-sparkle {
+                animation: none !important;
+                box-shadow: 0 0 24px 6px rgba(255, 209, 0, 0.4) !important;
+            }
+        }
         .goehs-ai-prefilled {
             background-color: #ecfdf5 !important;
             border-color: #10b981 !important;

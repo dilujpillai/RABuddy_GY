@@ -1108,6 +1108,21 @@
         }
     }
 
+    const FIRST_OPEN_SPARKLE_MS = 5400; // a little over 3 full glow cycles (1.8s each)
+
+    /**
+     * Adds the shimmering "AI magic" glow to the panel for a few seconds, then
+     * removes it. Only ever called from the first-ever-visit auto-open in init()
+     * below - a manual FAB click never gets this, on purpose, so it reads as a
+     * one-time reveal rather than a decoration that shows up on every open.
+     */
+    function addFirstOpenSparkle() {
+        const panel = el('rabAssistantPanel');
+        if (!panel) return;
+        panel.classList.add('rab-first-open-sparkle');
+        setTimeout(() => panel.classList.remove('rab-first-open-sparkle'), FIRST_OPEN_SPARKLE_MS);
+    }
+
     function init() {
         el('rabAssistantFab')?.addEventListener('click', () => toggle());
         el('rabAssistantClose')?.addEventListener('click', () => toggle(false));
@@ -1131,7 +1146,10 @@
             seenBefore = !!(window.localStorage && window.localStorage.getItem(FIRST_VISIT_KEY));
             if (window.localStorage) window.localStorage.setItem(FIRST_VISIT_KEY, '1');
         } catch (_) { /* localStorage blocked (private mode, policy) - leave it closed */ }
-        if (!seenBefore) toggle(true);
+        if (!seenBefore) {
+            toggle(true);
+            addFirstOpenSparkle();
+        }
     }
 
     if (document.readyState === 'loading') {
