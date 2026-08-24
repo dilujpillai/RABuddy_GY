@@ -248,8 +248,10 @@
                         'Mapping" and shows the filename. You do not need to upload it again.',
                     'Steps with no picture are fine. They are imported with a placeholder, and ' +
                         'the message afterwards tells you how many still need one.',
-                    '"💾 Save Project (JSON)" saves the mapper output itself, if you want to ' +
-                        'stop and come back to it later.',
+                    '"💾 Save Mapper Progress (JSON)" saves the mapper\'s own working state ' +
+                        '(step cards and column mapping) if you want to stop and come back to ' +
+                        'it later. This is DIFFERENT from "Save Project" on the main table - ' +
+                        'that one only exists after the mapper has handed off to the gallery.',
                     'Deleted steps are not gone — "↩️ Restore" brings them back.'
                 ]
             },
@@ -569,7 +571,12 @@
                     'This is DIFFERENT from Download: Download produces the final delivery ' +
                     'package (optimized images, CSV, report) meant to be handed off, not ' +
                     'reopened here. Save Project is the "resume later" file; Download is ' +
-                    'the "I am done" file.'
+                    'the "I am done" file. It is ALSO different from "Save Mapper Progress ' +
+                    '(JSON)" in the Legacy Excel mapper - that button saves the mapper\'s own ' +
+                    'step cards and column mapping, a different file, for a different tool. ' +
+                    'The two are easy to conflate because they share the word "Project", but ' +
+                    'a mapper-progress file cannot be loaded with Load Project, and a ' +
+                    'Save Project file cannot be reopened in the mapper.'
             },
             {
                 term: '"Intelligent Fill" (a name in messages, not a button)',
@@ -769,7 +776,7 @@
             {
                 where: 'The Excel mapper\'s own drop zone, inside the import window',
                 accepts: '.xlsx, .xlsm, .xls or .json',
-                notes: 'The .json here is a mapper project saved earlier with "Save Project (JSON)".'
+                notes: 'The .json here is mapper progress saved earlier with "Save Mapper Progress (JSON)" - not a main-app "Save Project" file, which the mapper does not accept.'
             }
         ],
 
@@ -790,8 +797,18 @@
             { label: 'Excel Sheet', where: 'top tab bar', does: 'Switches to the Excel Sheet workflow.', dom: 'tab-excel', nav: true },
             { label: 'Fire Risk', where: 'top tab bar', does: 'Switches to the Fire Risk Assessment workflow. Marked BETA.', dom: 'tab-fire-ra', nav: true },
             { label: 'Cost-Benefit', where: 'top tab bar', does: 'Switches to the Cost-Benefit Analysis workflow. Marked BETA.', dom: 'tab-cost-benefit', nav: true },
-            { label: '\ud83d\udcc1 Project \u25be', where: 'top bar', does: 'Opens a menu holding "Save Project" and "Download Project ZIP".', dom: 'projectMenuBtn' },
-            { label: '\ud83c\udf10 Language \u25be', where: 'top bar', does: 'Opens the language menu, holding "Translate" and "Revert All Translations".', dom: 'languageMenuBtn' },
+            // NOT dom-linked, on purpose: stripped of its emoji/caret, this label's
+            // matchable core collapses to the single word "Project" - a word that also
+            // appears constantly in ordinary prose (Project ID, Project name, "your
+            // risk project"...) with no connection to this specific menu. Linking it
+            // was tried and reliably false-positived on exactly that generic prose.
+            // "Save Project" and "Download Project ZIP" below are dom-linked
+            // individually instead, each with `reveal: ['projectMenuBtn']` - the menu
+            // still opens on the way to either, this toggle just is not a link itself.
+            { label: '\ud83d\udcc1 Project \u25be', where: 'top bar', does: 'Opens a menu holding "Save Project" and "Download Project ZIP".' },
+            // Same reasoning as Project above: "Language" alone is too generic a word
+            // (target Language, hazard dropdown Language...) to safely auto-link.
+            { label: '\ud83c\udf10 Language \u25be', where: 'top bar', does: 'Opens the language menu, holding "Translate" and "Revert All Translations".' },
             { label: 'Translate', where: 'Language menu', does: 'Translates the main table into the chosen language.', dom: 'translateTableBtn', reveal: ['languageMenuBtn'] },
             { label: 'Revert All Translations', where: 'Language menu', does: 'Reverts all translations to the original values.', dom: 'revertTranslationsBtn', reveal: ['languageMenuBtn', 'translateTableBtn'] },
             { label: 'How to Use This App \ud83d\ude80', where: 'top bar', does: 'Opens the built-in walkthrough for every workflow.', dom: 'howToUseBtn' },
@@ -841,7 +858,7 @@
             { label: '\u21bb Refresh', where: 'Excel mapper', does: 'Re-reads the sheet with the current mapping.' },
             { label: 'Add Step', where: 'Excel mapper', does: 'Adds an empty step card, for a step that needs a new photo.' },
             { label: '\u21a9\ufe0f Restore', where: 'Excel mapper', does: 'Brings back step cards you deleted. The count is shown on the button.' },
-            { label: '\ud83d\udcbe Save Project (JSON)', where: 'Excel mapper footer', does: 'Saves the mapper output itself, to come back to later.' },
+            { label: '\ud83d\udcbe Save Mapper Progress (JSON)', where: 'Excel mapper footer', does: 'Saves the MAPPER\'S OWN working state (step cards + column mapping) to come back to later. Different data, and a different file, from "Save Project" on the main table - do not conflate the two.' },
             { label: '\u2713 Load as New Project', where: 'Excel mapper footer', does: 'Hands the steps and pictures to the Rich Media gallery as a new project. The table is left EMPTY - you then press "Generate AI Risk Assessment".' },
 
             // RA 2025 mapper

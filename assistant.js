@@ -103,6 +103,18 @@
         ['excelImportModal', 'excel-legacy']
     ];
 
+    // Raw tab-content id -> the exact, plain label text used for that tab in
+    // KB.buttons (the `nav: true` entries added so a tab name in prose is clickable).
+    // Kept here, next to MODAL_WORKFLOW_IDS, because both exist to translate the
+    // app's own element ids into names the KB already knows about.
+    const TAB_LABELS = {
+        'rich-media': 'Rich Media',
+        'free-text': 'Free Text',
+        'excel': 'Excel Sheet',
+        'fire-ra': 'Fire Risk',
+        'cost-benefit': 'Cost-Benefit'
+    };
+
     function openWorkflowModalId() {
         for (const [elId, wfId] of MODAL_WORKFLOW_IDS) {
             const modalEl = document.getElementById(elId);
@@ -691,10 +703,29 @@
      *  plain text - the markers contain no '<', '>' or '&', so escapeHtml() leaves
      *  them untouched and they survive being carried into a <li>, <p>, bold span, etc.
      *  exactly like any other character. */
+    // Linking principle: a single common English word is never eligible on its own,
+    // even if some future KB edit gives it a `dom` id. "📁 Project ▾" and "🌐
+    // Language ▾" both learned this the hard way - stripped to their core they are
+    // just "Project" / "Language", words that also show up constantly in unrelated
+    // prose (Project ID, Project name, target Language, hazard dropdown Language...)
+    // with zero connection to that specific menu, so linking them false-positived on
+    // ordinary sentences instead of real button mentions. Multi-word labels ("Save
+    // Project", "GOEHS Integration") are naturally specific enough that this hasn't
+    // been a problem; it is exactly the bare-single-common-noun case that keeps
+    // being the risk. This filter is a second, code-level guard against the same
+    // mistake recurring - the KB fix (dropping `dom` from those two entries) is the
+    // first, and either alone would have been enough here, but only the code-level
+    // one protects against a FUTURE entry making the same mistake.
+    const GENERIC_SINGLE_WORDS = new Set([
+        'project', 'language', 'file', 'files', 'table', 'image', 'images',
+        'report', 'settings', 'name', 'menu', 'download', 'upload', 'export', 'import'
+    ]);
+
     function linkifyButtons(text) {
         const candidates = (KB.buttons || [])
             .map((b, idx) => ({ idx, core: stripLabelDecoration(b.label) }))
-            .filter(c => c.core.length >= 3 && KB.buttons[c.idx].dom);
+            .filter(c => c.core.length >= 3 && KB.buttons[c.idx].dom
+                && !(!/\s/.test(c.core) && GENERIC_SINGLE_WORDS.has(c.core.toLowerCase())));
         if (!candidates.length) return text;
         // Longest label first, so e.g. "Download Project ZIP" wins over a shorter
         // candidate that could otherwise match a prefix of it at the same position.
@@ -962,10 +993,25 @@
             const wf = currentWorkflow();
             const log = el('rabAssistantLog');
             if (log && !log.childElementCount) {
+                // Name the OTHER tabs too, not just the active one - otherwise a
+                // first-time user on Rich Media has no idea Free Text/Excel/Fire
+                // Risk/Cost-Benefit exist. Uses the exact `nav: true` labels from
+                // KB.buttons, so each name renders as a real, clickable tab-switch
+                // chip through the same pipeline as any other jump link - nothing
+                // extra to wire up here.
+                const activeContent = document.querySelector('.tab-content:not(.hidden)');
+                const activeTabId = activeContent ? activeContent.id.replace(/^tab-content-/, '') : null;
+                const otherTabs = Object.entries(TAB_LABELS)
+                    .filter(([id]) => id !== activeTabId)
+                    .map(([, label]) => label);
+                const otherLine = otherTabs.length
+                    ? ' I can also help with ' + otherTabs.slice(0, -1).join(', ')
+                        + (otherTabs.length > 1 ? ', or ' : '') + otherTabs[otherTabs.length - 1] + '.'
+                    : '';
                 addMessage('assistant', wf
-                    ? `Hi — I can help with ${wf.label}. Ask me anything about this app, ` +
+                    ? `Hi — I can help with ${wf.label}.${otherLine} Ask me anything about this app, ` +
                       `in any language.`
-                    : 'Hi — ask me anything about this app, in any language.');
+                    : `Hi — ask me anything about this app, in any language.${otherLine}`);
                 if (wf && wf.status === 'beta') addMessage('assistant', KB.betaNotice);
             }
             renderFollowUps();
