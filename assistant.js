@@ -1145,7 +1145,15 @@
         try {
             seenBefore = !!(window.localStorage && window.localStorage.getItem(FIRST_VISIT_KEY));
             if (window.localStorage) window.localStorage.setItem(FIRST_VISIT_KEY, '1');
-        } catch (_) { /* localStorage blocked (private mode, policy) - leave it closed */ }
+        } catch (e) {
+            // localStorage blocked (private mode, policy, or file:// restrictions in
+            // some browsers) - logged rather than silently swallowed, since this is
+            // exactly the kind of thing that otherwise looks like "the feature is
+            // just broken" with no way to tell why from the outside.
+            console.warn('[assistant] localStorage unavailable - first-visit auto-open ' +
+                'disabled for this session:', e);
+        }
+        console.debug('[assistant] first-visit check: seenBefore=' + seenBefore);
         if (!seenBefore) {
             toggle(true);
             addFirstOpenSparkle();
