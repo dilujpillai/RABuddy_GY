@@ -71,8 +71,8 @@
     <script src="image-editor.js"></script>
     <!-- Help assistant. All of its content lives in assistant-kb.js — extend that file,
          not assistant.js, to teach it about new features. KB must load first. -->
-    <script src="assistant-kb.js?v=20260824b"></script>
-    <script src="assistant.js?v=20260824b"></script>
+    <script src="assistant-kb.js?v=20260824c"></script>
+    <script src="assistant.js?v=20260824c"></script>
 
     <!-- React 18 + htm (no build step) -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
@@ -451,12 +451,35 @@
             0%, 100% { box-shadow: 0 0 0 0 rgba(79, 70, 229, 0.55); }
             50% { box-shadow: 0 0 0 6px rgba(79, 70, 229, 0); }
         }
+        /* Sits ABOVE .rab-jump-overlay (and even above the assistant panel, so the
+           target still pops if the panel happens to sit near it) purely via z-index -
+           no clip-path cutout needed, the element just renders on top of the dimmed
+           backdrop already blurred behind it. Added/removed alongside .rab-jump-overlay
+           by jumpToButton() in assistant.js. */
         .rab-jump-highlight {
             animation: rab-jump-pulse 0.4s ease-in-out 3;
             outline: 2px solid #4f46e5;
             outline-offset: 2px;
             border-radius: 6px;
+            position: relative;
+            z-index: 100060;
         }
+        /* Full-page dim + blur behind the highlighted button, so attention goes
+           straight to it instead of hunting the (possibly still busy) screen behind
+           the assistant panel. Fades in/out rather than snapping, and never blocks
+           clicks - it is purely a visual cue, gone again in about a second. */
+        .rab-jump-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 99990;
+            background: rgba(15, 23, 42, 0.45);
+            backdrop-filter: blur(2px);
+            -webkit-backdrop-filter: blur(2px);
+            opacity: 0;
+            transition: opacity 0.25s ease;
+            pointer-events: none;
+        }
+        .rab-jump-overlay.rab-jump-overlay-show { opacity: 1; }
         .goehs-ai-prefilled {
             background-color: #ecfdf5 !important;
             border-color: #10b981 !important;

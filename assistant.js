@@ -998,6 +998,35 @@
      * generated yet, so this build's action bar is legitimately hidden), the KB's own
      * `where` text is surfaced as a toast instead of a silent no-op.
      */
+    let spotlightTimer = null;
+
+    /**
+     * Dims and blurs the rest of the page behind a single fixed overlay for about a
+     * second, while the target itself sits above it (see .rab-jump-highlight's
+     * z-index in index.html) and so stays fully sharp. Purely a visual cue - the
+     * overlay is `pointer-events: none`, so nothing underneath is ever unclickable
+     * because of it. One overlay element is created once and reused, since jump
+     * clicks are a rapid, repeatable interaction - re-triggering it mid-fade just
+     * restarts the timer rather than stacking overlays.
+     */
+    function spotlightElement() {
+        let overlay = document.getElementById('rabJumpOverlay');
+        if (!overlay) {
+            overlay = document.createElement('div');
+            overlay.id = 'rabJumpOverlay';
+            overlay.className = 'rab-jump-overlay';
+            document.body.appendChild(overlay);
+        }
+        if (spotlightTimer) clearTimeout(spotlightTimer);
+        // Drop then re-add the show class so a click that lands mid-fade restarts the
+        // transition from 0, instead of the browser skipping it because opacity is
+        // already at (or animating toward) 1.
+        overlay.classList.remove('rab-jump-overlay-show');
+        void overlay.offsetWidth; // force a reflow between the remove and the re-add
+        overlay.classList.add('rab-jump-overlay-show');
+        spotlightTimer = setTimeout(() => overlay.classList.remove('rab-jump-overlay-show'), 1000);
+    }
+
     function jumpToButton(idx) {
         const entry = (KB.buttons || [])[idx];
         if (!entry || !entry.dom) return;
@@ -1012,6 +1041,7 @@
             target.scrollIntoView({ behavior: 'smooth', block: 'center' });
             target.classList.add('rab-jump-highlight');
             setTimeout(() => target.classList.remove('rab-jump-highlight'), 1600);
+            spotlightElement();
         } else if (typeof window.showCustomAlert === 'function') {
             window.showCustomAlert('You’ll find "' + stripLabelDecoration(entry.label) + '" ' + entry.where + '.', 'info');
         }
